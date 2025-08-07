@@ -1,0 +1,94 @@
+services:
+  # PostgreSQL 資料庫服務
+  db:
+    image: postgres:15-alpine
+    container_name: goat-nutrition-db
+    environment:
+      POSTGRES_DB: goat_nutrition_db
+      POSTGRES_USER: goat_user
+      POSTGRES_PASSWORD: goat_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goat_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - goat-network
+
+  # 後端服務
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: goat-nutrition-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # PostgreSQL 資料庫配置
+      POSTGRES_DB: goat_nutrition_db
+      POSTGRES_USER: goat_user
+      POSTGRES_PASSWORD: goat_password
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      
+      # 應用程式配置
+      SECRET_KEY: your-very-secret-key-change-in-production
+      FLASK_ENV: production
+      FLASK_DEBUG: "False"
+      
+      # CORS 配置
+      CORS_ORIGINS: https://*.app.github.dev,https://*.codespaces.github.com,https://*.githubpreview.dev,http://localhost,http://127.0.0.1
+      
+      # Google API
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-your-gemini-api-key}
+    volumes:
+      - ./backend/logs:/app/logs
+    ports:
+      - "5001:5001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/auth/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - goat-network
+
+  # 前端服務
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: goat-nutrition-frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "3000:80"  # 額外埠口，支援 Codespaces 埠口轉發
+    environment:
+      - NGINX_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - goat-network
+
+# 資料卷定義
+volumes:
+  postgres_data:
+    driver: local
+
+# 網路定義
+networks:
+  goat-network:
+    driver: bridge
