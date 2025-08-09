@@ -74,43 +74,44 @@ def register():
         db.session.rollback()
         return jsonify(error=f'註冊失敗: {str(e)}'), 500
 
+from werkzeug.exceptions import UnsupportedMediaType
+
 @bp.route('/login', methods=['POST'])
 def login():
-    try:
-        if current_user.is_authenticated:
-            return jsonify(success=True, message='用戶已登入')
+    if current_user.is_authenticated:
+        return jsonify(success=True, message='用戶已登入')
 
+    try:
         data = request.get_json()
         if not data:
             return jsonify(error='請求中未包含 JSON 數據'), 400
-
-        username = data.get('username')
-        password = data.get('password')
-        
-        print(f"Login attempt for user: {username}")  # Debug log
-        
-        user = User.query.filter_by(username=username).first()
-        print(f"User found: {user is not None}")  # Debug log
-        
-        if user:
-            password_valid = user.check_password(password)
-            print(f"Password valid: {password_valid}")  # Debug log
-            
-            if password_valid:
-                login_user(user, remember=True)
-                return jsonify(
-                    success=True, 
-                    message='登入成功',
-                    user={'username': user.username}
-                )
-        
-        return jsonify(error='無效的使用者名稱或密碼'), 401
-        
+    except UnsupportedMediaType as e:
+        return jsonify(error=f'無效的請求格式: {e.description}'), 415
     except Exception as e:
-        print(f"Login error: {str(e)}")  # Debug log
-        import traceback
-        traceback.print_exc()
-        return jsonify(error=f'登入時發生錯誤: {str(e)}'), 500
+        return jsonify(error=f'解析請求時發生錯誤: {str(e)}'), 400
+
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify(error='使用者名稱和密碼為必填項'), 400
+
+    try:
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user, remember=True)
+            return jsonify(
+                success=True,
+                message='登入成功',
+                user={'username': user.username}
+            )
+        else:
+            return jsonify(error='無效的使用者名稱或密碼'), 401
+            
+    except Exception as e:
+        # This will catch database errors or other unexpected issues
+        return jsonify(error=f'登入時發生伺服器內部錯誤: {str(e)}'), 500
 
 @bp.route('/logout', methods=['POST'])
 @login_required

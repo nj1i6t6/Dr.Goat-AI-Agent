@@ -122,54 +122,61 @@ def get_recommendation():
     return jsonify(recommendation_html=recommendation_html)
 
 
+from werkzeug.exceptions import UnsupportedMediaType
+
 @bp.route('/chat', methods=['POST'])
 @login_required
 def chat_with_agent():
     """與 AI 聊天，支援文字和圖片"""
+    api_key = None
+    user_message = ''
+    session_id = None
+    ear_num_context = None
+    image_base64 = None
+    image_file = None
+
     try:
-        # 檢查是否為包含檔案的請求
         if 'image' in request.files:
-            # 處理包含圖片的請求
             api_key = request.form.get('api_key')
             user_message = request.form.get('message', '')
             session_id = request.form.get('session_id')
             ear_num_context = request.form.get('ear_num_context')
             image_file = request.files['image']
-            
-            if not api_key or not session_id:
-                return jsonify(error="缺少必要參數"), 400
-            
-            # 驗證圖片
+
+            if not all([api_key, session_id]):
+                return jsonify(error="缺少必要參數(api_key, session_id)"), 400
             if not image_file or not image_file.filename:
                 return jsonify(error="未選擇圖片檔案"), 400
             
-            # 檢查檔案類型
-            allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+            allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
             if image_file.content_type not in allowed_types:
-                return jsonify(error="不支援的圖片格式，請使用 JPEG、PNG、GIF 或 WebP"), 400
+                return jsonify(error=f"不支援的圖片格式: {image_file.content_type}"), 415
             
-            # 檢查檔案大小 (10MB)
             image_data = image_file.read()
             if len(image_data) > 10 * 1024 * 1024:
-                return jsonify(error="圖片檔案不能超過 10MB"), 400
+                return jsonify(error="圖片檔案不能超過 10MB"), 413
             
-            # 將圖片編碼為 base64
             image_base64 = base64.b64encode(image_data).decode('utf-8')
-            
         else:
-            # 處理純文字請求
-            chat_data = AgentChatModel(**request.get_json())
+            json_data = request.get_json()
+            if not json_data:
+                return jsonify(error="請求中未包含 JSON 數據"), 400
+
+            chat_data = AgentChatModel(**json_data)
             api_key = chat_data.api_key
             user_message = chat_data.message
             session_id = chat_data.session_id
             ear_num_context = chat_data.ear_num_context
-            image_base64 = None
-            
+
+    except UnsupportedMediaType as e:
+        return jsonify(error=f'無效的請求格式: {e.description}'), 415
     except ValidationError as e:
         return jsonify(create_error_response("聊天資料驗證失敗", e.errors())), 400
     except Exception as e:
-        return jsonify(error=f"處理請求時發生錯誤: {str(e)}"), 400
+        current_app.logger.error(f"請求處理錯誤: {e}", exc_info=True)
+        return jsonify(error=f"處理請求時發生未知錯誤: {str(e)}"), 500
 
+    # ... (rest of the function remains the same) ...
     # 獲取聊天歷史
     history = ChatHistory.query.filter_by(
         user_id=current_user.id, 
@@ -209,8 +216,8 @@ def chat_with_agent():
     # 如果有圖片，加入圖片部分
     user_message_parts = [{"text": current_user_message_with_context}]
     if image_base64:
-        mime_type = "image/jpeg"  # 默認值
-        if 'image' in request.files:
+        mime_type = "image/jpeg"
+        if image_file:
             mime_type = image_file.content_type
         
         user_message_parts.append({
@@ -232,11 +239,7 @@ def chat_with_agent():
     
     # 儲存聊天記錄
     try:
-        # 為包含圖片的訊息添加標記
-        user_content = user_message
-        if image_base64:
-            user_content += " [包含圖片]"
-            
+        user_content = user_message + (" [包含圖片]" if image_base64 else "")
         user_entry = ChatHistory(user_id=current_user.id, session_id=session_id, role='user', content=user_content, ear_num_context=ear_num_context)
         model_entry = ChatHistory(user_id=current_user.id, session_id=session_id, role='model', content=model_reply_text, ear_num_context=ear_num_context)
         db.session.add(user_entry)

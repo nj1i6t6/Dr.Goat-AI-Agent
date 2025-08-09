@@ -219,14 +219,14 @@ def sheep_with_weight_data(authenticated_client, db_session):
     db_session.commit()
     
     # 創建足夠的體重歷史記錄
-    base_date = datetime(2024, 1, 1)
+    base_date = datetime(2023, 1, 15)
     for i in range(6):  # 6 筆記錄，滿足最少3筆的要求
         record = SheepHistoricalData(
             sheep_id=sheep.id,
             user_id=user.id,
-            record_date=(base_date + timedelta(days=i*15)).strftime('%Y-%m-%d'),
-            record_type='體重',
-            value=10.0 + i * 2.0  # 模擬增長趨勢
+            record_date=(base_date + timedelta(days=i*30)).strftime('%Y-%m-%d'),
+            record_type='Body_Weight_kg',
+            value=10.0 + i * 2.5  # 模擬增長趨勢
         )
         db_session.add(record)
     
@@ -256,8 +256,8 @@ def sheep_insufficient_data(authenticated_client, db_session):
     record = SheepHistoricalData(
         sheep_id=sheep.id,
         user_id=user.id,
-        record_date='2024-01-01',
-        record_type='體重',
+        record_date='2023-07-01',
+        record_type='Body_Weight_kg',
         value=15.0
     )
     db_session.add(record)

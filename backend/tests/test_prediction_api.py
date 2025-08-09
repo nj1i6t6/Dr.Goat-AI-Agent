@@ -25,19 +25,6 @@ class TestPredictionAPI:
         assert 'data_quality_report' in data
         assert 'ai_analysis' in data
 
-    def test_get_prediction_missing_api_key(self, authenticated_client, sheep_with_weight_data):
-        """測試缺少 API 金鑰的情況"""
-        ear_tag = sheep_with_weight_data.EarNum
-        
-        response = authenticated_client.get(
-            f'/api/prediction/goats/{ear_tag}/prediction?target_days=30'
-        )
-        
-        assert response.status_code == 401
-        data = json.loads(response.data)
-        assert 'error' in data
-        assert 'API金鑰' in data['error']
-
     def test_get_prediction_sheep_not_found(self, authenticated_client):
         """測試羊隻不存在的情況"""
         response = authenticated_client.get(

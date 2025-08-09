@@ -45,19 +45,23 @@ class TestAuthAPIEnhanced:
         
         with patch('app.api.auth.User.query') as mock_query:
             mock_query.filter_by.side_effect = Exception("Database error")
+
+            response = client.post('/api/auth/login', json=login_data)
             
-            # 數據庫錯誤會導致未處理的異常，Flask 會返回 500
-            with pytest.raises(Exception, match="Database error"):
-                response = client.post('/api/auth/login', json=login_data)
+            assert response.status_code == 500
+            data = json.loads(response.data)
+            assert 'error' in data
+            assert '伺服器內部錯誤' in data['error']
 
     def test_login_non_json_request(self, client):
         """測試非JSON格式的登入請求"""
         response = client.post('/api/auth/login',
                              data='not json',
                              content_type='text/plain')
-        assert response.status_code == 415  # Flask 在沒有適當 Content-Type 時返回 415
-        # 對於 415 錯誤，Flask 返回 HTML 而不是 JSON
-        assert 'Unsupported Media Type' in response.data.decode()
+        assert response.status_code == 415
+        data = json.loads(response.data)
+        assert 'error' in data
+        assert '無效的請求格式' in data['error']
 
     def test_login_with_case_sensitivity(self, client, app):
         """測試用戶名大小寫敏感性"""
@@ -256,9 +260,10 @@ class TestAgentAPIEnhanced:
         response = authenticated_client.post('/api/agent/chat',
                                            data='not json',
                                            content_type='text/plain')
-        assert response.status_code == 415  # Flask 在沒有適當 Content-Type 時返回 415
-        # 對於 415 錯誤，Flask 返回 HTML 而不是 JSON
-        assert 'Unsupported Media Type' in response.data.decode()
+        assert response.status_code == 415
+        data = json.loads(response.data)
+        assert 'error' in data
+        assert '無效的請求格式' in data['error']
 
     def test_chat_history_saving_failure(self, authenticated_client, mock_gemini_api):
         """測試聊天歷史保存失敗"""

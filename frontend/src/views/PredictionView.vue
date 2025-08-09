@@ -346,146 +346,114 @@ onMounted(() => {
 
 <style scoped>
 .prediction-page {
-  padding: 20px;
+  animation: fadeIn 0.5s ease-out;
 }
 
 .page-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 1.8em;
+  color: #1e3a8a;
   margin-bottom: 20px;
-  color: #303133;
 }
 
 .card-header {
-  font-size: 16px;
-  font-weight: 600;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  font-size: 1.2em;
+  font-weight: bold;
 }
 
 .data-info {
-  font-size: 12px;
-  color: #909399;
+  font-size: 0.9em;
+  color: #6b7280;
   font-weight: normal;
 }
 
 .sheep-selection-area {
-  margin-bottom: 20px;
-}
-
-.ear-tag-suggestion {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.ear-tag {
-  font-weight: 600;
-}
-
-.sheep-info {
-  color: #909399;
-  font-size: 12px;
+  padding: 10px 0;
 }
 
 .results-card {
-  margin-top: 20px;
+  margin-top: 25px;
 }
 
 .results-content {
-  min-height: 400px;
+  min-height: 450px;
 }
 
 .chart-section {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
+  padding-right: 20px;
 }
 
 .chart-container {
   width: 100%;
-  height: 400px;
-  margin: 20px 0;
+  height: 380px;
+  margin-bottom: 20px;
 }
 
 .key-metrics {
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
 .metric-card {
-  background: white;
-  padding: 16px;
-  border-radius: 8px;
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: 12px;
   text-align: center;
-  border: 2px solid #e4e7ed;
+  border: 1px solid #eef2f7;
+  transition: all 0.3s ease;
 }
-
-.metric-card.status-good {
-  border-color: #67c23a;
-}
-
-.metric-card.status-warning {
-  border-color: #e6a23c;
-}
-
-.metric-card.status-error {
-  border-color: #f56c6c;
+.metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
 .metric-label {
-  font-size: 12px;
-  color: #909399;
+  font-size: 0.9em;
+  color: #64748b;
   margin-bottom: 8px;
 }
 
 .metric-value {
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 1.5em;
+  font-weight: 700;
+  color: #0f172a;
 }
+.metric-card.status-good .metric-value { color: #16a34a; }
+.metric-card.status-warning .metric-value { color: #f97316; }
+.metric-card.status-error .metric-value { color: #dc2626; }
 
 .ai-report-section {
-  background: #f0f9ff;
-  padding: 20px;
-  border-radius: 8px;
+  background-color: #f0f9ff;
+  border: 1px solid #e0f2fe;
+  padding: 25px;
+  border-radius: 12px;
   height: 100%;
+}
+.ai-report-section h3 {
+  font-size: 1.2em;
+  color: #0c4a6e;
+  margin-top: 0;
 }
 
 .ai-analysis-content {
   margin-top: 16px;
-  line-height: 1.6;
+  line-height: 1.7;
+  font-size: 0.95em;
 }
 
+.ai-analysis-content :deep(h1),
+.ai-analysis-content :deep(h2),
 .ai-analysis-content :deep(h3) {
-  color: #409eff;
-  font-size: 16px;
-  margin: 16px 0 8px 0;
-}
-
-.ai-analysis-content :deep(h4) {
-  color: #606266;
-  font-size: 14px;
-  margin: 12px 0 6px 0;
-}
-
-.ai-analysis-content :deep(p) {
-  margin: 8px 0;
+  color: #0891b2;
+  border-bottom: 1px solid #e0f2fe;
+  padding-bottom: 5px;
+  margin-top: 20px;
 }
 
 .ai-analysis-content :deep(strong) {
-  color: #303133;
+  color: #075985;
 }
 
 .ai-analysis-content :deep(ul) {
-  margin: 8px 0;
   padding-left: 20px;
-}
-
-.ai-analysis-content :deep(li) {
-  margin: 4px 0;
+  list-style-type: disc;
 }
 </style>

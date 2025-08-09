@@ -27,3 +27,32 @@ body .el-container {
 .el-table th.is-sortable .cell {
     cursor: pointer;
 }
+
+/* --- UI Beautification --- */
+
+/* Global transitions for a smoother feel */
+.el-button, .el-card, .el-input__wrapper, .el-select .el-input__wrapper {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Hover effects for interactive elements */
+.el-button--primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(64, 158, 255, 0.3);
+}
+.el-button--success:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(103, 194, 58, 0.3);
+}
+.el-button--warning:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(230, 162, 60, 0.3);
+}
+
+.el-card {
+    border: 1px solid #e2e8f0;
+}
+.el-card:hover {
+    box-shadow: 0 8px 25px -8px rgba(0,0,0,0.1);
+    border-color: #a0cfff;
+}

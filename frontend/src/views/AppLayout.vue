@@ -26,6 +26,7 @@
 
       <!-- 用戶資訊與漢堡選單 -->
       <div class="right-panel">
+        <el-button @click="showGuide" type="warning" :icon="QuestionFilled" circle plain title="新手教學" />
         <div class="user-info">
           <span>{{ authStore.username }}</span>
           <el-button @click="handleLogout" type="danger" size="small" plain>登出</el-button>
@@ -35,6 +36,8 @@
         </div>
       </div>
     </el-header>
+
+    <user-guide v-model:visible="guideVisible" />
 
     <!-- 抽屜菜單 (移動版) -->
     <el-drawer
@@ -89,15 +92,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
-  Menu, DataAnalysis, HelpFilled, Service, Tickets, Upload, Setting, TrendCharts
+  Menu, DataAnalysis, HelpFilled, Service, Tickets, Upload, Setting, TrendCharts, QuestionFilled
 } from '@element-plus/icons-vue';
+import UserGuide from '../components/common/UserGuide.vue';
 
 const authStore = useAuthStore();
 const drawerVisible = ref(false);
+const guideVisible = ref(false);
 
 const handleLogout = () => {
   ElMessageBox.confirm('您確定要登出嗎？', '提示', {
@@ -109,6 +114,18 @@ const handleLogout = () => {
     ElMessage({ type: 'success', message: '您已成功登出' });
   }).catch(() => {});
 };
+
+const showGuide = () => {
+  guideVisible.value = true;
+};
+
+onMounted(() => {
+  const hasSeenGuide = localStorage.getItem('hasSeenUserGuide');
+  if (!hasSeenGuide) {
+    guideVisible.value = true;
+    localStorage.setItem('hasSeenUserGuide', 'true');
+  }
+});
 </script>
 
 <style scoped>

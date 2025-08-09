@@ -106,17 +106,21 @@ class TestAuthAPI:
 
     def test_login_validation_errors(self, client):
         """測試登錄資料驗證錯誤"""
-        # 缺少密碼 - API 會直接返回 401（無效認證）
+        # 缺少密碼 - API 會返回 400 (無效請求)
         response = client.post('/api/auth/login', json={'username': 'test'})
-        assert response.status_code == 401
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert '使用者名稱和密碼為必填項' in data['error']
         
-        # 缺少用戶名 - API 會直接返回 401（無效認證）
+        # 缺少用戶名 - API 會返回 400 (無效請求)
         response = client.post('/api/auth/login', json={'password': 'test'})
-        assert response.status_code == 401
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert '使用者名稱和密碼為必填項' in data['error']
         
-        # 空用戶名 - API 會直接返回 401（無效認證）
+        # 空用戶名 - API 會返回 400 (無效請求)
         response = client.post('/api/auth/login', json={'username': '', 'password': 'test'})
-        assert response.status_code == 401
+        assert response.status_code == 400
 
     def test_register_validation_errors(self, client):
         """測試註冊資料驗證錯誤"""
