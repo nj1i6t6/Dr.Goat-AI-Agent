@@ -4,13 +4,19 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_cors import CORS
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# 使用絕對路徑載入 .env 文件
-env_path = '/workspaces/Goat_Nutrition_App_Optimization_Test/.env'
-load_dotenv(env_path)
-print(f"Loading .env from: {env_path}")
-print(f"SECRET_KEY loaded: {'Yes' if os.environ.get('SECRET_KEY') else 'No'}")
+# 載入 .env 設定：優先採用 DOTENV_PATH，其次自動尋找專案根目錄的 .env
+dotenv_path = os.environ.get('DOTENV_PATH') or find_dotenv(usecwd=True)
+if dotenv_path:
+    load_dotenv(dotenv_path)
+    try:
+        print(f"Loaded .env: {dotenv_path}")
+    except Exception:
+        pass
+else:
+    # 若找不到檔案仍呼叫一次，允許從系統環境變數載入
+    load_dotenv()
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -104,5 +110,47 @@ def create_app():
                 return send_from_directory(app.static_folder, path)
             else:
                 return send_from_directory(app.static_folder, 'index.html')
+
+                # --- OpenAPI 規格與 Swagger UI ---
+                @app.route('/openapi.yaml')
+                def serve_openapi_yaml():
+                        # 從 backend 目錄提供 openapi.yaml
+                        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+                        yaml_path = os.path.join(backend_dir, 'openapi.yaml')
+                        if os.path.exists(yaml_path):
+                                return send_from_directory(backend_dir, 'openapi.yaml')
+                        from flask import jsonify
+                        return jsonify(error='openapi.yaml not found'), 404
+
+                @app.route('/docs')
+                def swagger_ui():
+                        # 簡易 Swagger UI（使用 CDN）
+                        return (
+                                """
+                                <!DOCTYPE html>
+                                <html lang="zh-Hant">
+                                <head>
+                                    <meta charset="UTF-8" />
+                                    <title>Goat Nutrition API Docs</title>
+                                    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+                                    <style>body{margin:0;}#swagger-ui{max-width: 100vw;}</style>
+                                </head>
+                                <body>
+                                    <div id="swagger-ui"></div>
+                                    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+                                    <script>
+                                        window.onload = () => {
+                                            window.ui = SwaggerUIBundle({
+                                                url: '/openapi.yaml',
+                                                dom_id: '#swagger-ui',
+                                                presets: [SwaggerUIBundle.presets.apis],
+                                                layout: 'BaseLayout'
+                                            });
+                                        };
+                                    </script>
+                                </body>
+                                </html>
+                                """
+                        )
 
         return app

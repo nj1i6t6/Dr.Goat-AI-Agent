@@ -159,10 +159,8 @@ echo View logs: %DOCKER_COMPOSE_CMD% logs -f
 echo Stop services: %DOCKER_COMPOSE_CMD% down
 echo Restart services: %DOCKER_COMPOSE_CMD% restart
 echo.
-echo Default admin account:
-echo Username: admin
-echo Password: admin123
-echo NOTE: Please change the password after first login
+echo Account notice:
+echo Please register a new account via the UI or API (/api/auth/register) before login.
 echo.
 echo Press any key to exit...
 pause >nul
