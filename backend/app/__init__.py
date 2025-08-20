@@ -1,5 +1,5 @@
 import os
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -74,7 +74,6 @@ def create_app():
 
     @login_manager.unauthorized_handler
     def unauthorized():
-        from flask import jsonify
         return jsonify(error="Login required"), 401
 
     with app.app_context():
@@ -100,6 +99,47 @@ def create_app():
         app.register_blueprint(dashboard_bp.bp, url_prefix='/api/dashboard')
         app.register_blueprint(prediction_bp.bp, url_prefix='/api/prediction')
 
+        # --- OpenAPI 規格與 Swagger UI ---
+        @app.route('/openapi.yaml')
+        def serve_openapi_yaml():
+            # 從 backend 目錄提供 openapi.yaml
+            backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            yaml_path = os.path.join(backend_dir, 'openapi.yaml')
+            if os.path.exists(yaml_path):
+                return send_from_directory(backend_dir, 'openapi.yaml')
+            return jsonify(error='openapi.yaml not found'), 404
+
+        @app.route('/docs')
+        def swagger_ui():
+            # 簡易 Swagger UI（使用 CDN）
+            return (
+                """
+                <!DOCTYPE html>
+                <html lang="zh-Hant">
+                <head>
+                    <meta charset="UTF-8" />
+                    <title>Goat Nutrition API Docs</title>
+                    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+                    <style>body{margin:0;}#swagger-ui{max-width: 100vw;}</style>
+                </head>
+                <body>
+                    <div id="swagger-ui"></div>
+                    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+                    <script>
+                        window.onload = () => {
+                            window.ui = SwaggerUIBundle({
+                                url: '/openapi.yaml',
+                                dom_id: '#swagger-ui',
+                                presets: [SwaggerUIBundle.presets.apis],
+                                layout: 'BaseLayout'
+                            });
+                        };
+                    </script>
+                </body>
+                </html>
+                """
+            )
+
         # --- 【修改二：添加捕獲所有路由的規則】 ---
         # 這個規則確保，任何不匹配 API 的請求，都會返回前端的 index.html
         # 這是讓 Vue Router (History 模式) 正常工作的關鍵
@@ -110,47 +150,5 @@ def create_app():
                 return send_from_directory(app.static_folder, path)
             else:
                 return send_from_directory(app.static_folder, 'index.html')
-
-                # --- OpenAPI 規格與 Swagger UI ---
-                @app.route('/openapi.yaml')
-                def serve_openapi_yaml():
-                        # 從 backend 目錄提供 openapi.yaml
-                        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-                        yaml_path = os.path.join(backend_dir, 'openapi.yaml')
-                        if os.path.exists(yaml_path):
-                                return send_from_directory(backend_dir, 'openapi.yaml')
-                        from flask import jsonify
-                        return jsonify(error='openapi.yaml not found'), 404
-
-                @app.route('/docs')
-                def swagger_ui():
-                        # 簡易 Swagger UI（使用 CDN）
-                        return (
-                                """
-                                <!DOCTYPE html>
-                                <html lang="zh-Hant">
-                                <head>
-                                    <meta charset="UTF-8" />
-                                    <title>Goat Nutrition API Docs</title>
-                                    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
-                                    <style>body{margin:0;}#swagger-ui{max-width: 100vw;}</style>
-                                </head>
-                                <body>
-                                    <div id="swagger-ui"></div>
-                                    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-                                    <script>
-                                        window.onload = () => {
-                                            window.ui = SwaggerUIBundle({
-                                                url: '/openapi.yaml',
-                                                dom_id: '#swagger-ui',
-                                                presets: [SwaggerUIBundle.presets.apis],
-                                                layout: 'BaseLayout'
-                                            });
-                                        };
-                                    </script>
-                                </body>
-                                </html>
-                                """
-                        )
 
         return app
