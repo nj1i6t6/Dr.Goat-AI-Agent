@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device--width, initial-scale=1.0">
+    <title>智牧預言者 | LLM 對話 × AI 成長預測的智慧牧場</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .section-title {
+            @apply text-3xl md:text-4xl font-bold text-slate-800 text-center mb-4;
+        }
+        .section-subtitle {
+            @apply text-lg md:text-xl text-slate-600 text-center max-w-3xl mx-auto mb-12;
+        }
+        .card {
+            @apply bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2;
+        }
+        .tag {
+            @apply inline-block bg-emerald-100 text-emerald-800 text-sm font-semibold px-3 py-1 rounded-full;
+        }
+        .tech-card-content {
+             @apply text-slate-600;
+        }
+        .tech-card-content ul {
+             @apply list-disc list-inside space-y-2 mt-4;
+        }
+        .tech-card-content code {
+            @apply bg-slate-200 text-slate-800 rounded px-1 py-0.5 text-sm font-mono;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header & Navigation -->
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-2xl font-bold text-emerald-600">
+                <a href="#">智牧預言者</a>
+            </div>
+            <div class="hidden md:flex space-x-8 items-center">
+                <a href="#problem" class="text-slate-600 hover:text-emerald-600 transition-colors">產業痛點</a>
+                <a href="#solution" class="text-slate-600 hover:text-emerald-600 transition-colors">解決方案</a>
+                <a href="#tech" class="text-slate-600 hover:text-emerald-600 transition-colors">核心技術</a>
+                <a href="#demo" class="text-slate-600 hover:text-emerald-600 transition-colors">系統展示</a>
+                <a href="#future" class="text-slate-600 hover:text-emerald-600 transition-colors">未來展望</a>
+            </div>
+            <a href="#demo" class="hidden md:block bg-emerald-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-emerald-600 transition-all shadow-md hover:shadow-lg">
+                觀看展示
+            </a>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section id="hero" class="bg-emerald-50 py-20 md:py-32">
+            <div class="container mx-auto px-6 text-center">
+                <span class="tag mb-4">LLM 對話 × AI 成長預測的智慧牧場</span>
+                <h1 class="text-4xl md:text-6xl font-extrabold text-slate-800 mb-6 leading-tight">
+                    歡迎來到「領頭羊博士」
+                </h1>
+                <p class="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto">
+                    我們將傳統畜牧業的經驗法則，轉化為數據驅動的智慧決策，為您的牧場帶來前所未有的效率、精準與永續性。
+                </p>
+            </div>
+        </section>
+
+        <!-- Problem Section -->
+        <section id="problem" class="py-20 md:py-28">
+            <div class="container mx-auto px-6">
+                <h2 class="section-title">傳統畜牧業的挑戰</h2>
+                <p class="section-subtitle">面對全球對效率與永續性的追求，傳統飼養方式正遭遇瓶頸。</p>
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div class="card p-8 text-center">
+                        <div class="text-4xl mb-4">🤔</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">依賴經驗法則</h3>
+                        <p class="text-slate-600">缺乏精確數據支持，導致飼養決策不穩定，難以規模化複製成功經驗。</p>
+                    </div>
+                    <div class="card p-8 text-center">
+                        <div class="text-4xl mb-4">💸</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">飼料成本高昂</h3>
+                        <p class="text-slate-600">無法精準評估營養需求，造成飼料浪費，直接侵蝕牧場利潤。</p>
+                    </div>
+                    <div class="card p-8 text-center">
+                        <div class="text-4xl mb-4">📉</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">生長效率不佳</h3>
+                        <p class="text-slate-600">管理被動，錯過最佳介入時機，影響動物健康與生長週期。</p>
+                    </div>
+                    <div class="card p-8 text-center">
+                        <div class="text-4xl mb-4">🌍</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">永續壓力漸增</h3>
+                        <p class="text-slate-600">ESG 成為趨勢，但缺乏有效工具來量化與追蹤環境、社會及治理績效。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Solution Section -->
+        <section id="solution" class="bg-white py-20 md:py-28">
+            <div class="container mx-auto px-6">
+                <h2 class="section-title">我們的解決方案：AI 驅動的個人化牧場永續顧問</h2>
+                <p class="section-subtitle">「領頭羊博士」不僅是管理工具，更是您牧場的專屬營養師、數據分析師與永續管理師。我們採用企業級前後端分離微服務架構，透過 Docker 容器化部署，確保系統具備高可用性、高擴展性與高可靠性。</p>
+                <div class="max-w-6xl mx-auto">
+                    <div class="bg-white rounded-xl shadow-2xl p-4 md:p-8">
+                        <svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg" class="w-full">
+                            <style>
+                                .node { stroke: #4A5568; stroke-width: 1.5; fill: #F7FAFC; }
+                                .node-text { font-family: 'Inter', 'Noto Sans TC', sans-serif; font-size: 14px; fill: #2D3748; text-anchor: middle; }
+                                .label-text { font-family: 'Inter', 'Noto Sans TC', sans-serif; font-size: 12px; fill: #718096; text-anchor: middle; }
+                                .arrow { stroke: #A0AEC0; stroke-width: 1.5; marker-end: url(#arrowhead); }
+                                .line { stroke: #CBD5E0; stroke-width: 1; }
+                                .container { fill: rgba(17, 94, 89, 0.05); stroke: #047857; stroke-width: 1; stroke-dasharray: 4 4; }
+                            </style>
+                            <defs>
+                                <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#A0AEC0" />
+                                </marker>
+                            </defs>
+                            <!-- Containers -->
+                            <rect x="20" y="20" width="180" height="460" rx="10" class="container"/>
+                            <text x="110" y="45" class="node-text font-bold">使用者端 (Client)</text>
+                            <rect x="230" y="20" width="440" height="460" rx="10" class="container"/>
+                            <text x="450" y="45" class="node-text font-bold">後端應用 (Backend)</text>
+                            <rect x="700" y="20" width="180" height="460" rx="10" class="container"/>
+                            <text x="790" y="45" class="node-text font-bold">外部服務 (Services)</text>
+                            
+                            <!-- Client Side -->
+                            <rect x="50" y="100" width="120" height="60" rx="5" class="node"/>
+                            <text x="110" y="135" class="node-text">瀏覽器</text>
+                            <text x="110" y="115" class="label-text">Vue.js / ECharts</text>
+                            
+                            <!-- Backend Side -->
+                            <rect x="260" y="100" width="120" height="60" rx="5" class="node"/>
+                            <text x="320" y="135" class="node-text">Nginx</text>
+                            <text x="320" y="115" class="label-text">反向代理</text>
+
+                            <rect x="440" y="100" width="200" height="60" rx="5" class="node"/>
+                            <text x="540" y="135" class="node-text">Flask App (WSGI)</text>
+                            <text x="540" y="115" class="label-text">核心業務邏輯</text>
+
+                            <rect x="260" y="220" width="120" height="60" rx="5" class="node"/>
+                            <text x="320" y="255" class="node-text">業務邏輯層</text>
+                            <text x="320" y="235" class="label-text">API藍圖 / Pydantic</text>
+
+                            <rect x="440" y="220" width="200" height="60" rx="5" class="node"/>
+                            <text x="540" y="255" class="node-text">數據服務層</text>
+                            <text x="540" y="235" class="label-text">SQLAlchemy / Scikit-learn</text>
+
+                            <rect x="350" y="340" width="200" height="60" rx="5" class="node"/>
+                            <text x="450" y="375" class="node-text">PostgreSQL DB</text>
+                            <text x="450" y="355" class="label-text">持久化數據</text>
+
+                            <!-- External Services -->
+                            <rect x="730" y="220" width="120" height="60" rx="5" class="node"/>
+                            <text x="790" y="255" class="node-text">Google Gemini</text>
+                            <text x="790" y="235" class="label-text">Generative AI API</text>
+
+                            <!-- Arrows -->
+                            <path class="arrow" d="M170,130 C210,130 220,130 260,130" />
+                            <text x="215" y="125" class="label-text">HTTPS</text>
+                            <path class="arrow" d="M380,130 h 60" />
+                            <text x="410" y="125" class="label-text">WSGI</text>
+                            <path class="arrow" d="M540,160 v 60" />
+                            <path class="arrow" d="M540,280 v 60" />
+                            <path class="arrow" d="M440,250 h -60" />
+                            <path class="arrow" d="M640,250 C670,250 700,250 730,250" />
+                             <text x="685" y="245" class="label-text">API Call</text>
+                        </svg>
+                    </div>
+                    <p class="text-center mt-4 text-slate-500">圖1: 系統架構圖 - 採用前後端分離的微服務架構，確保系統的穩定性、可擴展性與高效能。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Core Technologies Section -->
+        <section id="tech" class="py-20 md:py-28">
+            <div class="container mx-auto px-6">
+                <h2 class="section-title">創新關鍵技術</h2>
+                <p class="section-subtitle">我們整合前瞻性 AI 與數據分析技術，將傳統畜牧管理轉化為數據驅動的智慧決策系統。</p>
+                <div class="space-y-16">
+                    <!-- Tech 1 -->
+                    <div class="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                        <div class="order-2 md:order-1 tech-card-content">
+                            <span class="tag">Google Gemini API</span>
+                            <h3 class="text-2xl font-bold text-slate-800 mt-2 mb-4">動態提示工程與領域知識注入</h3>
+                            <p>本系統的核心在於將大型語言模型(LLM)從通用工具轉化為畜牧領域專家。我們設計了一套複雜的**動態提示工程 (Dynamic Prompt Engineering)** 流程，而非使用靜態模板。</p>
+                            <ul>
+                                <li><b>異構數據融合</b>: 系統會即時融合羊隻的結構化數據 (如品種、體重時序數據) 與非結構化數據 (如管理者目標、歷史事件)，動態生成一個高維度的特徵向量。</li>
+                                <li><b>情境感知提示建構</b>: 此特徵向量將被注入一個預設的、符合 NRC 營養學與 ESG 理論的複雜提示框架中，形成一個具備深度情境感知的 Prompt。</li>
+                                <li><b>專家知識生成</b>: 最終，此 Prompt 能引導 Gemini 模型在龐大的知識空間中，聚焦於畜牧營養學的特定子集，生成不僅準確且具備專家級洞察與前瞻性建議的報告。</li>
+                            </ul>
+                        </div>
+                        <div class="order-1 md:order-2 card p-4">
+                            <svg viewBox="0 0 500 350" xmlns="http://www.w3.org/2000/svg">
+                               <style> .svg-text{font-family:'Inter','Noto Sans TC',sans-serif;font-size:12px;fill:#334155}.svg-label{font-size:10px;fill:#64748b}.svg-box{fill:#f1f5f9;stroke:#cbd5e0;stroke-width:1}.svg-arrow{fill:none;stroke:#94a3b8;stroke-width:1.5;marker-end:url(#svg-arrowhead)} </style>
+                               <defs><marker id="svg-arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/></marker></defs>
+                               <!-- Nodes -->
+                               <rect x="20" y="30" width="120" height="50" rx="5" class="svg-box"/><text x="80" y="55" text-anchor="middle" class="svg-text">結構化數據</text><text x="80" y="70" text-anchor="middle" class="svg-label">(品種, 體重, 年齡)</text>
+                               <rect x="20" y="100" width="120" height="50" rx="5" class="svg-box"/><text x="80" y="125" text-anchor="middle" class="svg-text">非結構化數據</text><text x="80" y="140" text-anchor="middle" class="svg-label">(管理目標, 歷史事件)</text>
+                               <rect x="20" y="170" width="120" height="50" rx="5" class="svg-box"/><text x="80" y="195" text-anchor="middle" class="svg-text">領域知識庫</text><text x="80" y="210" text-anchor="middle" class="svg-label">(NRC, ESG標準)</text>
+                               <rect x="180" y="100" width="120" height="50" rx="5" class="svg-box" style="fill:#e0f2f1;stroke:#047857;"/><text x="240" y="125" text-anchor="middle" class="svg-text">動態提示生成器</text>
+                               <rect x="360" y="100" width="120" height="50" rx="5" class="svg-box"/><text x="420" y="125" text-anchor="middle" class="svg-text">Gemini API</text>
+                               <rect x="180" y="250" width="300" height="60" rx="5" class="svg-box" style="fill:#f0f9ff;stroke:#0284c7;"/><text x="330" y="275" text-anchor="middle" class="svg-text">專家級分析報告</text><text x="330" y="295" text-anchor="middle" class="svg-label">(營養建議 + ESG洞察 + 風險預警)</text>
+                               <!-- Arrows -->
+                               <path d="M140 55 H 180" class="svg-arrow"/> <path d="M140 125 H 180" class="svg-arrow"/> <path d="M140 195 H 180" class="svg-arrow"/>
+                               <path d="M300 125 H 360" class="svg-arrow"/>
+                               <path d="M420 150 V 220 C 420 230, 410 240, 400 240 H 260 C 250 240, 240 250, 240 260 V 250" class="svg-arrow" style="stroke-dasharray: 4 2;"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <!-- Tech 2 -->
+                    <div class="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                        <div class="card p-4">
+                           <svg viewBox="0 0 500 350" xmlns="http://www.w3.org/2000/svg">
+                                <style> .svg-text{font-family:'Inter','Noto Sans TC',sans-serif;font-size:12px;fill:#334155}.svg-label{font-size:10px;fill:#64748b}.svg-box{fill:#f1f5f9;stroke:#cbd5e0;stroke-width:1}.svg-arrow{fill:none;stroke:#94a3b8;stroke-width:1.5;marker-end:url(#svg-arrowhead)} </style>
+                                <!-- Nodes -->
+                                <rect x="20" y="150" width="120" height="50" rx="5" class="svg-box"/><text x="80" y="175" text-anchor="middle" class="svg-text">歷史體重時序數據</text><text x="80" y="190" text-anchor="middle" class="svg-label">Time-Series Data</text>
+                                <rect x="180" y="40" width="140" height="60" rx="5" class="svg-box" style="fill:#fefce8;stroke:#ca8a04;"/><text x="250" y="65" text-anchor="middle" class="svg-text">統計預測模型</text><text x="250" y="85" text-anchor="middle" class="svg-label">Linear Regression (Scikit-learn)</text>
+                                <rect x="180" y="250" width="140" height="60" rx="5" class="svg-box" style="fill:#e0f2f1;stroke:#047857;"/><text x="250" y="275" text-anchor="middle" class="svg-text">大型語言模型</text><text x="250" y="295" text-anchor="middle" class="svg-label">Google Gemini</text>
+                                <rect x="360" y="40" width="120" height="60" rx="5" class="svg-box"/><text x="420" y="65" text-anchor="middle" class="svg-text">量化指標</text><text x="420" y="85" text-anchor="middle" class="svg-label">預測體重, ADG</text>
+                                <rect x="360" y="250" width="120" height="60" rx="5" class="svg-box"/><text x="420" y="275" text-anchor="middle" class="svg-text">質化洞察</text><text x="420" y="295" text-anchor="middle" class="svg-label">生長潛力解讀</text>
+                                <circle cx="250" cy="175" r="30" class="svg-box" style="fill:#fff; stroke-width: 2;"/><text x="250" y="170" text-anchor="middle" class="svg-text">特徵</text><text x="250" y="185" text-anchor="middle" class="svg-text">融合</text>
+                                <!-- Arrows -->
+                                <path d="M140 175 H 220" class="svg-arrow"/>
+                                <path d="M250 145 V 100" class="svg-arrow"/>
+                                <path d="M250 205 V 250" class="svg-arrow"/>
+                                <path d="M320 70 H 360" class="svg-arrow"/>
+                                <path d="M320 280 H 360" class="svg-arrow"/>
+                                <path d="M480 70 H 490 V 280 H 480" class="svg-arrow" style="stroke-dasharray: 4 2;"/>
+                                <text x="440" y="175" text-anchor="middle" transform="rotate(90, 440, 175)" class="svg-label">注入上下文</text>
+                           </svg>
+                        </div>
+                        <div class="tech-card-content">
+                            <span class="tag">Hybrid AI Approach</span>
+                            <h3 class="text-2xl font-bold text-slate-800 mt-2 mb-4">混合式 AI 預測架構</h3>
+                            <p>為提供兼具統計嚴謹性與深度洞察的預測，我們創新地設計了一種**混合式 AI 架構 (Hybrid AI Approach)**，將傳統機器學習與生成式 AI 進行級聯（Cascade）。</p>
+                            <ul>
+                                <li><b>第一階段：量化特徵提取</b>: 系統首先運用 <code>Scikit-learn</code> 函式庫中的線性迴歸 (Linear Regression) 演算法，對羊隻的歷史體重時序數據進行擬合，提取關鍵的量化指標，如未來特定時間點的預測體重與平均日增重 (ADG)。</li>
+                                <li><b>第二階段：深度語意分析</b>: 這些由第一階段產出的結構化數據，將被作為特徵向量 (Feature Vector) 注入至 Google Gemini 模型。Gemini 運用其龐大的神經網路，對這些數據進行全面的情境理解與語意分析，最終生成包含生長潛力解讀、與品種標準比對的專家級分析報告。</li>
+                            </ul>
+                            <p class="mt-4">此架構克服了單一模型的局限，實現了左腦（統計分析）與右腦（語意洞察）的協同工作。</p>
+                        </div>
+                    </div>
+                    <!-- Tech 3 -->
+                    <div class="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                        <div class="order-2 md:order-1 tech-card-content">
+                            <span class="tag">Data-Driven ESG</span>
+                            <h3 class="text-2xl font-bold text-slate-800 mt-2 mb-4">數據驅動的 ESG 閉環管理</h3>
+                            <p>我們將抽象的 ESG 概念，轉化為一個可量化、可追蹤、可優化的**數據驅動決策閉環 (Data-Driven Decision Loop)**。</p>
+                            <ul>
+                                <li><b class="text-emerald-700">(E) 環境:</b> 透過精準計算營養需求，將飼料轉換率 (FCR) 從一個滯後指標變為一個前瞻性的優化目標，從源頭減少資源浪費與環境足跡。</li>
+                                <li><b class="text-emerald-700">(S) 社會:</b> 系統化的健康監控與用藥停藥期提醒，不僅提升了動物福利，更為食品安全提供了可追溯的數據鏈，強化了企業的社會責任。</li>
+                                <li><b class="text-emerald-700">(G) 治理:</b> 所有飼養決策與生產記錄皆數據化、透明化，為建立符合現代標準的產銷履歷提供基礎，體現了數據驅動的現代化牧場治理核心價值。</li>
+                            </ul>
+                        </div>
+                        <div class="order-1 md:order-2 card p-4">
+                            <svg viewBox="0 0 500 350" xmlns="http://www.w3.org/2000/svg">
+                                <style> .svg-text{font-family:'Inter','Noto Sans TC',sans-serif;font-size:12px;fill:#334155}.svg-label{font-size:10px;fill:#64748b}.svg-box{fill:#f1f5f9;stroke:#cbd5e0;stroke-width:1}.svg-arrow{fill:none;stroke:#94a3b8;stroke-width:1.5;marker-end:url(#svg-arrowhead)} </style>
+                                <!-- Central Loop -->
+                                <path d="M 250, 80 A 100 100 0 1 1 250, 280 A 100 100 0 1 1 250, 80" fill="none" stroke="#e2e8f0" stroke-width="20"/>
+                                <!-- Nodes on loop -->
+                                <g transform="translate(250, 80)"> <circle r="20" fill="#fff" stroke="#059669" stroke-width="2"/> <text y="5" text-anchor="middle" class="svg-text">數據收集</text> </g>
+                                <g transform="translate(350, 180)"> <circle r="20" fill="#fff" stroke="#059669" stroke-width="2"/> <text y="5" text-anchor="middle" class="svg-text">AI分析</text> </g>
+                                <g transform="translate(250, 280)"> <circle r="20" fill="#fff" stroke="#059669" stroke-width="2"/> <text y="5" text-anchor="middle" class="svg-text">決策建議</text> </g>
+                                <g transform="translate(150, 180)"> <circle r="20" fill="#fff" stroke="#059669" stroke-width="2"/> <text y="5" text-anchor="middle" class="svg-text">管理實踐</text> </g>
+                                <!-- ESG Nodes -->
+                                <rect x="30" y="30" width="100" height="50" rx="5" class="svg-box"><text x="80" y="50" text-anchor="middle" class="svg-text font-bold text-emerald-700">(E) 環境</text><text x="80" y="65" text-anchor="middle" class="svg-label">FCR, 碳足跡</text></rect>
+                                <rect x="370" y="30" width="100" height="50" rx="5" class="svg-box"><text x="420" y="50" text-anchor="middle" class="svg-text font-bold text-emerald-700">(S) 社會</text><text x="420" y="65" text-anchor="middle" class="svg-label">動物福利, 食安</text></rect>
+                                <rect x="30" y="270" width="100" height="50" rx="5" class="svg-box"><text x="80" y="290" text-anchor="middle" class="svg-text font-bold text-emerald-700">(G) 治理</text><text x="80" y="305" text-anchor="middle" class="svg-label">數據透明, 產銷履歷</text></rect>
+                                <!-- Arrows -->
+                                <path d="M285,70 L325,140" class="svg-arrow"/> <path d="M350,215 L285,270" class="svg-arrow"/>
+                                <path d="M215,270 L175,215" class="svg-arrow"/> <path d="M175,140 L215,70" class="svg-arrow"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- System Demonstration Section -->
+        <section id="demo" class="bg-white py-20 md:py-28">
+            <div class="container mx-auto px-6">
+                <h2 class="section-title">系統實例展示</h2>
+                <p class="section-subtitle">眼見為憑。探索「領頭羊博士」如何將強大的功能轉化為直觀、易用的操作介面。</p>
+                
+                <div class="grid lg:grid-cols-2 gap-8 items-start">
+                    <!-- Left Column: Key Features -->
+                    <div class="space-y-8 sticky top-28">
+                        <div class="card p-8">
+                            <h3 class="text-2xl font-bold text-slate-800 mb-3">一站式管理駕駛艙</h3>
+                            <p class="text-slate-600">登入即可見「領頭羊博士的問候」，主動提供每日管理提示。儀表板高度整合任務提醒、健康警示與 ESG 關鍵指標，讓牧場狀況一目了然。</p>
+                        </div>
+                         <div class="card p-8">
+                            <h3 class="text-2xl font-bold text-slate-800 mb-3">AI 生長預測與分析</h3>
+                            <p class="text-slate-600">選擇羊隻與預測時長，系統立即呈現視覺化成長趨勢圖，並由 AI 生成包含生長潛力解讀、ESG 建議與數據透明度提醒的專家級分析報告。</p>
+                        </div>
+                        <div class="card p-8">
+                            <h3 class="text-2xl font-bold text-slate-800 mb-3">牧場年度報告摘要</h3>
+                            <p class="text-slate-600">系統能一鍵生成牧場年度報告，包含羊群結構、品種分佈、生產性能與健康狀況摘要，輔助您做出更宏觀的年度規劃決策。</p>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Screenshots -->
+                    <div class="space-y-8">
+                        <div class="card">
+                            <div class="p-4 bg-slate-100 font-semibold text-slate-700">圖5: 儀表板</div>
+                            <img src="https://placehold.co/800x600/FFFFFF/334155?text=儀表板畫面" alt="儀表板畫面" class="w-full" onerror="this.onerror=null;this.src='https://placehold.co/800x600/FFFFFF/334155?text=Dashboard+Screenshot';">
+                        </div>
+                        <div class="card">
+                            <div class="p-4 bg-slate-100 font-semibold text-slate-700">圖6: 生長預測分析結果</div>
+                            <img src="https://placehold.co/800x600/FFFFFF/334155?text=生長預測分析結果畫面" alt="生長預測分析結果畫面" class="w-full" onerror="this.onerror=null;this.src='https://placehold.co/800x600/FFFFFF/334155?text=Prediction+Analysis+Screenshot';">
+                        </div>
+                        <div class="card">
+                            <div class="p-4 bg-slate-100 font-semibold text-slate-700">圖9: 牧場年度報告摘要</div>
+                            <img src="https://placehold.co/800x600/FFFFFF/334155?text=牧場年度報告摘要畫面" alt="牧場年度報告摘要畫面" class="w-full" onerror="this.onerror=null;this.src='https://placehold.co/800x600/FFFFFF/334155?text=Annual+Report+Screenshot';">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Future Outlook Section -->
+        <section id="future" class="py-20 md:py-28 bg-slate-800 text-white">
+            <div class="container mx-auto px-6">
+                <h2 class="section-title !text-white">結論與未來展望</h2>
+                <p class="section-subtitle !text-slate-300">「領頭羊博士」標誌著山羊養殖業邁向智能化、精準化與永續化的新紀元。我們的旅程才剛開始。</p>
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+                    <div class="bg-slate-700/50 p-6 rounded-lg">
+                        <h3 class="text-xl font-bold mb-2">強化 AI 預測模型</h3>
+                        <p class="text-slate-300">整合飼料、環境等多維度數據，並引入信賴區間計算，大幅提升預測準確性。</p>
+                    </div>
+                    <div class="bg-slate-700/50 p-6 rounded-lg">
+                        <h3 class="text-xl font-bold mb-2">精進 ESG 永續管理</h3>
+                        <p class="text-slate-300">導入碳足跡、水資源利用率等更精細的環境指標，並產出視覺化永續報告。</p>
+                    </div>
+                    <div class="bg-slate-700/50 p-6 rounded-lg">
+                        <h3 class="text-xl font-bold mb-2">整合 IoT 智慧物聯</h3>
+                        <p class="text-slate-300">串接智慧感測器，自動採集羊隻即時生理數據，實現全天候健康監測與預警。</p>
+                    </div>
+                    <div class="bg-slate-700/50 p-6 rounded-lg">
+                        <h3 class="text-xl font-bold mb-2">應用區塊鏈技術</h3>
+                        <p class="text-slate-300">探索將養殖與 ESG 紀錄上鏈，打造公開透明、不可竄改的產銷履歷。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-12">
+        <div class="container mx-auto px-6 text-center">
+            <p>&copy; 2025 智牧預言者 (領頭羊博士) 專案團隊. All Rights Reserved.</p>
+            <p class="text-sm mt-2">專為 2025 全國大專校院智慧創新暨跨域整合創作競賽打造</p>
+        </div>
+    </footer>
+
+</body>
+</html>

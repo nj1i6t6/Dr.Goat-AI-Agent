@@ -175,3 +175,43 @@ class ChatHistory(db.Model):
     
     def __repr__(self):
         return f'<Chat {self.session_id} - {self.role}>'
+
+
+class HealthAlert(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    sheep_id = db.Column(db.Integer, db.ForeignKey('sheep.id', ondelete='CASCADE'), nullable=False)
+    ear_num = db.Column(db.String(100), nullable=False)
+
+    alert_type = db.Column(db.String(100), nullable=False, default='體重偏離')
+    message = db.Column(db.Text)  # Gemini 產生的精簡摘要
+    details = db.Column(db.Text)  # 需要時可存完整 Markdown
+
+    actual_weight = db.Column(db.Float)
+    predicted_weight = db.Column(db.Float)
+    deviation_pct = db.Column(db.Float)
+    record_date = db.Column(db.String(50))
+    model_name = db.Column(db.String(100))
+
+    status = db.Column(db.String(50), default='open')  # open/resolved
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    resolved_at = db.Column(db.DateTime)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'sheep_id': self.sheep_id,
+            'ear_num': self.ear_num,
+            'alert_type': self.alert_type,
+            'message': self.message,
+            'details': self.details,
+            'actual_weight': self.actual_weight,
+            'predicted_weight': self.predicted_weight,
+            'deviation_pct': self.deviation_pct,
+            'record_date': self.record_date,
+            'model_name': self.model_name,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
+        }

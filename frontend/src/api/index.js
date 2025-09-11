@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { EventSourcePolyfill } from '../utils/eventSourcePolyfill';
 import { handleApiError } from '../utils/errorHandler';
 
 const apiClient = axios.create({
@@ -143,6 +144,18 @@ export default {
     const payload = { ...data, api_key: apiKey };
     return withErrorHandling(() => apiClient.post('/api/agent/recommendation', payload), errorHandler);
   },
+  // SSE: recommendation streaming
+  streamRecommendation(apiKey, data, onChunk, onDone, onError) {
+    const payload = JSON.stringify({ ...data, api_key: apiKey });
+    const es = new EventSourcePolyfill('/api/agent/recommendation/stream', {
+      headers: { 'Content-Type': 'application/json' },
+      payload,
+    });
+    es.onmessage = (e) => onChunk && onChunk(e.data);
+    es.addEventListener('done', () => { onDone && onDone(); es.close(); });
+    es.onerror = (err) => { onError && onError(err); es.close(); };
+    return es;
+  },
   chatWithAgent(apiKey, message, sessionId, earNumContext, imageData = null, errorHandler) {
     // 如果有圖片，使用 FormData
     if (imageData && imageData.file) {
@@ -164,6 +177,18 @@ export default {
       const payload = { api_key: apiKey, message, session_id: sessionId, ear_num_context: earNumContext };
       return withErrorHandling(() => apiClient.post('/api/agent/chat', payload), errorHandler);
     }
+  },
+  // SSE: chat streaming
+  streamChat(apiKey, message, sessionId, earNumContext, onChunk, onDone, onError) {
+    const payload = JSON.stringify({ api_key: apiKey, message, session_id: sessionId, ear_num_context: earNumContext });
+    const es = new EventSourcePolyfill('/api/agent/chat/stream', {
+      headers: { 'Content-Type': 'application/json' },
+      payload,
+    });
+    es.onmessage = (e) => onChunk && onChunk(e.data);
+    es.addEventListener('done', () => { onDone && onDone(); es.close(); });
+    es.onerror = (err) => { onError && onError(err); es.close(); };
+    return es;
   },
 
   // 儀表板 API
@@ -225,6 +250,14 @@ export default {
   },
   getPredictionChartData(earTag, targetDays, errorHandler) {
     return withErrorHandling(() => apiClient.get(`/api/prediction/goats/${earTag}/prediction/chart-data?target_days=${targetDays}`), errorHandler);
+  },
+
+  // 健康警示 API
+  listHealthAlerts(earNum, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/sheep/${earNum}/alerts`), errorHandler);
+  },
+  resolveHealthAlert(alertId, errorHandler) {
+    return withErrorHandling(() => apiClient.post(`/api/sheep/alerts/${alertId}/resolve`), errorHandler);
   },
 
   // 原始錯誤處理包裝函數，供外部使用

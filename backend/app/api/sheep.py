@@ -1,12 +1,13 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
-from app.models import db, Sheep, SheepEvent, SheepHistoricalData
+from app.models import db, Sheep, SheepEvent, SheepHistoricalData, HealthAlert
 from app.schemas import (
     SheepCreateModel, SheepUpdateModel, SheepEventCreateModel, 
     HistoricalDataCreateModel, create_error_response
 )
 from pydantic import ValidationError
 from datetime import datetime, date
+from app.services.alerts import evaluate_weight_deviation, create_alert_with_gemini
 
 bp = Blueprint('sheep', __name__)
 
@@ -109,6 +110,46 @@ def update_sheep(ear_num):
                                 notes=f"從 {old_value or '空值'} 更新為 {new_value}"
                             )
                             db.session.add(history_record)
+                            # 觸發健康警示檢查（僅體重）
+                            if key == 'Body_Weight_kg':
+                                try:
+                                    payload = evaluate_weight_deviation(
+                                        ear_num=sheep.EarNum,
+                                        user_id=current_user.id,
+                                        new_weight=float(new_value),
+                                        new_date=record_date_obj.strftime('%Y-%m-%d'),
+                                    )
+                                    if payload:
+                                        ai_res = create_alert_with_gemini(payload, api_key=current_app.config.get('GOOGLE_API_KEY'))
+                                        if 'error' in ai_res:
+                                            current_app.logger.warning(f"警示 AI 生成失敗: {ai_res['error']}")
+                                        else:
+                                            summary = ai_res.get('text', '')
+                                            # 建立 HealthAlert 記錄
+                                            alert = HealthAlert(
+                                                user_id=current_user.id,
+                                                sheep_id=sheep.id,
+                                                ear_num=sheep.EarNum,
+                                                alert_type='體重偏離',
+                                                message=(summary[:200] if summary else None),
+                                                details=summary,
+                                                actual_weight=payload['actual_weight'],
+                                                predicted_weight=payload['predicted_weight'],
+                                                deviation_pct=payload['deviation_pct'],
+                                                record_date=payload['record_date'],
+                                                model_name=payload['model_name'],
+                                            )
+                                            db.session.add(alert)
+                                            # 仍保留一筆事件，供舊 UI 顯示
+                                            db.session.add(SheepEvent(
+                                                user_id=current_user.id,
+                                                sheep_id=sheep.id,
+                                                event_date=record_date_obj.strftime('%Y-%m-%d'),
+                                                event_type='健康警示',
+                                                description=f"[警示] 體重低於預測 {payload['deviation_pct']}%"
+                                            ))
+                                except Exception as _e:
+                                    current_app.logger.warning(f"健康警示流程失敗: {_e}", exc_info=True)
                         except (ValueError, TypeError) as date_err:
                             current_app.logger.warning(f"更新羊隻歷史數據時，日期格式錯誤: {record_date}, 錯誤: {date_err}")
                             pass 
@@ -240,3 +281,31 @@ def delete_sheep_history(record_id):
     except Exception as e:
         db.session.rollback()
         return jsonify(error=f"刪除歷史數據失敗: {str(e)}"), 500
+
+
+# --- Health Alerts API ---
+
+@bp.route('/<string:ear_num>/alerts', methods=['GET'])
+@login_required
+def list_health_alerts(ear_num):
+    sheep = Sheep.query.filter_by(user_id=current_user.id, EarNum=ear_num).first_or_404()
+    alerts = HealthAlert.query.filter_by(user_id=current_user.id, sheep_id=sheep.id).order_by(HealthAlert.created_at.desc()).all()
+    return jsonify([a.to_dict() for a in alerts])
+
+
+@bp.route('/alerts/<int:alert_id>/resolve', methods=['POST'])
+@login_required
+def resolve_health_alert(alert_id):
+    alert = HealthAlert.query.get_or_404(alert_id)
+    if alert.user_id != current_user.id:
+        return jsonify(error="權限不足"), 403
+    if alert.status == 'resolved':
+        return jsonify(success=True, message='已處理過'), 200
+    alert.status = 'resolved'
+    alert.resolved_at = datetime.utcnow()
+    try:
+        db.session.commit()
+        return jsonify(success=True, alert=alert.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(error=f"更新失敗: {str(e)}"), 500

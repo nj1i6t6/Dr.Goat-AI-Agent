@@ -14,6 +14,10 @@ export const useChatStore = defineStore('chat', () => {
   // 使用 reactive 來管理消息陣列，以便 Vue 能夠追蹤陣列內的變化
   const messages = reactive([createInitialMessage()]);
   const isLoading = ref(false);
+  // 串流狀態（背景任務）
+  const isStreaming = ref(false);
+  const streamBuffer = ref('');
+  let streamHandle = null;
   const error = ref('');
 
   // --- Actions ---
@@ -61,6 +65,54 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // 背景串流聊天：純文字走 SSE；圖片仍走非串流 API（暫不支持串流圖片）
+  function startStreamingChat(apiKey, message, earNumContext) {
+    if (isStreaming.value && streamHandle && typeof streamHandle.close === 'function') {
+      streamHandle.close();
+      streamHandle = null;
+    }
+    // 推一則占位訊息
+    messages.push({ role: 'model', content: '', streaming: true });
+    streamBuffer.value = '';
+    isStreaming.value = true;
+    error.value = '';
+
+    try {
+      streamHandle = api.streamChat(
+        apiKey,
+        message,
+        sessionId.value,
+        earNumContext,
+        (chunk) => { streamBuffer.value += chunk; },
+        () => {
+          const last = messages[messages.length - 1];
+          if (last && last.streaming) { last.streaming = false; last.content = streamBuffer.value; }
+          isStreaming.value = false;
+          streamHandle = null;
+        },
+        () => {
+          const last = messages[messages.length - 1];
+          if (last && last.streaming) { last.streaming = false; last.content = '<p style=\"color:red;\">串流中斷</p>'; }
+          isStreaming.value = false;
+          streamHandle = null;
+        }
+      );
+    } catch (e) {
+      // 若建立串流失敗，退回非串流路徑
+      isStreaming.value = false;
+      streamHandle = null;
+      return sendMessage(apiKey, message, earNumContext, null);
+    }
+  }
+
+  function cancelStreaming() {
+    if (streamHandle && typeof streamHandle.close === 'function') {
+      streamHandle.close();
+    }
+    streamHandle = null;
+    isStreaming.value = false;
+  }
+
   // 清空對話歷史
   function clearChat() {
     sessionId.value = 'session_' + Date.now();
@@ -68,6 +120,8 @@ export const useChatStore = defineStore('chat', () => {
     messages.length = 0;
     messages.push(createInitialMessage());
     isLoading.value = false;
+  cancelStreaming();
+  streamBuffer.value = '';
     error.value = '';
   }
 
@@ -75,8 +129,12 @@ export const useChatStore = defineStore('chat', () => {
     sessionId,
     messages,
     isLoading,
+  isStreaming,
+  streamBuffer,
     error,
     sendMessage,
+  startStreamingChat,
+  cancelStreaming,
     clearChat,
   };
 });

@@ -47,16 +47,11 @@
                 <span>❤️ 健康與福利警示</span>
               </div>
             </template>
-            <el-empty v-if="!dashboardData.health_alerts || dashboardData.health_alerts.length === 0" description="羊群健康狀況良好" />
-             <ul v-else class="dashboard-list">
-              <li v-for="(alert, index) in dashboardData.health_alerts" :key="index" class="alert-item">
-                <strong>{{ alert.type }}</strong>
-                <div>
-                  <span class="ear-num-link">{{ alert.ear_num }}</span> - 
-                  <span class="alert-message">{{ alert.message }}</span>
-                </div>
-              </li>
-            </ul>
+            <HealthAlertsPanel
+              :alerts="healthAlerts"
+              @view="viewAlert"
+              @resolve="resolveAlert"
+            />
           </el-card>
         </el-col>
       </el-row>
@@ -95,6 +90,13 @@
       </el-card>
     </div>
   </div>
+
+  <el-dialog v-model="alertModal.open" title="健康警示詳情" width="600px">
+    <div v-html="alertModal.content"></div>
+    <template #footer>
+      <el-button @click="alertModal.open=false">關閉</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -102,6 +104,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSettingsStore } from '../stores/settings';
 import api from '../api';
+import HealthAlertsPanel from '../components/sheep/HealthAlertsPanel.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
 const router = useRouter();
@@ -116,6 +119,8 @@ const dashboardData = reactive({
   flock_status_summary: [],
   esg_metrics: {},
 });
+const healthAlerts = ref([]);
+const alertModal = ref({ open: false, content: '' });
 
 const statusMap = {
   maintenance: "維持期", growing_young: "生長前期", growing_finishing: "生長育肥期",
@@ -152,6 +157,7 @@ async function fetchDashboardContent() {
   // 修改：調用 store 中的 action 來獲取每日提示
   settingsStore.fetchAndSetAgentTip();
   fetchDashboardData();
+  fetchHealthAlerts();
 }
 
 async function fetchDashboardData() {
@@ -161,6 +167,32 @@ async function fetchDashboardData() {
   } catch (error) {
     ElMessage.error(`載入儀表板數據失敗: ${error.error || error.message}`);
   }
+}
+
+async function fetchHealthAlerts() {
+  try {
+    // 簡化：抓取前 10 隻羊的 alerts 聚合
+    const sheepList = await api.getAllSheep();
+    const limited = (sheepList || []).slice(0, 10);
+    const results = await Promise.all(limited.map(s => api.listHealthAlerts(s.EarNum).catch(() => [])));
+    healthAlerts.value = results.flat().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  } catch (e) {
+    // ignore
+  }
+}
+
+async function resolveAlert(a) {
+  try {
+    await api.resolveHealthAlert(a.id);
+    ElMessage.success('已標記為已處理');
+    fetchHealthAlerts();
+  } catch (e) {
+    ElMessage.error('更新狀態失敗');
+  }
+}
+
+function viewAlert(a) {
+  alertModal.value = { open: true, content: a.details || a.message };
 }
 
 async function generateFarmReport() {

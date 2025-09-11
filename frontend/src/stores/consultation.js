@@ -20,6 +20,10 @@ export const useConsultationStore = defineStore('consultation', () => {
   const form = reactive(createInitialFormState());
 
   const isLoading = ref(false);
+  // 串流狀態（背景任務）
+  const isStreaming = ref(false);
+  const streamBuffer = ref('');
+  let streamHandle = null;
   const resultHtml = ref('');
   const error = ref('');
   
@@ -40,7 +44,7 @@ export const useConsultationStore = defineStore('consultation', () => {
     error.value = '';
   }
 
-  // Action to get recommendation
+  // Action to get recommendation（非串流備援/同步版本）
   async function getRecommendation(apiKey) {
     // We use the form state stored within this store
     const formData = toRaw(form);
@@ -61,10 +65,50 @@ export const useConsultationStore = defineStore('consultation', () => {
     }
   }
 
+  // 背景串流：營養建議（SSE）
+  function startStreamingRecommendation(apiKey) {
+    // 若已有串流，先中止
+    if (isStreaming.value && streamHandle && typeof streamHandle.close === 'function') {
+      streamHandle.close();
+      streamHandle = null;
+    }
+    // 重置舊結果
+    resultHtml.value = '';
+    error.value = '';
+    streamBuffer.value = '';
+    isStreaming.value = true;
+
+    // 建立串流連線
+    try {
+      const payload = toRaw(form);
+      streamHandle = api.streamRecommendation(
+        apiKey,
+        payload,
+        (chunk) => { streamBuffer.value += chunk; },
+        () => { isStreaming.value = false; streamHandle = null; },
+        (err) => { error.value = err?.message || '串流中斷'; isStreaming.value = false; streamHandle = null; }
+      );
+    } catch (e) {
+      error.value = '無法建立串流連線';
+      isStreaming.value = false;
+      streamHandle = null;
+    }
+  }
+
+  function cancelStreaming() {
+    if (streamHandle && typeof streamHandle.close === 'function') {
+      streamHandle.close();
+    }
+    streamHandle = null;
+    isStreaming.value = false;
+  }
+
   // Action to reset everything
   function reset() {
     Object.assign(form, createInitialFormState());
     isLoading.value = false;
+    cancelStreaming();
+    streamBuffer.value = '';
     resultHtml.value = '';
     error.value = '';
   }
@@ -72,10 +116,14 @@ export const useConsultationStore = defineStore('consultation', () => {
   return {
     form,
     isLoading,
+    isStreaming,
+    streamBuffer,
     resultHtml,
     error,
     setFormData,
     getRecommendation,
+    startStreamingRecommendation,
+    cancelStreaming,
     reset,
   };
 });

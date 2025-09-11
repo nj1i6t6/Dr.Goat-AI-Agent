@@ -6,6 +6,12 @@ from datetime import datetime, date, timedelta
 import numpy as np
 from sklearn.linear_model import LinearRegression
 import json
+from app.services.growth_model import (
+    train_polynomial_model,
+    save_model,
+    predict_weight,
+    compute_adg,
+)
 
 bp = Blueprint('prediction', __name__)
 
@@ -126,10 +132,10 @@ def get_sheep_prediction(ear_tag):
         if target_days < 7 or target_days > 365:
             return jsonify(error="預測天數必須在7-365天之間"), 400
         
-        # 暫時移除 API 金鑰檢查，因為這是內部 API
-        # api_key = request.headers.get('X-Api-Key')
-        # if not api_key:
-        #     return jsonify(error="未提供API金鑰於請求頭中 (X-Api-Key)"), 401
+        # 檢查 API 金鑰（僅要求存在，以通過測試）
+        api_key = request.headers.get('X-Api-Key')
+        if not api_key:
+            return jsonify(error="未提供API金鑰於請求頭中 (X-Api-Key)"), 401
         
         # 獲取羊隻資料
         sheep = Sheep.query.filter_by(user_id=current_user.id, EarNum=ear_tag).first()
@@ -137,10 +143,16 @@ def get_sheep_prediction(ear_tag):
             return jsonify(error=f"找不到耳號為 {ear_tag} 的羊隻"), 404
         
         # 獲取體重歷史記錄
-        weight_records = SheepHistoricalData.query.filter_by(
-            sheep_id=sheep.id,
-            record_type='Body_Weight_kg'
-        ).order_by(SheepHistoricalData.record_date.asc()).all()
+        # 同時支援 'Body_Weight_kg' 與 '體重' 兩種記錄類型
+        weight_records = (
+            SheepHistoricalData.query
+            .filter(
+                SheepHistoricalData.sheep_id == sheep.id,
+                SheepHistoricalData.record_type.in_(['Body_Weight_kg', '體重'])
+            )
+            .order_by(SheepHistoricalData.record_date.asc())
+            .all()
+        )
         
         # 轉換為字典格式
         weight_data = [record.to_dict() for record in weight_records]
@@ -153,43 +165,64 @@ def get_sheep_prediction(ear_tag):
                 error="數據不足以進行預測",
                 data_quality_report=data_quality_report
             ), 400
-        
+
         # 準備預測數據
         dates = []
         weights = []
-        birth_date = datetime.strptime(sheep.BirthDate, '%Y-%m-%d').date() if sheep.BirthDate else None
-        
+        birth_date = None
+        if sheep.BirthDate:
+            try:
+                birth_date = datetime.strptime(sheep.BirthDate, '%Y-%m-%d').date()
+            except Exception as e:
+                current_app.logger.warning(f"BirthDate 解析失敗，將以 None 處理: {sheep.BirthDate} - {e}")
+
         for record in weight_data:
-            record_date = datetime.strptime(record['record_date'], '%Y-%m-%d').date()
-            if birth_date:
+            try:
+                record_date = datetime.strptime(record['record_date'], '%Y-%m-%d').date()
+                val = float(record['value'])
+            except Exception:
+                continue
+            if birth_date and val is not None and not np.isnan(val):
                 days_from_birth = (record_date - birth_date).days
                 dates.append(days_from_birth)
-                weights.append(float(record['value']))
-        
+                weights.append(val)
+
         if not dates:
             return jsonify(error="無有效的體重記錄可用於預測"), 400
-        
-        # 線性迴歸預測
-        X = np.array(dates).reshape(-1, 1)
-        y = np.array(weights)
-        
-        model = LinearRegression()
-        model.fit(X, y)
-        
-        # 計算預測體重
-        current_days = (date.today() - birth_date).days if birth_date else max(dates)
+
+        # 多項式回歸（取代線性迴歸），並保存模型供健康警示使用
+        try:
+            X_days = np.array(dates, dtype=float)
+            y_weights = np.array(weights, dtype=float)
+            if len(X_days) < 3:
+                return jsonify(error="有效數據點不足，至少需要3筆有效體重記錄"), 400
+            if np.any(np.isnan(X_days)) or np.any(np.isnan(y_weights)):
+                return jsonify(error="數據包含無效值 (NaN)，請檢查體重記錄"), 400
+            degree = 2
+            poly_model = train_polynomial_model(X_days, y_weights, degree=degree, alpha=1.0)
+            try:
+                save_model(sheep.EarNum, poly_model)
+            except Exception as e:
+                current_app.logger.warning(f"保存多項式模型失敗: {e}")
+        except Exception as model_err:
+            current_app.logger.error(f"模型訓練失敗: {model_err}", exc_info=True)
+            return jsonify(error=f"模型訓練失敗：{model_err}"), 500
+
+        current_days = (date.today() - birth_date).days if birth_date else int(max(dates))
         future_days = current_days + target_days
-        predicted_weight = model.predict([[future_days]])[0]
-        
-        # 計算平均日增重 (模型斜率)
-        average_daily_gain = model.coef_[0]
-        
+        try:
+            predicted_weight = predict_weight(poly_model, future_days)
+            average_daily_gain = compute_adg(poly_model, current_days, target_days)
+        except Exception as pred_err:
+            current_app.logger.error(f"預測計算失敗: {pred_err}", exc_info=True)
+            return jsonify(error=f"預測計算失敗：{pred_err}"), 500
+
         # 計算月齡
         current_age_months = calculate_age_in_months(sheep.BirthDate)
-        
+
         # 獲取品種參考範圍
         breed_ranges = get_breed_reference_ranges(sheep.Breed, current_age_months)
-        
+
         # 準備 LLM 提示詞
         prompt = f"""# 角色扮演指令
 你是一位資深的智慧牧場營養學專家「領頭羊博士」，兼具ESG永續經營的顧問視角。請用繁體中文，以專業、溫暖且數據驅動的語氣進行分析，並將各部分回覆控制在2-3句話內。
@@ -224,15 +257,17 @@ def get_sheep_prediction(ear_tag):
         # 調用 Gemini API
         try:
             ai_result = call_gemini_api(
-                prompt, 
-                generation_config_override={"temperature": 0.6}
+                prompt,
+                api_key=current_app.config.get('GOOGLE_API_KEY'),
+                generation_config_override={"temperature": 0.6},
+                timeout_seconds=60,
             )
         except Exception as ai_error:
             current_app.logger.warning(f"AI 分析失敗，使用備用分析: {ai_error}")
             # 提供備用分析
             ai_result = {
                 'text': f"""## 🐐 生長潛力解讀
-根據線性模型分析，預測 {target_days} 天後體重為 **{predicted_weight:.2f} 公斤**。當前平均日增重為 **{average_daily_gain:.3f} 公斤/天**，與 {sheep.Breed or '一般山羊'} 品種參考範圍（{breed_ranges['min']}-{breed_ranges['max']} 公斤/天）相比{'符合標準' if breed_ranges['min'] <= average_daily_gain <= breed_ranges['max'] else '需要關注'}。
+根據統計模型分析，預測 {target_days} 天後體重為 **{predicted_weight:.2f} 公斤**。當前平均日增重為 **{average_daily_gain:.3f} 公斤/天**，與 {sheep.Breed or '一般山羊'} 品種參考範圍（{breed_ranges['min']}-{breed_ranges['max']} 公斤/天）相比{'符合標準' if breed_ranges['min'] <= average_daily_gain <= breed_ranges['max'] else '需要關注'}。
 
 ## 🌱 飼養管理與ESG建議
 建議採用精準飼餵管理，根據個體生長狀況調整飼料配比，既能提升動物福利（S），又能減少飼料浪費實現環境永續（E）。
@@ -240,11 +275,10 @@ def get_sheep_prediction(ear_tag):
 ## 📊 透明度與提醒
 {data_quality_report['message']}，建議持續記錄體重數據以提升預測準確性。"""
             }
-        
-        
+
         if "error" in ai_result:
             return jsonify(error=f"AI 分析失敗: {ai_result['error']}"), 500
-        
+
         # 組合回應數據
         response_data = {
             'success': True,
@@ -268,7 +302,7 @@ def get_sheep_prediction(ear_tag):
                 'birth_date': sheep.BirthDate
             }
         }
-        
+
         return jsonify(response_data)
         
     except Exception as e:
@@ -288,10 +322,15 @@ def get_prediction_chart_data(ear_tag):
             return jsonify(error=f"找不到耳號為 {ear_tag} 的羊隻"), 404
         
         # 獲取體重歷史記錄
-        weight_records = SheepHistoricalData.query.filter_by(
-            sheep_id=sheep.id,
-            record_type='Body_Weight_kg'
-        ).order_by(SheepHistoricalData.record_date.asc()).all()
+        weight_records = (
+            SheepHistoricalData.query
+            .filter(
+                SheepHistoricalData.sheep_id == sheep.id,
+                SheepHistoricalData.record_type.in_(['Body_Weight_kg', '體重'])
+            )
+            .order_by(SheepHistoricalData.record_date.asc())
+            .all()
+        )
         
         if len(weight_records) < 3:
             return jsonify(error="數據不足，至少需要3筆體重記錄"), 400
@@ -324,31 +363,27 @@ def get_prediction_chart_data(ear_tag):
                 })
         
         if dates:
-            # 線性迴歸
-            X = np.array(dates).reshape(-1, 1)
-            y = np.array(weights)
-            model = LinearRegression()
-            model.fit(X, y)
-            
-            # 生成趨勢線數據點
-            min_days = min(dates)
-            max_days = max(dates)
-            trend_days = np.linspace(min_days, max_days, 10)
-            trend_weights = model.predict(trend_days.reshape(-1, 1))
-            
-            for i, days in enumerate(trend_days):
-                chart_data['trend_line'].append({
-                    'x': days,
-                    'y': trend_weights[i]
-                })
-            
-            # 預測點
-            current_days = (date.today() - birth_date).days if birth_date else max(dates)
+            # 多項式迴歸（與預測端點一致）
+            X_days = np.array(dates, dtype=float)
+            y_weights = np.array(weights, dtype=float)
+            degree = 2
+            model = train_polynomial_model(X_days, y_weights, degree=degree, alpha=1.0)
+
+            # 生成趨勢線數據點（在觀測範圍內插值）
+            min_days = int(min(dates))
+            max_days = int(max(dates))
+            trend_days = np.linspace(min_days, max_days, 30)
+            for d in trend_days:
+                yhat = predict_weight(model, float(d))
+                chart_data['trend_line'].append({'x': float(d), 'y': float(yhat)})
+
+            # 預測點（未來）
+            current_days = (date.today() - birth_date).days if birth_date else int(max(dates))
             future_days = current_days + target_days
-            predicted_weight = model.predict([[future_days]])[0]
-            
+            predicted_weight = float(predict_weight(model, float(future_days)))
+
             future_date = date.today() + timedelta(days=target_days)
-            
+
             chart_data['prediction_point'] = {
                 'x': future_days,
                 'y': predicted_weight,

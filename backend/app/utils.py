@@ -3,16 +3,28 @@ import json
 import base64
 from .models import Sheep, SheepEvent, SheepHistoricalData
 from flask import current_app
+from typing import Generator, Union, List, Dict, Any
 
-def call_gemini_api(prompt_text, api_key, generation_config_override=None, safety_settings_override=None):
+def call_gemini_api(
+    prompt_text,
+    api_key=None,
+    generation_config_override=None,
+    safety_settings_override=None,
+    timeout_seconds: int = 60,
+):
+    """通用 Gemini API 調用函數 (支援文字 / 多輪訊息 / 圖片)。
+
+    改進內容:
+    1. api_key 參數現在為可選; 若未提供則嘗試從 Flask config['GOOGLE_API_KEY'] 取得。
+    2. 新增 timeout_seconds 參數 (預設 60s，原本硬編碼 180s 防止 Nginx upstream timeout)。
+    3. 可透過 generation_config_override 覆寫 maxOutputTokens 等，避免過大輸出導致延遲。
     """
-    通用 Gemini API 調用函數。
-    """
-    # 檢查 API 金鑰是否有效
-    if not api_key or api_key == 'your-gemini-api-key-here':
-        return {"error": "請設置有效的 Google Gemini API 金鑰。請在 .env 文件中設置 GOOGLE_API_KEY。"}
+    # 若未傳入 api_key，嘗試由設定取得
+    api_key = api_key or (current_app.config.get('GOOGLE_API_KEY') if current_app else None)
+    if not api_key or api_key in ('your-gemini-api-key', 'your-gemini-api-key-here'):
+        return {"error": "缺少有效的 Google Gemini API 金鑰 (GOOGLE_API_KEY)。請於 .env 或請求中提供。"}
     
-    GEMINI_MODEL_NAME = "gemini-2.5-pro"
+    GEMINI_MODEL_NAME = "gemini-2.5-flash"
     MAX_OUTPUT_TOKENS_GEMINI = 16384 
     GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL_NAME}:generateContent?key={api_key}"
     
@@ -43,12 +55,14 @@ def call_gemini_api(prompt_text, api_key, generation_config_override=None, safet
     payload = {
         "contents": payload_contents,
         "generationConfig": generation_config,
-        "safetySettings": safety_settings
+        "safetySettings": safety_settings,
     }
     headers = {'Content-Type': 'application/json'}
 
     try:
-        response = requests.post(GEMINI_API_URL, headers=headers, data=json.dumps(payload), timeout=180)
+        response = requests.post(
+            GEMINI_API_URL, headers=headers, data=json.dumps(payload), timeout=timeout_seconds
+        )
         response.raise_for_status()
         result_json = response.json()
 
@@ -84,6 +98,56 @@ def call_gemini_api(prompt_text, api_key, generation_config_override=None, safet
         return {"error": f"處理 API 請求時發生未知錯誤: {e}"}
 
 
+def stream_gemini_api(
+    prompt_or_messages: Union[str, List[Dict[str, Any]]],
+    api_key: str = None,
+    generation_config_override: Dict[str, Any] = None,
+) -> Generator[str, None, None]:
+    """以真串流方式呼叫 Gemini，逐段 yield 文字片段。
+
+    - 優先使用 google-genai GA 客戶端的 generate_content_stream。
+    - 若環境缺套件或失敗，丟出例外給呼叫端回退。
+    """
+    api_key = api_key or (current_app.config.get('GOOGLE_API_KEY') if current_app else None)
+    if not api_key:
+        raise RuntimeError("缺少 GOOGLE_API_KEY，無法啟動串流")
+
+    try:
+        from google import genai
+    except Exception as e:
+        raise RuntimeError(f"未安裝 google-genai 套件: {e}")
+
+    client = genai.Client(api_key=api_key)
+    model = "gemini-2.5-flash"
+    config = {"temperature": 0.5}
+    if generation_config_override:
+        config.update(generation_config_override)
+
+    # 直接將字串或 messages 傳入 contents；google-genai 會處理基本格式
+    stream = client.models.generate_content_stream(
+        model=model,
+        contents=prompt_or_messages,
+        config=config,
+    )
+
+    for chunk in stream:
+        try:
+            if hasattr(chunk, 'text') and chunk.text:
+                yield chunk.text
+            else:
+                # 兼容性：嘗試從 candidates 擷取
+                cands = getattr(chunk, 'candidates', []) or []
+                if cands:
+                    parts = getattr(cands[0], 'content', None)
+                    if parts and getattr(parts, 'parts', None):
+                        _text = getattr(parts.parts[0], 'text', '')
+                        if _text:
+                            yield _text
+        except Exception:
+            # 單片段解析失敗時略過，持續串流
+            continue
+
+
 def get_sheep_info_for_context(ear_num, user_id):
     """
     獲取指定羊隻的資訊，用於組合AI提示詞。
@@ -115,3 +179,55 @@ def encode_image_to_base64(image_data):
     將圖片數據編碼為 base64 字符串
     """
     return base64.b64encode(image_data).decode('utf-8')
+
+
+def stream_gemini_api(
+    prompt_text,
+    api_key=None,
+    generation_config_override=None,
+):
+    """真正串流：使用 google-genai GA 版客戶端 (generate_content_stream)。
+
+    參數:
+    - prompt_text: str 或 list(contents)，與 call_gemini_api 一致。
+    - api_key: 若未提供，嘗試從 Flask config['GOOGLE_API_KEY'] 取得。
+    - generation_config_override: 可覆寫 temperature 等參數。
+
+    產生器：逐段 yield 純文字 chunk（已過濾空白）。
+    若套件缺失或發生錯誤，會 raise 例外；呼叫端需捕捉並回退到非串流或回傳錯誤。
+    """
+    # 取得金鑰
+    api_key = api_key or (current_app.config.get('GOOGLE_API_KEY') if current_app else None)
+    if not api_key or api_key in ('your-gemini-api-key', 'your-gemini-api-key-here'):
+        raise RuntimeError("缺少有效的 Google Gemini API 金鑰 (GOOGLE_API_KEY)")
+
+    try:
+        from google import genai
+    except Exception as e:
+        raise RuntimeError("未安裝 google-genai 套件，請在 backend/requirements.txt 加入 google-genai") from e
+
+    GEMINI_MODEL_NAME = "gemini-2.5-flash"
+    client = genai.Client(api_key=api_key)
+
+    # 準備 contents
+    if isinstance(prompt_text, str):
+        contents = prompt_text
+    else:
+        # 直接將 list(contents) 傳入新版 SDK
+        contents = prompt_text
+
+    # 預設參數（盡量少設，以尊重上層 max tokens 設定）
+    gen_config = {"temperature": 0.4}
+    if generation_config_override:
+        gen_config.update(generation_config_override)
+
+    # 逐塊產生
+    stream = client.models.generate_content_stream(
+        model=GEMINI_MODEL_NAME,
+        contents=contents,
+        generation_config=gen_config,
+    )
+    for chunk in stream:
+        text = getattr(chunk, 'text', None)
+        if text:
+            yield text

@@ -49,7 +49,9 @@
             <!-- 顯示用戶文字 -->
             <div v-if="message.content" v-text="message.content"></div>
           </div>
-          <div v-else class="message-content" v-html="message.content"></div>
+          <div v-else class="message-content">
+            <StreamText :source="message.streaming ? chatStore.streamBuffer : message.content" :loading="message.streaming" />
+          </div>
         </div>
         <div v-if="chatStore.isLoading" class="chat-message model">
           <div class="loading-dots">
@@ -118,11 +120,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, nextTick, watch, onBeforeUnmount } from 'vue';
 import { Service, Delete, Search, Picture } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useSettingsStore } from '../stores/settings';
 import { useChatStore } from '../stores/chat';
+import StreamText from '../components/common/StreamText.vue';
 import { useSheepStore } from '../stores/sheep';
 
 const settingsStore = useSettingsStore();
@@ -135,6 +138,7 @@ const manualEarNumInput = ref('');
 const chatContainerRef = ref(null);
 const fileInputRef = ref(null);
 const selectedImage = ref(null);
+// 串流改由 store 管理（背景任務）
 
 // 為 el-select-v2 準備符合其格式的選項陣列
 const sheepOptions = computed(() => 
@@ -186,7 +190,13 @@ const handleSendMessage = async () => {
   userInput.value = '';
   selectedImage.value = null;
   
-  await chatStore.sendMessage(settingsStore.apiKey, messageToSend, selectedEarNum.value, imageToSend);
+  // 傳統非串流 + 串流切換：若沒有圖片，優先走串流
+  if (!imageToSend) {
+    // 交由 Store 啟動背景串流
+    chatStore.startStreamingChat(settingsStore.apiKey, messageToSend, selectedEarNum.value);
+  } else {
+    await chatStore.sendMessage(settingsStore.apiKey, messageToSend, selectedEarNum.value, imageToSend);
+  }
 };
 
 const openFileSelector = () => {
@@ -234,6 +244,10 @@ const removeSelectedImage = () => {
 onMounted(() => {
   sheepStore.fetchSheepList();
   scrollToBottom();
+});
+
+onBeforeUnmount(() => {
+  chatStore.cancelStreaming();
 });
 </script>
 

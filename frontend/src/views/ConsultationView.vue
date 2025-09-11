@@ -73,21 +73,24 @@
       </el-form>
     </el-card>
 
-    <el-card shadow="never" class="results-area" v-if="consultationStore.resultHtml || consultationStore.isLoading">
+  <el-card shadow="never" class="results-area" v-if="consultationStore.resultHtml || consultationStore.streamBuffer || consultationStore.isLoading || consultationStore.isStreaming">
       <h3 class="results-title">領頭羊博士的綜合建議</h3>
-      <div v-loading="consultationStore.isLoading" class="recommendation-content" v-html="consultationStore.resultHtml"></div>
+      <div class="recommendation-content">
+    <StreamText :source="consultationStore.streamBuffer || consultationStore.resultHtml" :loading="consultationStore.isStreaming" />
+      </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { HelpFilled, Search } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useSettingsStore } from '../stores/settings';
 import { useConsultationStore } from '../stores/consultation';
 import api from '../api';
+import StreamText from '../components/common/StreamText.vue';
 import { sexOptions, breedCategoryOptions, statusOptions, activityLevelOptions, formatDateForInput } from '../utils';
 
 const route = useRoute();
@@ -98,6 +101,7 @@ const consultationStore = useConsultationStore();
 const earNumInput = ref('');
 const formRef = ref(null);
 const formLoading = ref(false);
+// 串流改由 store 管理（背景任務）
 
 const rules = {
   EarNum: [{ required: true, message: '請輸入耳號', trigger: 'blur' }],
@@ -140,17 +144,20 @@ const handleGetRecommendation = async () => {
     return;
   }
   await formRef.value.validate(async (valid) => {
-    if (valid) {
-      consultationStore.getRecommendation(settingsStore.apiKey);
-    } else {
+    if (!valid) {
       ElMessage.warning('請檢查表單必填項是否已填寫');
+      return;
     }
+  // 交由 Store 啟動背景串流
+  consultationStore.startStreamingRecommendation(settingsStore.apiKey);
   });
 };
 
 const handleResetForm = () => {
   earNumInput.value = '';
   consultationStore.reset();
+  // 中斷背景串流
+  consultationStore.cancelStreaming();
 };
 
 onMounted(() => {
@@ -159,6 +166,10 @@ onMounted(() => {
     loadSheepData();
     router.replace({ query: {} });
   }
+});
+
+onBeforeUnmount(() => {
+  consultationStore.cancelStreaming();
 });
 </script>
 
