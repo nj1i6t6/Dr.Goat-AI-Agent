@@ -258,7 +258,8 @@ def get_sheep_prediction(ear_tag):
         try:
             ai_result = call_gemini_api(
                 prompt,
-                api_key=current_app.config.get('GOOGLE_API_KEY'),
+                # 使用請求頭提供的 API Key，避免僅依賴伺服器環境變數
+                api_key=api_key,
                 generation_config_override={"temperature": 0.6},
                 timeout_seconds=60,
             )
