@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from app.models import db, Sheep, SheepEvent, SheepHistoricalData
+from app.cache import clear_dashboard_cache
 from app.schemas import (
     SheepCreateModel, SheepUpdateModel, SheepEventCreateModel, 
     HistoricalDataCreateModel, create_error_response
@@ -42,6 +43,7 @@ def add_sheep():
         new_sheep = Sheep(user_id=current_user.id, **sheep_dict)
         db.session.add(new_sheep)
         db.session.commit()
+        clear_dashboard_cache(current_user.id)
         return jsonify(
             success=True, 
             message="羊隻資料新增成功", 
@@ -117,6 +119,7 @@ def update_sheep(ear_num):
         
         sheep.last_updated = datetime.utcnow()
         db.session.commit()
+        clear_dashboard_cache(current_user.id)
         return jsonify(
             success=True, 
             message="羊隻資料更新成功，並已自動記錄歷史數據。", 
@@ -137,6 +140,7 @@ def delete_sheep(ear_num):
     try:
         db.session.delete(sheep)
         db.session.commit()
+        clear_dashboard_cache(current_user.id)
         return jsonify(success=True, message="羊隻資料刪除成功")
     except Exception as e:
         db.session.rollback()
@@ -173,6 +177,7 @@ def add_sheep_event(ear_num):
         )
         db.session.add(new_event)
         db.session.commit()
+        clear_dashboard_cache(current_user.id)
         return jsonify(success=True, message="羊隻事件新增成功", event=new_event.to_dict()), 201
     except Exception as e:
         db.session.rollback()
@@ -196,6 +201,7 @@ def update_event(event_id):
             if key in allowed_keys:
                 setattr(event, key, value)
         db.session.commit()
+        clear_dashboard_cache(current_user.id)
         return jsonify(success=True, message="事件更新成功", event=event.to_dict())
     except Exception as e:
         db.session.rollback()
@@ -212,6 +218,7 @@ def delete_event(event_id):
     try:
         db.session.delete(event)
         db.session.commit()
+        clear_dashboard_cache(current_user.id)
         return jsonify(success=True, message="事件刪除成功")
     except Exception as e:
         db.session.rollback()
@@ -225,6 +232,7 @@ def delete_event(event_id):
 def get_sheep_history(ear_num):
     sheep = Sheep.query.filter_by(user_id=current_user.id, EarNum=ear_num).first_or_404()
     history_data = SheepHistoricalData.query.filter_by(sheep_id=sheep.id).order_by(SheepHistoricalData.record_date.asc(), SheepHistoricalData.id.asc()).all()
+    # 讀取不觸發快取失效
     return jsonify([h.to_dict() for h in history_data])
 
 @bp.route('/history/<int:record_id>', methods=['DELETE'])
@@ -236,6 +244,7 @@ def delete_sheep_history(record_id):
     try:
         db.session.delete(record)
         db.session.commit()
+        clear_dashboard_cache(current_user.id)
         return jsonify(success=True, message="歷史數據刪除成功")
     except Exception as e:
         db.session.rollback()

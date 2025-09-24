@@ -5,6 +5,7 @@ from sqlalchemy import func, case
 from sqlalchemy.orm import aliased
 from datetime import datetime, date, timedelta
 import numpy as np
+from app.cache import get_dashboard_cache, set_dashboard_cache, clear_dashboard_cache, get_user_lock
 
 bp = Blueprint('dashboard', __name__)
 
@@ -17,7 +18,19 @@ def get_dashboard_data():
         user_id = current_user.id
         today = date.today()
         seven_days_later = today + timedelta(days=7)
+        # 先嘗試命中快取
+        cached = get_dashboard_cache(user_id)
+        if cached:
+            return jsonify(cached)
         
+        # 避免併發重算，對單一 user_id 加鎖
+        lock = get_user_lock(user_id)
+        with lock:
+            # 雙重檢查
+            cached2 = get_dashboard_cache(user_id)
+            if cached2:
+                return jsonify(cached2)
+
         # 1. 常規提醒事項
         reminders = []
         reminder_fields = {
@@ -53,7 +66,11 @@ def get_dashboard_data():
         medication_events = db.session.query(
             Sheep.EarNum, SheepEvent.event_date, SheepEvent.medication, SheepEvent.withdrawal_days
         ).join(Sheep, Sheep.id == SheepEvent.sheep_id)\
-         .filter(Sheep.user_id == user_id, SheepEvent.withdrawal_days != None, SheepEvent.withdrawal_days > 0).all()
+         .filter(
+             Sheep.user_id == user_id,
+             SheepEvent.withdrawal_days != None,
+             SheepEvent.withdrawal_days > 0
+         ).all()
 
         for event in medication_events:
             event_date_obj = datetime.strptime(event.event_date, '%Y-%m-%d').date()
@@ -72,28 +89,52 @@ def get_dashboard_data():
         ).filter(Sheep.user_id == user_id, Sheep.status != None, Sheep.status != '').group_by(Sheep.status).all()
         flock_summary_list = [{"status": status, "count": count} for status, count in flock_status_summary]
 
-        # 4. 健康與福利警示
+        # 4. 健康與福利警示（批次查詢 + SQL 限窗）
         health_alerts = []
 
-        # 輔助方法：取得某羊近 N 天的某類歷史值，按日期排序
-        def get_recent_history_values(sheep_id, record_type, days):
-            cutoff = today - timedelta(days=days)
-            rows = SheepHistoricalData.query \
-                .filter(
-                    SheepHistoricalData.sheep_id == sheep_id,
-                    SheepHistoricalData.record_type == record_type
-                ) \
-                .order_by(SheepHistoricalData.record_date.asc()) \
-                .all()
-            values = []
-            for r in rows:
-                try:
-                    d = datetime.strptime(r.record_date, '%Y-%m-%d').date()
-                except Exception:
-                    continue
-                if d >= cutoff:
-                    values.append((d, float(r.value)))
-            return values
+        all_sheep = Sheep.query.with_entities(
+            Sheep.id, Sheep.EarNum, Sheep.BirthDate, Sheep.Breed
+        ).filter_by(user_id=user_id).all()
+        sheep_by_id = {s.id: s for s in all_sheep}
+
+        # 需要的時間窗：體重 30 天、奶量 14 天
+        cutoff_weight = (today - timedelta(days=30)).strftime('%Y-%m-%d')
+        cutoff_milk = (today - timedelta(days=14)).strftime('%Y-%m-%d')
+
+        # 批次抓近 30 天內的體重與近 14 天內的奶量記錄
+        recent_hist = db.session.query(
+            SheepHistoricalData.sheep_id,
+            SheepHistoricalData.record_type,
+            SheepHistoricalData.record_date,
+            SheepHistoricalData.value
+        ).filter(
+            SheepHistoricalData.user_id == user_id,
+            (
+                (
+                    SheepHistoricalData.record_type == 'Body_Weight_kg'
+                ) & (SheepHistoricalData.record_date >= cutoff_weight)
+            ) | (
+                (
+                    SheepHistoricalData.record_type == 'milk_yield_kg_day'
+                ) & (SheepHistoricalData.record_date >= cutoff_milk)
+            )
+        ).order_by(
+            SheepHistoricalData.sheep_id.asc(),
+            SheepHistoricalData.record_type.asc(),
+            SheepHistoricalData.record_date.asc()
+        ).all()
+
+        weight_map = {}
+        milk_map = {}
+        for sid, rtype, rdate, val in recent_hist:
+            try:
+                d = datetime.strptime(rdate, '%Y-%m-%d').date()
+            except Exception:
+                continue
+            if rtype == 'Body_Weight_kg':
+                weight_map.setdefault(sid, []).append((d, float(val)))
+            elif rtype == 'milk_yield_kg_day':
+                milk_map.setdefault(sid, []).append((d, float(val)))
 
         # 輔助方法：計算線性回歸斜率（天 vs 值），缺資料返回 None
         def linear_slope(date_value_pairs):
@@ -135,10 +176,9 @@ def get_dashboard_data():
             return {'min': round(base['min'] * mul, 3), 'max': round(base['max'] * mul, 3)}
 
         # 掃描當前使用者所有羊隻，生成健康警示
-        all_sheep = Sheep.query.filter_by(user_id=user_id).all()
         for s in all_sheep:
             # 體重下降（近14天 vs 前14天平均體重下降 > 5%）
-            hist_30 = get_recent_history_values(s.id, 'Body_Weight_kg', 30)
+            hist_30 = weight_map.get(s.id, [])
             if len(hist_30) >= 4:
                 # 分段：最近14天、之前的14天
                 cut_14 = today - timedelta(days=14)
@@ -176,7 +216,7 @@ def get_dashboard_data():
                     })
 
             # 奶量變化（近7天平均 vs 前7天平均 下降 > 25%）
-            milk_14 = get_recent_history_values(s.id, 'milk_yield_kg_day', 14)
+            milk_14 = milk_map.get(s.id, [])
             if len(milk_14) >= 4:
                 cut_7 = today - timedelta(days=7)
                 prev_m = [v for d, v in milk_14 if d < cut_7]
@@ -195,12 +235,16 @@ def get_dashboard_data():
         # 5. ESG 指標模擬
         fcr_value = 4.5 # 簡化模擬值
 
-        return jsonify({
+        payload = {
             "reminders": sorted(reminders, key=lambda x: (x.get("due_date", "9999-99-99"))),
             "health_alerts": health_alerts,
             "flock_status_summary": flock_summary_list,
             "esg_metrics": {"fcr": fcr_value}
-        })
+        }
+
+        # 寫入快取
+        set_dashboard_cache(user_id, payload)
+        return jsonify(payload)
         
     except Exception as e:
         current_app.logger.error(f"獲取儀表板數據時發生錯誤: {e}", exc_info=True)
