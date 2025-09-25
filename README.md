@@ -39,44 +39,44 @@
 
 ```mermaid
 graph LR
-		subgraph Frontend [Vue 3 SPA]
-				Router
-				Pinia
-				Components
-				ApiClient
-		end
+    subgraph Frontend [Vue 3 SPA]
+        Router
+        Pinia
+        Components
+        ApiClient
+    end
 
-		subgraph Backend [Flask App]
-				Auth[Auth Blueprint]
-				Sheep[Sheep Blueprint]
-				Data[Data Blueprint]
-				Agent[Agent Blueprint]
-				Dashboard[Dashboard Blueprint]
-				Prediction[Prediction Blueprint]
-				Cache[(In-memory Cache)]
-		end
+    subgraph Backend [Flask App]
+        Auth[Auth Blueprint]
+        Sheep[Sheep Blueprint]
+        Data[Data Blueprint]
+        Agent[Agent Blueprint]
+        Dashboard[Dashboard Blueprint]
+        Prediction[Prediction Blueprint]
+        Cache[(In-memory Cache)]
+    end
 
-		subgraph Storage
-				Postgres[(PostgreSQL \n(Production))]
-				SQLite[(SQLite \n(Dev/Test))]
-		end
+    subgraph Storage
+        Postgres[(PostgreSQL<br/>Production)]
+        SQLite[(SQLite<br/>Dev/Test)]
+    end
 
-		Router -->|REST/JSON| ApiClient
-		ApiClient -->|/api/*| Auth
-		ApiClient --> Sheep
-		ApiClient --> Data
-		ApiClient --> Agent
-		ApiClient --> Dashboard
-		ApiClient --> Prediction
+    Router -->|REST/JSON| ApiClient
+    ApiClient -->|/api/*| Auth
+    ApiClient --> Sheep
+    ApiClient --> Data
+    ApiClient --> Agent
+    ApiClient --> Dashboard
+    ApiClient --> Prediction
 
-		Sheep --> Postgres
-		Data --> Postgres
-		Dashboard --> Cache
-		Prediction --> Postgres
-		Auth --> Postgres
-		Agent --> Postgres
+    Sheep --> Postgres
+    Data --> Postgres
+    Dashboard --> Cache
+    Prediction --> Postgres
+    Auth --> Postgres
+    Agent --> Postgres
 
-		Prediction -->|LLM prompt| Gemini[(Google Gemini)]
+    Prediction -->|LLM prompt| Gemini[(Google Gemini)]
 ```
 
 ![部署架構示意](docs/assets/deployment.png)
