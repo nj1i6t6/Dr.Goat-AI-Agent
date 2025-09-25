@@ -5,8 +5,6 @@
 import pytest
 import tempfile
 import os
-from app import create_app, db
-from app.models import User, Sheep, SheepEvent
 from werkzeug.security import generate_password_hash
 
 
@@ -16,15 +14,21 @@ def app():
     # 設置測試環境變數
     os.environ['SECRET_KEY'] = 'test-secret-key'
     os.environ['CORS_ORIGINS'] = '*'
-    # 清除資料庫相關環境變數，確保使用 SQLite
-    for key in ['DB_USERNAME', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME']:
-        if key in os.environ:
-            del os.environ[key]
+    # 清除資料庫相關環境變數，確保使用 SQLite，並避免載入專案根 .env
+    for key in [
+        'DB_USERNAME', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME',
+        'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB'
+    ]:
+        os.environ.pop(key, None)
+    # 阻止 app/__init__.py 在匯入時載入專案根 .env
+    os.environ['DOTENV_PATH'] = 'NON_EXISTENT_.env'
     
     # 創建臨時資料庫文件
     db_fd, db_path = tempfile.mkstemp(suffix='.db')
     os.close(db_fd)  # 立即關閉，讓 SQLite 可以使用
     
+    # 延後匯入，確保先完成環境變數清理
+    from app import create_app, db
     # 設置測試配置
     app = create_app()
     app.config.update({
@@ -37,7 +41,6 @@ def app():
     with app.app_context():
         db.create_all()
         yield app
-        
         # 清理臨時文件
         db.drop_all()
     
@@ -63,6 +66,8 @@ def runner(app):
 @pytest.fixture
 def test_user(app):
     """創建測試用戶"""
+    from app import db
+    from app.models import User
     with app.app_context():
         # 清理現有用戶（如果存在）
         existing_user = User.query.filter_by(username='testuser').first()
@@ -113,6 +118,8 @@ def test_sheep_data():
 @pytest.fixture
 def test_sheep(app, test_user, test_sheep_data):
     """創建測試羊隻"""
+    from app import db
+    from app.models import User, Sheep
     with app.app_context():
         # 重新獲取用戶以確保在當前會話中
         user = User.query.filter_by(username='testuser').first()
@@ -130,6 +137,8 @@ def test_sheep(app, test_user, test_sheep_data):
 @pytest.fixture
 def multiple_test_sheep(app, test_user):
     """創建多隻測試羊隻"""
+    from app import db
+    from app.models import User, Sheep
     with app.app_context():
         sheep_data = [
             {
@@ -225,7 +234,7 @@ def sheep_with_weight_data(authenticated_client, db_session):
             sheep_id=sheep.id,
             user_id=user.id,
             record_date=(base_date + timedelta(days=i*15)).strftime('%Y-%m-%d'),
-            record_type='體重',
+            record_type='Body_Weight_kg',
             value=10.0 + i * 2.0  # 模擬增長趨勢
         )
         db_session.add(record)
@@ -257,7 +266,7 @@ def sheep_insufficient_data(authenticated_client, db_session):
         sheep_id=sheep.id,
         user_id=user.id,
         record_date='2024-01-01',
-        record_type='體重',
+        record_type='Body_Weight_kg',
         value=15.0
     )
     db_session.add(record)
@@ -268,6 +277,7 @@ def sheep_insufficient_data(authenticated_client, db_session):
 @pytest.fixture
 def db_session(app):
     """提供資料庫會話的fixture"""
+    from app import db
     with app.app_context():
         return db.session
 

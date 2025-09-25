@@ -35,9 +35,9 @@
           <el-col :span="8">
             <el-form-item label="預測時長">
               <el-select v-model="targetDays" placeholder="選擇預測天數" style="width: 100%">
+                <el-option label="預測7天後" :value="7" />
+                <el-option label="預測14天後" :value="14" />
                 <el-option label="預測30天後" :value="30" />
-                <el-option label="預測60天後" :value="60" />
-                <el-option label="預測90天後" :value="90" />
               </el-select>
             </el-form-item>
           </el-col>

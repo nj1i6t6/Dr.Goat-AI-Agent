@@ -23,11 +23,20 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: [
-        'node_modules/',
+        // dependencies and build artifacts
+        'node_modules/**',
+        'dist/**',
+        'coverage/**',
+        // app bootstrap and test scaffolding
         'src/main.js',
-        'src/tests/',
-        '**/*.spec.js',
-        '**/*.test.js',
+        'src/test/**',
+        'src/tests/**',
+        // root config files (do not count towards coverage)
+        'vite.config.*',
+        'vitest.config.*',
+        // test files themselves
+        '**/*.spec.*',
+        '**/*.test.*',
       ],
     },
     fileParallelism: false,
