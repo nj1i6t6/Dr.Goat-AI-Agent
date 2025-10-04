@@ -5,7 +5,7 @@ Pydantic 資料驗證模型
 
 from pydantic import BaseModel, field_validator, Field
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 
 
 # === 認證相關模型 ===
@@ -138,6 +138,67 @@ class SuccessResponse(BaseModel):
     success: bool = Field(True, description="操作是否成功")
     message: Optional[str] = Field(None, description="成功訊息")
     data: Optional[Any] = Field(None, description="返回資料")
+
+
+# === 產銷履歷相關模型 ===
+class BatchSheepLinkModel(BaseModel):
+    sheep_id: int = Field(..., description="羊隻 ID")
+    contribution_type: Optional[str] = Field(None, max_length=100, description="貢獻類型")
+    quantity: Optional[float] = Field(None, ge=0, description="數量")
+    quantity_unit: Optional[str] = Field(None, max_length=50, description="數量單位")
+    role: Optional[str] = Field(None, max_length=100, description="角色")
+    notes: Optional[str] = Field(None, description="備註")
+
+
+class ProcessingStepInputModel(BaseModel):
+    title: str = Field(..., min_length=1, max_length=150, description="步驟標題")
+    description: Optional[str] = Field(None, description="步驟描述")
+    sequence_order: Optional[int] = Field(None, ge=1, description="排序")
+    started_at: Optional[datetime] = Field(None, description="開始時間")
+    completed_at: Optional[datetime] = Field(None, description="完成時間")
+    evidence_url: Optional[str] = Field(None, max_length=255, description="佐證連結")
+
+
+class ProductBatchBaseModel(BaseModel):
+    batch_number: str = Field(..., min_length=1, max_length=100, description="批次號")
+    product_name: str = Field(..., min_length=1, max_length=150, description="產品名稱")
+    product_type: Optional[str] = Field(None, max_length=100, description="產品類型")
+    description: Optional[str] = Field(None, description="產品描述")
+    esg_highlights: Optional[str] = Field(None, description="ESG 亮點")
+    production_date: Optional[date] = Field(None, description="生產日期")
+    expiration_date: Optional[date] = Field(None, description="到期日")
+    origin_story: Optional[str] = Field(None, description="品牌故事")
+    is_public: bool = Field(False, description="是否公開")
+
+
+class ProductBatchCreateModel(ProductBatchBaseModel):
+    sheep_links: Optional[List[BatchSheepLinkModel]] = Field(default_factory=list, description="羊隻關聯列表")
+    processing_steps: Optional[List[ProcessingStepInputModel]] = Field(default_factory=list, description="加工步驟列表")
+
+
+class ProductBatchUpdateModel(BaseModel):
+    product_name: Optional[str] = Field(None, min_length=1, max_length=150)
+    product_type: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = Field(None)
+    esg_highlights: Optional[str] = Field(None)
+    production_date: Optional[date] = Field(None)
+    expiration_date: Optional[date] = Field(None)
+    origin_story: Optional[str] = Field(None)
+    is_public: Optional[bool] = Field(None)
+    sheep_links: Optional[List[BatchSheepLinkModel]] = Field(default=None, description="重新設定羊隻關聯")
+
+
+class ProcessingStepCreateModel(ProcessingStepInputModel):
+    pass
+
+
+class ProcessingStepUpdateModel(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=150)
+    description: Optional[str] = Field(None)
+    sequence_order: Optional[int] = Field(None, ge=1)
+    started_at: Optional[datetime] = Field(None)
+    completed_at: Optional[datetime] = Field(None)
+    evidence_url: Optional[str] = Field(None, max_length=255)
 
 
 # === 設定相關模型 ===

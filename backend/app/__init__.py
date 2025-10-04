@@ -92,13 +92,22 @@ def create_app():
                 print(f"資料庫初始化失敗: {e}")
         
         # --- 註冊 API 藍圖 ---
-        from .api import auth as auth_bp, sheep as sheep_bp, data_management as data_management_bp, agent as agent_bp, dashboard as dashboard_bp, prediction as prediction_bp
+        from .api import (
+            auth as auth_bp,
+            sheep as sheep_bp,
+            data_management as data_management_bp,
+            agent as agent_bp,
+            dashboard as dashboard_bp,
+            prediction as prediction_bp,
+            traceability as traceability_bp,
+        )
         app.register_blueprint(auth_bp.bp, url_prefix='/api/auth')
         app.register_blueprint(sheep_bp.bp, url_prefix='/api/sheep')
         app.register_blueprint(data_management_bp.bp, url_prefix='/api/data')
         app.register_blueprint(agent_bp.bp, url_prefix='/api/agent')
         app.register_blueprint(dashboard_bp.bp, url_prefix='/api/dashboard')
         app.register_blueprint(prediction_bp.bp, url_prefix='/api/prediction')
+        app.register_blueprint(traceability_bp.bp, url_prefix='/api/traceability')
 
         # --- OpenAPI 規格與 Swagger UI ---
         @app.route('/openapi.yaml')

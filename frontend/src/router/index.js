@@ -12,6 +12,12 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/trace/:batchNumber',
+    name: 'TraceabilityPublic',
+    component: () => import('../views/TraceabilityPublicView.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/',
     name: 'AppLayout',
     component: AppLayout,
@@ -47,6 +53,11 @@ const routes = [
         path: 'prediction',
         name: 'Prediction',
         component: () => import('../views/PredictionView.vue')
+      },
+      {
+        path: 'traceability',
+        name: 'TraceabilityManagement',
+        component: () => import('../views/TraceabilityManagementView.vue')
       },
       {
         path: 'settings',

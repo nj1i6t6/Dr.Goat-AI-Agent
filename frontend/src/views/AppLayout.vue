@@ -20,6 +20,7 @@
         <el-menu-item index="/chat">AI 問答助理</el-menu-item>
         <el-menu-item index="/flock">羊群總覽</el-menu-item>
         <el-menu-item index="/prediction">生長預測</el-menu-item>
+        <el-menu-item index="/traceability">產銷履歷管理</el-menu-item>
         <el-menu-item index="/data-management">數據管理</el-menu-item>
         <el-menu-item index="/settings">系統設定</el-menu-item>
       </el-menu>
@@ -70,6 +71,10 @@
           <el-icon><TrendCharts /></el-icon>
           <span>生長預測</span>
         </el-menu-item>
+        <el-menu-item index="/traceability">
+          <el-icon><Collection /></el-icon>
+          <span>產銷履歷管理</span>
+        </el-menu-item>
         <el-menu-item index="/data-management">
           <el-icon><Upload /></el-icon>
           <span>數據管理</span>
@@ -93,7 +98,7 @@ import { ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
-  Menu, DataAnalysis, HelpFilled, Service, Tickets, Upload, Setting, TrendCharts
+  Menu, DataAnalysis, HelpFilled, Service, Tickets, Upload, Setting, TrendCharts, Collection
 } from '@element-plus/icons-vue';
 
 const authStore = useAuthStore();

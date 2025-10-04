@@ -44,6 +44,16 @@ npm install
 - `app/api/data_management.py`：Excel 匯入匯出與欄位映射。
 - `app/api/prediction.py`：線性回歸 + LLM 解釋。
 - `app/models.py`：User、Sheep、事件、歷史資料、ESG 欄位。
+- `app/api/traceability.py`：產品批次、加工流程、羊隻關聯與公開履歷查詢 API。
+- `app/models.py` 新增 `ProductBatch`、`ProcessingStep`、`BatchSheepAssociation`，提供多對多批次資料模型。
+- 前端 `src/views/TraceabilityManagementView.vue` 與 `TraceabilityPublicView.vue` 負責管理介面與公開故事頁。
+
+### 產銷履歷模組速覽
+
+- 管理端 API：`/api/traceability/batches`（CRUD）、`/steps`、`/sheep` 系列端點均需登入。
+- 公開端 API：`/api/traceability/public/<batch_number>` 傳回批次故事、加工流程時間軸與羊隻事件摘要。
+- 前端管理：登入後的新路由 `/traceability` 可建立批次、綁定羊隻、維護加工流程與一鍵複製公開連結。
+- 公開分享：任何裝置可直接造訪 `/trace/<批次號>`，支援透過 ngrok 或正式網域轉為 QR Code 分享。
 
 ## 前端開發流程
 
@@ -66,6 +76,7 @@ npm install
 cd backend
 Rename-Item ..\..\.env ..\..\.env.bak
 C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest
+C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest tests/test_traceability_api.py
 C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest --cov=app --cov-report=term-missing --cov-report=html
 Rename-Item ..\..\.env.bak ..\..\.env
 ```
@@ -85,6 +96,7 @@ Vitest 若未加 `--run` 會保持監聽模式。
 
 ```powershell
 cd frontend
+npm run test -- traceability  # 僅執行產銷履歷 store 測試
 npm run test -- --run
 npm run test:coverage -- --run
 ```

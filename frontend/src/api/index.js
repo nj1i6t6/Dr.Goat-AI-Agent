@@ -239,6 +239,43 @@ export default {
     return withErrorHandling(() => apiClient.get(`/api/prediction/goats/${earTag}/prediction/chart-data?target_days=${targetDays}`), errorHandler);
   },
 
+  // 產銷履歷 API
+  getTraceabilityBatches(includeDetails = false, errorHandler) {
+    const params = includeDetails ? { include_details: true } : undefined;
+    return withErrorHandling(() => apiClient.get('/api/traceability/batches', { params }), errorHandler);
+  },
+  createTraceabilityBatch(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/traceability/batches', data), errorHandler);
+  },
+  getTraceabilityBatch(batchId, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/traceability/batches/${batchId}`), errorHandler);
+  },
+  updateTraceabilityBatch(batchId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/traceability/batches/${batchId}`, data), errorHandler);
+  },
+  deleteTraceabilityBatch(batchId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/traceability/batches/${batchId}`), errorHandler);
+  },
+  replaceBatchSheepLinks(batchId, sheepLinks, errorHandler) {
+    const payload = { sheep_links: sheepLinks };
+    return withErrorHandling(() => apiClient.post(`/api/traceability/batches/${batchId}/sheep`, payload), errorHandler);
+  },
+  removeBatchSheep(batchId, sheepId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/traceability/batches/${batchId}/sheep/${sheepId}`), errorHandler);
+  },
+  addProcessingStep(batchId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.post(`/api/traceability/batches/${batchId}/steps`, data), errorHandler);
+  },
+  updateProcessingStep(stepId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/traceability/steps/${stepId}`, data), errorHandler);
+  },
+  deleteProcessingStep(stepId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/traceability/steps/${stepId}`), errorHandler);
+  },
+  getPublicTraceBatch(batchNumber, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/traceability/public/${batchNumber}`), errorHandler);
+  },
+
   // 原始錯誤處理包裝函數，供外部使用
   withErrorHandling
 };
