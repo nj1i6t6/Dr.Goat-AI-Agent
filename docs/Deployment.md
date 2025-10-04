@@ -46,6 +46,7 @@ docker compose ps
 | 前端 | http://localhost:3000 | Vue SPA |
 | 後端健康檢查 | http://localhost:5001/api/auth/status | `{ "authenticated": false }` |
 | Swagger | http://localhost:5001/docs | Swagger UI |
+| 公開履歷 API | http://localhost:5001/api/traceability/public/BATCH-001 | 404 或批次故事（視資料而定） |
 | PostgreSQL | `docker compose logs db` | `database system is ready to accept connections` |
 
 ## 3. 資料庫版本控制
@@ -102,6 +103,7 @@ docker compose cp backend:/app/logs ./logs-backup
 - [ ] `/api/auth/status` 回傳 200。
 - [ ] 前端登入流程順利（Cookie 寫入成功）。
 - [ ] `/api/data/export_excel` 能匯出檔案。
+- [ ] `/api/traceability/batches` 與 `/api/traceability/public/<批次號>` 依權限回傳正確資料。
 - [ ] `/api/agent/tip` 提供提示（若無 API key 會回傳錯誤，為正常行為）。
 - [ ] `docs/backend/coverage/index.html` 與 `docs/frontend/coverage/index.html` 覆蓋率報告已更新。
 

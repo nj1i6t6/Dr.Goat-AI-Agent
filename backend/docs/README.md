@@ -20,7 +20,7 @@ def internal_error(error):
 
 - **框架**：Flask 3、SQLAlchemy 2、Flask-Login、Pydantic 2。
 - **資料庫**：生產建議 PostgreSQL，開發預設 SQLite (`instance/app.db`)。
-- **模組**：Auth、Sheep、Data Management、Dashboard、Agent、Prediction。
+- **模組**：Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability。
 - **AI 整合**：Google Gemini (`X-Api-Key` 標頭)。
 - **部署**：Docker Compose（Waitress + Gunicorn），詳細見 `docs/Deployment.md`。
 
@@ -40,8 +40,9 @@ backend/
 │       ├── data_management.py
 │       ├── dashboard.py
 │       ├── agent.py
-│       └── prediction.py
-├── tests/                # 208 項 Pytest，含 Gemini mock Fixtures
+│       ├── prediction.py
+│       └── traceability.py    # 產品批次 / 加工流程 / 公開履歷
+├── tests/                # Pytest（含 Gemini mock Fixtures）
 ├── migrations/           # Alembic 遷移腳本
 ├── docs/                 # （本檔）
 ├── logs/                 # `app.log`
@@ -80,6 +81,12 @@ backend/
 - 先做資料品質檢查（數量、時間跨度、異常值）。
 - 回傳預測體重、平均日增重、參考範圍、AI Markdown 分析。
 
+### 產品產銷履歷 (`app/api/traceability.py`)
+- 為每位使用者提供批次管理、加工步驟與羊隻貢獻關聯。
+- `ProductBatch` / `ProcessingStep` / `BatchSheepAssociation` 模型支援多對多串接與排序。
+- 登入端 `/api/traceability/batches` 系列提供 CRUD 與羊隻維護；公開端 `/api/traceability/public/<批次號>` 提供脫敏後的故事資料。
+- 公開回應會整理加工時間軸、羊隻事件與 ESG 亮點，並移除內部 ID。
+
 ## 4. 組態
 
 | 類別 | 變數 | 說明 |
@@ -108,8 +115,9 @@ C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest --co
 Rename-Item ..\..\.env.bak ..\..\.env
 ```
 
-- 測試總數：208（全部通過）。
-- 覆蓋率：總計 **85%**；`app/api/dashboard.py` 目前 57%，是主要補強目標。
+- 測試內容涵蓋 Auth、Sheep、Data Management、Dashboard、Agent、Prediction 與 Traceability。
+- `tests/test_traceability_api.py` 驗證批次 CRUD、步驟管理、羊隻關聯更新與公開端權限。
+- 覆蓋率總覽於 `../../docs/backend/coverage/index.html`，`app/api/dashboard.py` 仍為主要補強目標。
 - HTML 報告：`../../docs/backend/coverage/index.html`。
 
 Fixtures 亮點（`tests/conftest.py`）：
@@ -144,7 +152,7 @@ python create_test_data.py
 ## 9. 授權與文件
 
 - 授權：MIT（見專案根目錄 `LICENSE`）。
-- 更新日期：2025-09-25。
+- 更新日期：2025-10-05。
 - 相關文件：
   - [docs/README.md](../../docs/README.md) — 全域說明
   - [docs/QuickStart.md](../../docs/QuickStart.md) — 啟動流程

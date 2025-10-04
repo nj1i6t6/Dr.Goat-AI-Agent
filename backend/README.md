@@ -42,11 +42,13 @@ backend/
 │   ├── utils.py                # 工具函數與 AI 整合
 │   └── api/                    # RESTful API 藍圖
 │       ├── __init__.py         # API 藍圖註冊
-│       ├── agent.py            # AI 代理人 API (18項功能)
-│       ├── auth.py             # 身份驗證 API (10項功能)
-│       ├── dashboard.py        # 儀表板數據 API (11項功能)
-│       ├── data_management.py  # 數據管理 API (12項功能)
-│       └── sheep.py            # 山羊管理 API (13項功能)
+│       ├── agent.py            # AI 代理人 API
+│       ├── auth.py             # 身份驗證 API
+│       ├── dashboard.py        # 儀表板數據 API
+│       ├── data_management.py  # 數據管理 API
+│       ├── prediction.py       # 生長預測 API
+│       ├── traceability.py     # 產品產銷履歷 API（批次、加工流程、公開端）
+│       └── sheep.py            # 山羊管理 API
 ├── instance/                   # Flask 實例特定檔案
 │   └── app.db                  # SQLite 開發資料庫
 ├── migrations/                 # Alembic 資料庫遷移
@@ -54,12 +56,13 @@ backend/
 │   ├── script.py.mako          # 遷移腳本範本
 │   └── versions/               # 資料庫版本控制
 │       └── a6d3b4664bd0_add_esg_fields.py  # ESG 欄位遷移
-└── tests/                      # 測試套件 ✅ 198/198 通過
+└── tests/                      # 測試套件（Pytest）
     ├── conftest.py             # pytest 測試配置與夾具
     ├── test_agent_api.py       # AI 代理人 API 測試 (18 tests)
     ├── test_auth_api.py        # 身份驗證 API 測試 (10 tests)
     ├── test_dashboard_api.py   # 儀表板 API 測試 (11 tests)
     ├── test_data_management_api.py # 數據管理 API 測試 (12 tests)
+    ├── test_traceability_api.py    # 產品批次與公開履歷流程測試
     ├── test_sheep_api.py       # 山羊管理 API 測試 (13 tests)
     ├── test_*_enhanced.py      # 增強測試套件 (130+ tests)
     ├── test_*_error_handling.py # 錯誤處理測試
@@ -118,35 +121,38 @@ python run.py
 - `DELETE /<id>` - 刪除山羊記錄
 
 ### AI 代理人 API (/api/agent)
-- `POST /nutrition-advice` - 取得營養建議
-- `POST /chat` - AI 對話諮詢
-- `GET /daily-tips` - 每日小貼士
+- `GET /tip` - 每日小貼士
+- `POST /recommendation` - 輸出營養/ESG 建議
+- `POST /chat` - AI 對話諮詢（支援圖片上傳）
 
 ### 儀表板 API (/api/dashboard)
-- `GET /stats` - 取得統計數據
+- `GET /data` - 聚合統計與提醒（含快取）
 - `GET /farm-report` - 生成牧場報告
+- `GET /event_options` - 事件類型/描述管理
 
-### 數據管理 API (/api/data-management)
-- `POST /export` - 匯出 Excel 檔案
-- `POST /import` - 匯入 Excel 檔案
-- `POST /analyze-file` - 分析檔案格式
+### 數據管理 API (/api/data)
+- `GET /export_excel` - 匯出 Excel 檔案
+- `POST /analyze_excel` - 分析檔案格式
+- `POST /process_import` - 匯入 Excel 資料
+
+### 生長預測 API (/api/prediction)
+- `GET /goats/<ear_tag>/prediction` - 生長趨勢預測
+- `GET /goats/<ear_tag>/prediction/chart-data` - 趨勢圖與信賴區間資料
+
+### 產品產銷履歷 API (/api/traceability)
+- `GET /batches` - 列出登入者批次（可含加工步驟/羊隻關聯）
+- `POST /batches` - 建立批次與初始步驟/羊隻
+- `PUT /batches/<id>` / `DELETE /batches/<id>` - 維護批次
+- `POST /batches/<id>/steps`、`PUT /steps/<step_id>`、`DELETE /steps/<step_id>` - 管理加工流程
+- `POST /batches/<id>/sheep`、`DELETE /batches/<id>/sheep/<sheep_id>` - 維護羊隻關聯
+- `GET /public/<batch_number>` - 取得公開履歷故事（無需登入）
 
 ## 🧪 測試覆蓋率
 
-### 測試統計 ✅
-- **總測試數量**：198 項測試全部通過
-- **整體覆蓋率**：94% (1047行代碼中有65行未覆蓋)
-- **測試執行時間**：~15秒
-
-### 各模組覆蓋率
-| 模組 | 覆蓋率 | 狀態 |
-|------|--------|------|
-| app/models.py | 96% | ✅ 優秀 |
-| app/api/data_management.py | 98% | ✅ 優秀 |
-| app/api/sheep.py | 98% | ✅ 優秀 |
-| app/api/auth.py | 94% | ✅ 良好 |
-| app/api/dashboard.py | 88% | ✅ 良好 |
-| app/api/agent.py | 90% | ✅ 良好 |
+### 測試概況
+- Pytest 覆蓋 Auth、Sheep、Data Management、Dashboard、Agent、Prediction 與 Traceability 模組。
+- 產銷履歷測試 (`tests/test_traceability_api.py`) 驗證批次 CRUD、步驟與羊隻關聯、公開端口權限。
+- HTML 覆蓋率報告產出於 `../docs/backend/coverage/index.html`，建議持續補強 `app/api/dashboard.py`。
 
 ### 執行測試
 ```bash
@@ -223,6 +229,12 @@ docker-compose logs backend
 - 請求速率限制 (建議實施)
 
 ## 📝 更新日誌
+
+### v2.1.0 (2025-10-05)
+- ✅ 新增 `app/api/traceability.py`，整合產品批次、加工流程與羊隻關聯
+- ✅ 擴充 `app/models.py` 與 `schemas.py`，支援公開履歷故事產生
+- ✅ 加入 `tests/test_traceability_api.py` 覆蓋批次 CRUD 與公開端權限
+- ✅ 公開端 `/api/traceability/public/<批次號>` 進行資料脫敏與安全加固
 
 ### v2.0.0 (2025-07-30)
 - ✅ 完成 Pydantic V1→V2 遷移

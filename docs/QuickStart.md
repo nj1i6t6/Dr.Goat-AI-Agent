@@ -67,6 +67,12 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/auth/login" -Cont
 # 建立羊隻
 Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/sheep/" -ContentType "application/json" -Body '{"EarNum":"A001","Breed":"台灣黑山羊","Sex":"母","BirthDate":"2024-01-15"}' -WebSession $s
 
+# 建立產品批次並公開
+Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/traceability/batches" -ContentType "application/json" -Body '{"batch_number":"BATCH-001","product_name":"鮮羊乳 946ml","production_date":"2025-10-04","is_public":true}' -WebSession $s
+
+# 導向公開履歷頁（瀏覽器）
+start http://localhost:5173/trace/BATCH-001
+
 # 取得儀表板摘要
 Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/dashboard/data" -WebSession $s | ConvertTo-Json -Depth 4
 ```
@@ -95,6 +101,7 @@ Vitest 預設為互動模式，建議以 `--run` 參數一次性執行：
 cd frontend
 npm run test -- --run
 npm run test:coverage -- --run
+npx vitest run traceability
 ```
 
 HTML 覆蓋率報告位於 `docs/frontend/coverage/index.html`。

@@ -96,7 +96,8 @@ Vitest 若未加 `--run` 會保持監聽模式。
 
 ```powershell
 cd frontend
-npm run test -- traceability  # 僅執行產銷履歷 store 測試
+npm run test -- traceability  # 互動模式下僅執行產銷履歷 store 測試
+npx vitest run traceability   # 以一次性方式跑產銷履歷 store 測試
 npm run test -- --run
 npm run test:coverage -- --run
 ```

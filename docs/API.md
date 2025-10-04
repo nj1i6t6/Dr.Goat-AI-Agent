@@ -70,6 +70,22 @@
 | GET | `/goats/{ear_tag}/prediction?target_days=30` | 以歷史體重做線性迴歸，回傳預測體重、平均日增重、數據品質檢查與 AI 說明 |
 | GET | `/goats/{ear_tag}/prediction/chart-data?target_days=30` | 取得圖表所需的歷史點、趨勢線、預測點 |
 
+## 產品產銷履歷 `/api/traceability`
+
+| Method | Path | 說明 | 權限 |
+|--------|------|------|------|
+| GET | `/batches?include_details=true` | 列出登入使用者的批次；可選擇載入加工步驟與羊隻關聯 | 需登入 |
+| POST | `/batches` | 建立批次，可一次性附帶加工步驟與羊隻關聯 | 需登入 |
+| GET | `/batches/{batch_id}` | 取得單一批次詳細資料 | 需登入 |
+| PUT | `/batches/{batch_id}` | 更新批次資訊與公開狀態 | 需登入 |
+| DELETE | `/batches/{batch_id}` | 刪除批次及其加工步驟、羊隻關聯 | 需登入 |
+| POST | `/batches/{batch_id}/steps` | 新增加工步驟 | 需登入 |
+| PUT | `/steps/{step_id}` | 更新加工步驟內容 | 需登入 |
+| DELETE | `/steps/{step_id}` | 刪除加工步驟 | 需登入 |
+| POST | `/batches/{batch_id}/sheep` | 以陣列替換羊隻關聯（會刪除舊資料） | 需登入 |
+| DELETE | `/batches/{batch_id}/sheep/{sheep_id}` | 移除單筆羊隻關聯 | 需登入 |
+| GET | `/public/{batch_number}` | 不需登入即可取得公開批次故事、加工流程時間軸、羊隻摘要 | 公開 |
+
 ## 通用規則
 
 - 例外處理：所有 Blueprint 會在失敗情況回傳 `{ "error": "..." }`，HTTP 狀態碼對應錯誤類型。

@@ -30,7 +30,7 @@
 
 | 範疇 | 技術 | 重點模組 |
 |------|------|----------|
-| 後端 | Python 3.11、Flask 3、SQLAlchemy 2、Pydantic 2 | `app/api/*`（Auth、Sheep、Data Management、Dashboard、Agent、Prediction）、`app/cache.py`（儀表板快取） |
+| 後端 | Python 3.11、Flask 3、SQLAlchemy 2、Pydantic 2 | `app/api/*`（Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability）、`app/cache.py`（儀表板快取） |
 | 前端 | Vue 3.5（Composition API）、Vite 7、Pinia、Element Plus、Chart.js/ECharts | `src/views/*`、`src/stores/*`、`src/api/index.js`（Axios Client） |
 | AI | Google Gemini API | `/api/agent/*`、`/api/prediction/*`（需 `X-Api-Key`） |
 | 基礎設施 | Docker Compose、Nginx、PostgreSQL 14+（生產）、SQLite（開發/測試） | `docker-compose.yml`、`frontend/nginx.conf`、`backend/docker-entrypoint.sh` |
@@ -86,10 +86,16 @@ graph LR
 ### 資料治理
 - 羊隻 CRUD、事件管理與歷史數據追蹤均依使用者隔離。
 - Excel 匯入提供欄位自動對映與手動映射；匯出產生多張工作表與說明頁。
+- 產品批次、加工流程與羊隻貢獻紀錄串連，支援公開產銷履歷與內部管理。
 
 ### AI 協作
 - `/api/agent/tip` 生成每日照護提醒；`/api/agent/recommendation` 輸出營養/ESG 建議；`/api/agent/chat` 支援圖片互動。
 - `/api/prediction` 以線性回歸 + LLM 製作羊隻生長預測，評估資料品質並提供永續建議。
+
+### 產品產銷履歷
+- 後端提供 `/api/traceability/batches` 系列端點管理批次、加工步驟與羊隻關聯。
+- 公開端 `/api/traceability/public/<batch_number>` 回傳面向消費者的故事、流程時間軸與 ESG 重點。
+- 前端新增 `/traceability` 管理頁與 `/trace/<批次號>` 公開頁，支援 QR Code 分享與 ngrok 暫時性網址。
 
 ### 儀表板與快取
 - 儀表板聚合提醒、停藥紀錄、健康警示與 ESG 指標。
@@ -209,10 +215,10 @@ docker compose down
 
 | 範疇 | 指令 | 結果摘要 |
 |------|------|-----------|
-| 後端單元/整合測試 | `C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest` | 208 項測試全數通過（19 則 SQLAlchemy Legacy API 警示）。 |
-| 後端覆蓋率 | `... -m pytest --cov=app --cov-report=term-missing --cov-report=html` | 覆蓋率 85%，`app/api/dashboard.py` 目前 57%。 |
-| 前端測試 | `npm run test -- --run` | 32 個測試檔、281 測試全通過。 |
-| 前端覆蓋率 | `npm run test:coverage -- --run` | Statements 81.73%、Branches 85.92%、Functions 66.43%。 |
+| 後端單元/整合測試 | `C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest` | 主要路徑含產品產銷履歷 API；需注意 SQLAlchemy Legacy 警示。 |
+| 後端覆蓋率 | `... -m pytest --cov=app --cov-report=term-missing --cov-report=html` | HTML 報告生成於 `docs/backend/coverage/index.html`。 |
+| 前端測試 | `npm run test -- --run` / `npx vitest run traceability` | 覆蓋核心頁面、Pinia store 與新產銷履歷管理流程。 |
+| 前端覆蓋率 | `npm run test:coverage -- --run` | Statements 約 82%、Branches 約 86%、Functions 約 66%。 |
 
 HTML 覆蓋率報告：
 - 後端：`docs/backend/coverage/index.html`

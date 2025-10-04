@@ -4,11 +4,12 @@
 
 ## 系統重點
 
-- **資料握在手上**：羊隻基本資料、事件、歷史生產數據與 ESG 指標皆可在後端追蹤，前端提供完整的視覺化管理介面。
+- **資料握在手上**：羊隻基本資料、事件、歷史生產數據、ESG 指標與產品批次都在後端完整建模，前端提供管理介面。
 - **AI 協作**：後端透過 Google Gemini API 提供每日提示、營養建議、圖片強化對話；前端提供聊天體驗與 API 金鑰管理。
 - **資料匯入匯出**：支援表單範本分析、批次導入、自動欄位對應與匯出多張工作表。
 - **預測模型**：以 sklearn 線性回歸計算羊隻生長趨勢並結合 LLM 提供 ESG 觀點的建議。
-- **完整測試**：後端 208 項 Pytest、前端 281 項 Vitest 皆通過，對應的 HTML 覆蓋率報告已收納在 `docs/backend/coverage/` 與 `docs/frontend/coverage/`。
+- **產品產銷履歷**：批次資料串連加工步驟與羊隻貢獻，支援公開分享、QR Code 與 ESG 故事呈現。
+- **完整測試**：後端 Pytest、前端 Vitest 皆涵蓋主要流程，HTML 覆蓋率報告收納於 `docs/backend/coverage/` 與 `docs/frontend/coverage/`。
 
 ## 架構一覽
 
@@ -26,7 +27,8 @@ graph LR
         Sheep[Sheep Blueprint]
         Data[Data Blueprint]
         Agent[Agent Blueprint]
-        Dashboard[Dashboard Blueprint]
+    Dashboard[Dashboard Blueprint]
+    Traceability[Traceability Blueprint]
         Prediction[Prediction Blueprint]
         Cache[(In-memory Cache)]
     end
@@ -43,6 +45,7 @@ graph LR
     ApiClient --> Agent
     ApiClient --> Dashboard
     ApiClient --> Prediction
+    ApiClient --> Traceability
 
     Sheep --> Postgres
     Data --> Postgres
@@ -50,6 +53,7 @@ graph LR
     Prediction --> Postgres
     Auth --> Postgres
     Agent --> Postgres
+    Traceability --> Postgres
 
     Prediction -->|LLM prompt| Gemini[(Google Gemini)]
 ```
@@ -68,14 +72,14 @@ graph LR
 
 > 圖片與架構圖集中於 `docs/assets/`，覆蓋率 HTML 報告集中於 `docs/backend/coverage/` 與 `docs/frontend/coverage/`。
 
-## 最新測試結果（2025-09-25）
+## 最新測試結果（更新於 2025-10-05）
 
 | 範疇 | 指令 | 結果摘要 |
 |------|------|-----------|
-| 後端單元與整合測試 | `C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest` | 208 測試全通過，19 則 SQLAlchemy 2.x LegacyAPI 警告。
-| 後端覆蓋率 | `... -m pytest --cov=app --cov-report=html --cov-report=term-missing` | 總覆蓋率 **85%**；`app/api/dashboard.py` 57% 為主要補強對象。
-| 前端測試 | `npm run test -- --run` | 32 個測試檔、281 測試全通過。
-| 前端覆蓋率 | `npm run test:coverage -- --run` | Statements 81.73%、Branches 85.92%、Functions 66.43%、Lines 81.73%。
+| 後端單元與整合測試 | `C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest` | 涵蓋羊隻、資料管理、AI、預測與產銷履歷流程，執行時可能出現 SQLAlchemy Legacy API 警示。 |
+| 後端覆蓋率 | `... -m pytest --cov=app --cov-report=html --cov-report=term-missing` | 可於 `docs/backend/coverage/index.html` 檢視，`app/api/dashboard.py` 仍是主要補強對象。 |
+| 前端測試 | `npm run test -- --run`、`npx vitest run traceability` | 涵蓋 Vue 視圖、Pinia store、前端 API client 及產銷履歷管理。 |
+| 前端覆蓋率 | `npm run test:coverage -- --run` | HTML 報告位於 `docs/frontend/coverage/index.html`，Statements 約 82%。 |
 
 📍 覆蓋率 HTML 報告入口：
 - 後端：[`docs/backend/coverage/index.html`](./backend/coverage/index.html)

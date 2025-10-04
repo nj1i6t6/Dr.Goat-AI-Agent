@@ -10,14 +10,14 @@ describe('API Client', () => {
 ## 1. 快速概覽
 
 - **框架**：Vue 3.5 + Composition API，建構工具為 Vite 7。
-- **狀態**：Pinia stores（auth、sheep、dashboard、chat、consultation、settings）。
+- **狀態**：Pinia stores（auth、sheep、dashboard、chat、consultation、settings、traceability）。
 - **圖表**：Chart.js + vue-chartjs、ECharts 5。
 - **測試**：Vitest + @vue/test-utils + happy-dom。
 - **部署**：多階段 Dockerfile，Nginx 服務 SPA 與 API 代理。
 
-最新實測（2025-09-25）
-- 測試：`npm run test` → 281 項測試全數通過。
-- 覆蓋率：`npm run test:coverage` → Statements 81.73%，HTML 報告：`../../docs/frontend/coverage/index.html`。
+最新實測（2025-10-05）
+- 測試：`npm run test -- --run`、`npx vitest run traceability`。
+- 覆蓋率：`npm run test:coverage -- --run`（Statements 約 82%，HTML 報告：`../../docs/frontend/coverage/index.html`）。
 
 ## 2. 目錄速覽
 
@@ -27,7 +27,7 @@ frontend/
 │   ├── api/            # Axios client + 模組化端點
 │   ├── components/     # 共用元件（含 FieldHelper、Sheep*）
 │   ├── router/         # 路由守衛、懶載入
-│   ├── stores/         # Pinia (auth/sheep/chat/...)
+│   ├── stores/         # Pinia (auth/sheep/chat/traceability/...)
 │   ├── utils/          # errorHandler、formatters 等
 │   └── views/          # Dashboard、Chat、DataManagement...
 ├── public/             # favicon、靜態資產
@@ -48,7 +48,10 @@ Pinia stores 皆以 `defineStore` 建立，並利用 `localStorage` 與後端 Co
 - **`src/views/PredictionView.vue`**：ECharts 視覺化與 AI 說明。
 - **`src/views/ChatView.vue`**：支援文字/圖片上傳，使用 Markdown-It 呈現。
 - **`src/views/DataManagementView.vue`**：整合 Excel 上傳、進度條、錯誤彙整。
+- **`src/views/TraceabilityManagementView.vue`**：產品批次與加工流程管理，支援羊隻貢獻設定與公開連結複製。
+- **`src/views/TraceabilityPublicView.vue`**：面向消費者的公開履歷頁，以時間軸呈現加工流程。
 - **`src/stores/chat.js`**：管理 Gemini 會話、歷史與載入狀態。
+- **`src/stores/traceability.js`**：集中管理批次、步驟、羊隻關聯與公開資料同步。
 
 ## 4. 建置與開發
 
@@ -76,6 +79,7 @@ npm run preview  # 驗證 dist 內容
 ```
 npm run test              # 標準 Vitest（happy-dom）
 npm run test:coverage     # 產生 V8 coverage + HTML
+npx vitest run traceability  # 無監聽模式執行產銷履歷 store 測試
 npm run test:ui           # 啟動 Vitest UI（選配）
 npm run test:isolated     # 迴避循環依賴的個別配置
 ```

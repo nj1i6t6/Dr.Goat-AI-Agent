@@ -35,3 +35,8 @@
 
 ## 何處可以找到系統架構示意圖？
 所有圖片都集中在 `docs/assets/`，例如部署架構 `docs/assets/deployment.png`。
+
+## 產品產銷履歷公開頁會不會洩漏資料？
+- 公開 API `/api/traceability/public/<批次號>` 只回傳必要欄位，已移除帳號 ID 與內部識別碼。
+- 管理端 `/api/traceability/batches` 等端點仍需登入，未授權會獲得 401。
+- 若擔心批次號容易被猜測，可為公開用戶提供難以預測的批次編碼或加上一層 URL 簽章；也可配置速率限制與監控日誌。
