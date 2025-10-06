@@ -16,11 +16,14 @@ def app():
     os.environ['SECRET_KEY'] = 'test-secret-key'
     os.environ['CORS_ORIGINS'] = '*'
     os.environ['GOOGLE_API_KEY'] = 'test-gemini-api-key'
+    os.environ['USE_FAKE_REDIS_FOR_TESTS'] = '1'
     # 清除資料庫相關環境變數，確保使用 SQLite，並避免載入專案根 .env
     for key in [
         'DB_USERNAME', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME',
         'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB'
     ]:
+        os.environ.pop(key, None)
+    for key in ['REDIS_URL', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_PASSWORD']:
         os.environ.pop(key, None)
     # 阻止 app/__init__.py 在匯入時載入專案根 .env
     os.environ['DOTENV_PATH'] = 'NON_EXISTENT_.env'

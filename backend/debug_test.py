@@ -6,6 +6,8 @@ import tempfile
 import sys
 sys.path.append('.')
 
+os.environ.setdefault('DOTENV_PATH', 'NON_EXISTENT_.env')
+
 from app import create_app, db
 
 # 設置測試環境

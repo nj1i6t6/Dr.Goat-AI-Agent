@@ -9,7 +9,7 @@
 - **部署現況**：後端 Flask 以 Session Cookie 驗證，前端 Vue 3；Docker Compose 版本含後端、前端、PostgreSQL。Ngrok 用於暫時公開前端與 API。
 - **資料儲存**：主資料庫 PostgreSQL，測試環境可切換 SQLite。模型檔案放在 `backend/models/`。
 - **AI 能力**：已整合 Gemini LLM。下一階段導入 Function Calling、RAG、指令化任務。
-- **快取現況**：目前為 Python 記憶體快取，將改為 Redis（兼任 Celery/RQ broker、Session store）。
+- **快取現況**：已改為 Redis（兼任輕量佇列 broker、Session store），Worker 可由 `backend/run_worker.py` 啟動。
 
 ---
 
@@ -22,7 +22,7 @@
 | **B3. 時序特徵管線** | 將歷史或感測資料轉為 rolling feature | 提升健康/乳量等預測精度 | 建立 Feature 生成服務（讀 SensorReading → 寫 FeatureStore）；區分訓練與推論流程 | 生長模型維持原樣，避免與既有訓練資料不一致 |
 | **B4. AI 助理 Function Calling** | 讓 Gemini 呼叫指定後端 API | 答覆採用即時資料 | 盤點可暴露的 API（例：`get_sheep_health_data`）；定義 function schema；調整後端代理層 | 需建立白名單與安全驗證；錯誤要有 fallback |
 | **B5. AI 助理 RAG** | 導入 Gemini Embeddings 建知識庫 | 降低幻覺、提升專業性 | 規劃資料來源（SOP/FAQ/紀錄）；使用 `gemini-embedding-001` 產生向量；建向量庫 | 維度建議先 768；資料用 RETRIEVAL_DOCUMENT，查詢用 RETRIEVAL_QUERY；向量正規化 |
-| **B6. Redis + 背景任務** | Redis 同時做快取、Broker、Session | 提升擴充性、支撐多實例 | Docker Compose 加上 Redis；導入 Celery 或 RQ；Session 改使用 Redis backend | 需設密碼、監控；任務失敗需有重試/通知 |
+| **B6. Redis + 背景任務** | Redis 同時做快取、Broker、Session | 提升擴充性、支撐多實例 | ✅ 已完成：Docker Compose 加入 Redis、Session/快取改用 Redis、導入輕量佇列示範任務與 Worker | 後續可評估監控、重試與任務管理介面 |
 | **B7. DB 索引優化** | 為高頻查詢欄位加 composite index | 改善查詢效能 | 透過 Alembic 新增索引，如 `SheepEvent(sheep_id, event_date)` 等 | 避免部署尖峰鎖表；上線前測試效能 |
 | **B8. ESG 自動計算** | 根據操作記錄計算 ESG KPI | 自動產出 ESG 追蹤指標 | 定義計算公式；開發 `esg_service` 定期計算 `EsgSummary`；Dashboard 顯示結果 | 需可追溯數據來源；計算規則建置為可配置 |
 | **B9. PWA 行動版** | 讓前端支援離線與手機操作 | 現場快速記錄 | 新增 manifest、service worker；調整 UI 流程（快速紀錄、照片上傳） | 需要處理 Session cookie 與離線時的資料同步策略 |

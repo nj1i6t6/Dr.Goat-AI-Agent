@@ -30,7 +30,7 @@
 
 | 範疇 | 技術 | 重點模組 |
 |------|------|----------|
-| 後端 | Python 3.11、Flask 3、SQLAlchemy 2、Pydantic 2 | `app/api/*`（Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability）、`app/cache.py`（儀表板快取） |
+| 後端 | Python 3.11、Flask 3、SQLAlchemy 2、Pydantic 2、Redis、輕量 RQ 佇列 | `app/api/*`（Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability、Tasks）、`app/cache.py`（Redis 儀表板快取）、`app/tasks.py`（背景任務） |
 | 前端 | Vue 3.5（Composition API）、Vite 7、Pinia、Element Plus、Chart.js/ECharts | `src/views/*`、`src/stores/*`、`src/api/index.js`（Axios Client） |
 | AI | Google Gemini API | `/api/agent/*`、`/api/prediction/*`（需 `X-Api-Key`） |
 | 基礎設施 | Docker Compose、Nginx、PostgreSQL 14+（生產）、SQLite（開發/測試） | `docker-compose.yml`、`frontend/nginx.conf`、`backend/docker-entrypoint.sh` |
@@ -53,12 +53,20 @@ graph LR
         Agent[Agent Blueprint]
         Dashboard[Dashboard Blueprint]
         Prediction[Prediction Blueprint]
-        Cache[(In-memory Cache)]
+        Tasks[Tasks Blueprint]
     end
 
     subgraph Storage
         Postgres[(PostgreSQL<br/>Production)]
         SQLite[(SQLite<br/>Dev/Test)]
+    end
+
+    subgraph Infrastructure
+        Redis[(Redis Cache & Queue)]
+    end
+
+    subgraph Worker
+        WorkerNode[Background Worker]
     end
 
     Router -->|REST/JSON| ApiClient
@@ -68,13 +76,18 @@ graph LR
     ApiClient --> Agent
     ApiClient --> Dashboard
     ApiClient --> Prediction
+    ApiClient --> Tasks
 
     Sheep --> Postgres
     Data --> Postgres
-    Dashboard --> Cache
+    Dashboard --> Redis
     Prediction --> Postgres
     Auth --> Postgres
     Agent --> Postgres
+    Tasks --> Redis
+
+    WorkerNode --> Redis
+    WorkerNode --> Postgres
 
     Prediction -->|LLM prompt| Gemini[(Google Gemini)]
 ```
@@ -99,7 +112,12 @@ graph LR
 
 ### 儀表板與快取
 - 儀表板聚合提醒、停藥紀錄、健康警示與 ESG 指標。
-- 記憶體快取保留 90 秒，可透過 `clear_dashboard_cache(user_id)` 強制刷新。
+- Redis 快取保留 90 秒，可透過 `clear_dashboard_cache(user_id)` 強制刷新並跨服務共享。
+- Flask-Session 改採 Redis 儲存，登入狀態對多實例部署更友善。
+
+### 背景任務
+- 內建輕量 RQ 風格佇列與 Redis broker，可處理報表、匯出等耗時流程。
+- `/api/tasks/example` 提供第一個測試任務，`backend/run_worker.py` 可啟動 Worker。
 
 ### 全面測試
 - 後端 Pytest 208 項、覆蓋率 85%；前端 Vitest 281 項、Statements 81.73%。
@@ -147,9 +165,16 @@ npm install
 
 ```powershell
 cd backend
+$env:REDIS_PASSWORD = "simon7220"  # 與 Docker/測試保持一致
 $env:FLASK_ENV = "development"
 $env:CORS_ORIGINS = "http://localhost:5173"
 python run.py
+```
+
+啟動本機 Redis（若尚未執行，可使用 Docker 快速啟動）：
+
+```powershell
+docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass simon7220
 ```
 
 前端（Vite 開發伺服器）：
@@ -184,7 +209,7 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/dashboard/data" -W
 
 ## Docker Compose 部署
 
-1. 準備 `.env` 並填寫 `POSTGRES_*`、`SECRET_KEY`、`CORS_ORIGINS`、`GOOGLE_API_KEY` 等參數。
+1. 準備 `.env` 並填寫 `POSTGRES_*`、`SECRET_KEY`、`CORS_ORIGINS`、`GOOGLE_API_KEY`、`REDIS_PASSWORD`（預設 `simon7220`）等參數。
 2. 啟動與檢查：
 
 ```powershell
@@ -201,6 +226,7 @@ docker compose ps
 | 後端健康檢查 | <http://localhost:5001/api/auth/status> | `{ "authenticated": false }` |
 | Swagger | <http://localhost:5001/docs> | Swagger UI |
 | PostgreSQL | `docker compose logs db` | `database system is ready` |
+| Redis | `docker compose logs redis` | `Ready to accept connections` |
 
 4. 維運指令：
 
@@ -241,15 +267,16 @@ HTML 覆蓋率報告：
 | `/api/dashboard` | 儀表板數據、提醒、事件類型管理。 |
 | `/api/agent` | 每日提示、營養建議、聊天（含圖片上傳）。 |
 | `/api/prediction` | 生長預測、圖表資料（線性迴歸 + LLM）。 |
+| `/api/tasks` | 背景任務觸發與示範佇列。 |
 
 完整欄位與範例請參閱 [`docs/API.md`](docs/API.md) 或 Swagger。
 
 ## 開發工作流與最佳實務
 
 - **後端**：
-	- 啟動 `python run.py`，預設使用 SQLite；設定 `POSTGRES_*` 可切換 PostgreSQL。
-	- `app/cache.py` 提供儀表板快取；測試需即時資料時可呼叫 `clear_dashboard_cache`。
-	- 主要模組：`agent.py`（AI）、`data_management.py`（匯入匯出）、`prediction.py`（生長預測）、`models.py`（資料模型）。
+        - 啟動 `python run.py`，預設使用 SQLite；設定 `POSTGRES_*` 可切換 PostgreSQL。
+        - `app/cache.py` 透過 Redis 快取儀表板資料；測試需即時資料時可呼叫 `clear_dashboard_cache`。
+        - 主要模組：`agent.py`（AI）、`data_management.py`（匯入匯出）、`prediction.py`（生長預測）、`models.py`（資料模型）、`tasks.py`（背景任務）。
 - **前端**：
 	- `npm run dev` 啟動 Vite，透過代理將 `/api` 指向 `http://127.0.0.1:5001`。
 	- Pinia store 位於 `src/stores`，登入資訊同步存放 `localStorage`。

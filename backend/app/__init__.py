@@ -6,6 +6,15 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from dotenv import load_dotenv, find_dotenv
 
+try:  # pragma: no cover - optional dependency for real Redis
+    from redis import Redis  # type: ignore
+except ImportError:  # pragma: no cover
+    Redis = None  # type: ignore
+
+from .session_interface import RedisSessionInterface
+from .in_memory_redis import InMemoryRedis
+from .simple_queue import SimpleQueue
+
 # 載入 .env 設定：優先採用 DOTENV_PATH，其次自動尋找專案根目錄的 .env
 dotenv_path = os.environ.get('DOTENV_PATH') or find_dotenv(usecwd=True)
 if dotenv_path:
@@ -21,6 +30,41 @@ else:
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
+
+
+def _build_redis_url() -> str:
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url:
+        return redis_url
+
+    host = os.environ.get('REDIS_HOST', 'localhost')
+    port = os.environ.get('REDIS_PORT', '6379')
+    db_index = os.environ.get('REDIS_DB', '0')
+    password = os.environ.get('REDIS_PASSWORD')
+
+    if password:
+        return f"redis://:{password}@{host}:{port}/{db_index}"
+    return f"redis://{host}:{port}/{db_index}"
+
+
+def _init_redis_client(app: Flask):
+    redis_url = _build_redis_url()
+    use_fake = os.environ.get('USE_FAKE_REDIS_FOR_TESTS') == '1'
+    client = None
+
+    if not use_fake and Redis is not None:  # pragma: no branch - optional runtime dependency
+        try:
+            client = Redis.from_url(redis_url, decode_responses=True)  # type: ignore[attr-defined]
+            client.ping()
+        except Exception:
+            client = None
+
+    if client is None:
+        client = InMemoryRedis()
+
+    app.config.setdefault('REDIS_URL', redis_url)
+    app.extensions['redis_client'] = client
+    return client
 
 def create_app():
     # --- 【修改一：配置靜態檔案路徑】 ---
@@ -68,6 +112,19 @@ def create_app():
     
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+    # --- Redis / Session 設定 ---
+    redis_client = _init_redis_client(app)
+    app.config.setdefault('SESSION_TYPE', 'redis')
+    app.config.setdefault('SESSION_USE_SIGNER', True)
+    app.config.setdefault('SESSION_PERMANENT', False)
+    app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
+    app.config['SESSION_REDIS'] = redis_client
+    app.session_interface = RedisSessionInterface(redis_client)
+
+    queue_name = os.environ.get('RQ_QUEUE_NAME', 'default')
+    app.config.setdefault('RQ_QUEUE_NAME', queue_name)
+    app.extensions['rq_queue'] = SimpleQueue(queue_name, connection=redis_client)
+
     # --- 初始化擴展 ---
     db.init_app(app)
     migrate.init_app(app, db)
@@ -100,6 +157,7 @@ def create_app():
             dashboard as dashboard_bp,
             prediction as prediction_bp,
             traceability as traceability_bp,
+            tasks as tasks_bp,
         )
         app.register_blueprint(auth_bp.bp, url_prefix='/api/auth')
         app.register_blueprint(sheep_bp.bp, url_prefix='/api/sheep')
@@ -108,6 +166,7 @@ def create_app():
         app.register_blueprint(dashboard_bp.bp, url_prefix='/api/dashboard')
         app.register_blueprint(prediction_bp.bp, url_prefix='/api/prediction')
         app.register_blueprint(traceability_bp.bp, url_prefix='/api/traceability')
+        app.register_blueprint(tasks_bp.bp, url_prefix='/api/tasks')
 
         # --- OpenAPI 規格與 Swagger UI ---
         @app.route('/openapi.yaml')
