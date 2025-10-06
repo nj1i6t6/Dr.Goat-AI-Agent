@@ -1,10 +1,6 @@
-docker compose ps
-docker compose logs -f backend
-docker compose down
-docker compose restart backend
 # 部署指南
 
-> 建議使用 Docker Compose：三個容器涵蓋前端 Nginx、後端 Flask、PostgreSQL。
+> 建議使用 Docker Compose：四個容器涵蓋前端 Nginx、後端 Flask、PostgreSQL 與 Redis（快取/Session/Broker）。
 
 ![部署架構示意](./assets/deployment.png)
 
@@ -31,6 +27,7 @@ notepad .env
 | `SECRET_KEY` | Flask Session 使用的密鑰 |
 | `CORS_ORIGINS` | 允許呼叫 API 的前端來源清單 |
 | `GOOGLE_API_KEY` | Google Gemini API 金鑰（若使用 AI 功能） |
+| `REDIS_PASSWORD` | Redis 驗證密碼（預設 `simon7220`，需與 docker-compose 一致） |
 
 ## 2. 佈署與檢查
 
@@ -48,6 +45,7 @@ docker compose ps
 | Swagger | http://localhost:5001/docs | Swagger UI |
 | 公開履歷 API | http://localhost:5001/api/traceability/public/BATCH-001 | 404 或批次故事（視資料而定） |
 | PostgreSQL | `docker compose logs db` | `database system is ready to accept connections` |
+| Redis | `docker compose logs redis` | `Ready to accept connections` |
 
 ## 3. 資料庫版本控制
 
@@ -66,6 +64,7 @@ docker compose exec backend flask db upgrade
 docker compose logs -f backend
 docker compose logs -f frontend
 docker compose logs -f db
+docker compose logs -f redis
 
 # 重啟單一服務
 docker compose restart backend
@@ -105,6 +104,7 @@ docker compose cp backend:/app/logs ./logs-backup
 - [ ] `/api/data/export_excel` 能匯出檔案。
 - [ ] `/api/traceability/batches` 與 `/api/traceability/public/<批次號>` 依權限回傳正確資料。
 - [ ] `/api/agent/tip` 提供提示（若無 API key 會回傳錯誤，為正常行為）。
+- [ ] Redis 健康檢查通過，且 Worker（`python run_worker.py` 或對應服務）已啟動。
 - [ ] `docs/backend/coverage/index.html` 與 `docs/frontend/coverage/index.html` 覆蓋率報告已更新。
 
 完成上述步驟後即可交付或進行監控布建。更多開發細節請參閱 [Development](./Development.md)。

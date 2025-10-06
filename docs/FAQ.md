@@ -27,11 +27,19 @@
 - 若仍無法載入，請清除瀏覽器快取或開啟開發者工具查看 4xx/5xx 錯誤。
 
 ## 端口衝突？
-- 前端：3000（對外 80），後端：5001，PostgreSQL：5432。
+- 前端：3000（對外 80），後端：5001，PostgreSQL：5432，Redis：6379。
 - 若本地已有服務占用，可調整 `docker-compose.yml` 或 `.env` 中對應埠口後重建。
 
 ## 可以不依賴 Docker 嗎？
 可以，請依 [Development](./Development.md) 啟動 Flask 與 Vite。本機測試預設使用 SQLite，若需 PostgreSQL 請自行啟動資料庫並更新 `.env`。
+
+## Redis 連不上或快取失效？
+- 確認本機或 Docker `redis` 服務已啟動，且密碼與 `.env` 中 `REDIS_PASSWORD` 一致。
+- 可使用 `redis-cli -a <密碼> ping` 測試；若需暫時停用可設定 `USE_FAKE_REDIS_FOR_TESTS=1`。
+
+## 背景任務沒有執行？
+- `/api/tasks/example` 回傳的 `job_id` 需要由背景 Worker 處理，請啟動 `python run_worker.py` 或部署對應服務。
+- 檢查 Redis 內是否有 `rq:queue:default` 等佇列，以及 Worker 日誌是否顯示已連線。
 
 ## 何處可以找到系統架構示意圖？
 所有圖片都集中在 `docs/assets/`，例如部署架構 `docs/assets/deployment.png`。

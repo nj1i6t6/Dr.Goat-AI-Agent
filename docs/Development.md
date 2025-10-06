@@ -8,6 +8,7 @@
 | Node.js | 20.x |
 | npm | 10.x |
 | PostgreSQL（選用） | 14+ |
+| Redis | 5+ |
 
 ### 建立虛擬環境（後端）
 
@@ -29,14 +30,16 @@ npm install
 
 1. 啟動 Flask：
 	```powershell
-	cd backend
-	$env:FLASK_ENV="development"
-	$env:CORS_ORIGINS="http://localhost:5173"
-	python run.py
-	```
+        cd backend
+        $env:REDIS_PASSWORD="simon7220"
+        $env:FLASK_ENV="development"
+        $env:CORS_ORIGINS="http://localhost:5173"
+        python run.py
+        ```
 2. 預設會使用 `instance/app.db`（SQLite）。若需 PostgreSQL，請於 `.env` 中填入 `POSTGRES_*` 後重新啟動。
-3. Swagger 文件位於 `http://localhost:5001/docs`，`/openapi.yaml` 可供匯入 Postman/Insomnia。
-4. 記憶體快取：`/api/dashboard/data` 使用 `app/cache.py` 90 秒快取，可在需要時呼叫 `clear_dashboard_cache(user_id)` 清除。
+3. Redis 預設連線 `localhost:6379`，可使用 `docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass simon7220` 快速啟動。
+4. Swagger 文件位於 `http://localhost:5001/docs`，`/openapi.yaml` 可供匯入 Postman/Insomnia。
+5. Redis 快取：`/api/dashboard/data` 使用 `app/cache.py` setex 90 秒快取，可在需要時呼叫 `clear_dashboard_cache(user_id)` 清除。
 
 ### 重要模組
 
@@ -44,6 +47,7 @@ npm install
 - `app/api/data_management.py`：Excel 匯入匯出與欄位映射。
 - `app/api/prediction.py`：線性回歸 + LLM 解釋。
 - `app/models.py`：User、Sheep、事件、歷史資料、ESG 欄位。
+- `app/api/tasks.py` / `app/tasks.py`：Redis + 輕量佇列背景任務、示範佇列。
 - `app/api/traceability.py`：產品批次、加工流程、羊隻關聯與公開履歷查詢 API。
 - `app/models.py` 新增 `ProductBatch`、`ProcessingStep`、`BatchSheepAssociation`，提供多對多批次資料模型。
 - 前端 `src/views/TraceabilityManagementView.vue` 與 `TraceabilityPublicView.vue` 負責管理介面與公開故事頁。
@@ -86,7 +90,8 @@ Rename-Item ..\..\.env.bak ..\..\.env
 - HTML 報告位置：`docs/backend/coverage/index.html`。
 
 fixtures 位於 `backend/tests/conftest.py`，會自動：
-- 清除資料庫相關環境變數並強制使用 SQLite。
+- 清除資料庫與 Redis 相關環境變數並強制使用 SQLite。
+- 啟用 fakeredis（`USE_FAKE_REDIS_FOR_TESTS=1`），避免外部依賴。
 - 建立 `authenticated_client` 與基本帳號 testuser/testpass。
 - 模擬 Gemini API 回傳內容。
 
@@ -118,6 +123,9 @@ flask db upgrade
 # 只重跑指定測試
 pytest tests/test_prediction_api.py::TestPredictionAPI::test_get_prediction_success
 
+# 啟動背景任務 Worker
+python run_worker.py
+
 # 前端分析打包結果
 npm run build -- --analyze
 ```
@@ -132,4 +140,5 @@ npm run build -- --analyze
 
 - 保持 AI 相關功能時提供有效的 `GOOGLE_API_KEY`，否則 `/api/agent/*` 與 `/api/prediction` 會回傳錯誤描述。
 - 若需同時開啟 Docker 與本機服務，請調整 `.env` 中的 CORS 與資料庫設定避免衝突。
+- Redis 須與後端使用相同密碼；如需暫時停用可將 `REDIS_URL` 指向測試伺服器或啟用 fakeredis。
 - 文件與圖片集中於 `docs/`，更新說明請同步維護該目錄。

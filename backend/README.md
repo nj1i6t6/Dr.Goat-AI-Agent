@@ -27,6 +27,8 @@
 - **資料庫遷移**：Alembic 1.13.1
 - **AI 整合**：Google Generative AI 0.8.5
 - **身份驗證**：Flask-Login 0.6.3
+- **Session / 快取**：Flask-Session 0.5.0 + Redis 5（Session、儀表板快取）
+- **背景任務**：輕量 RQ 風格佇列（Redis Broker）
 - **測試框架**：pytest 8.2.0 + pytest-cov 5.0.0
 - **WSGI 伺服器**：Waitress 3.0.0
 - **Excel 處理**：openpyxl 3.1.4 + pandas 2.2.2
@@ -36,9 +38,11 @@
 backend/
 ├── app/                        # Flask 應用程式核心
 │   ├── __init__.py             # Flask 應用程式工廠
+│   ├── cache.py                # Redis 儀表板快取
 │   ├── error_handlers.py       # 統一錯誤處理器
 │   ├── models.py               # SQLAlchemy 資料模型
 │   ├── schemas.py              # Pydantic 資料驗證模型
+│   ├── tasks.py                # 輕量 RQ 風格背景任務與佇列工具
 │   ├── utils.py                # 工具函數與 AI 整合
 │   └── api/                    # RESTful API 藍圖
 │       ├── __init__.py         # API 藍圖註冊
@@ -47,6 +51,7 @@ backend/
 │       ├── dashboard.py        # 儀表板數據 API
 │       ├── data_management.py  # 數據管理 API
 │       ├── prediction.py       # 生長預測 API
+│       ├── tasks.py            # 背景任務觸發 API
 │       ├── traceability.py     # 產品產銷履歷 API（批次、加工流程、公開端）
 │       └── sheep.py            # 山羊管理 API
 ├── instance/                   # Flask 實例特定檔案
@@ -55,7 +60,7 @@ backend/
 │   ├── env.py                  # 遷移環境配置
 │   ├── script.py.mako          # 遷移腳本範本
 │   └── versions/               # 資料庫版本控制
-│       └── a6d3b4664bd0_add_esg_fields.py  # ESG 欄位遷移
+│       └── 20240723_add_core_indexes.py    # 核心複合索引遷移
 └── tests/                      # 測試套件（Pytest）
     ├── conftest.py             # pytest 測試配置與夾具
     ├── test_agent_api.py       # AI 代理人 API 測試 (18 tests)
@@ -63,6 +68,7 @@ backend/
     ├── test_dashboard_api.py   # 儀表板 API 測試 (11 tests)
     ├── test_data_management_api.py # 數據管理 API 測試 (12 tests)
     ├── test_traceability_api.py    # 產品批次與公開履歷流程測試
+    ├── test_tasks_api.py       # 背景任務與 API 測試
     ├── test_sheep_api.py       # 山羊管理 API 測試 (13 tests)
     ├── test_*_enhanced.py      # 增強測試套件 (130+ tests)
     ├── test_*_error_handling.py # 錯誤處理測試
@@ -74,6 +80,7 @@ backend/
 ### 環境需求
 - Python 3.11+
 - PostgreSQL 13+ (生產環境) / SQLite (開發環境)
+- Redis 5+（快取、Session 與背景任務佇列）
 
 ### 安裝步驟
 
@@ -94,6 +101,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 ```
+確保 `.env` 或系統環境變數中設定 `REDIS_PASSWORD`（預設 `simon7220`）與 `REDIS_HOST`（本機開發可為 `localhost`）。
 
 4. **初始化資料庫**
 ```bash
@@ -102,6 +110,7 @@ flask db upgrade
 
 5. **啟動開發伺服器**
 ```bash
+export REDIS_PASSWORD=simon7220  # Windows 請使用 set / $env
 python run.py
 ```
 
@@ -138,6 +147,9 @@ python run.py
 ### 生長預測 API (/api/prediction)
 - `GET /goats/<ear_tag>/prediction` - 生長趨勢預測
 - `GET /goats/<ear_tag>/prediction/chart-data` - 趨勢圖與信賴區間資料
+
+### 背景任務 API (/api/tasks)
+- `POST /example` - 建立示範性的儀表板快照任務（使用 Redis + 輕量佇列）
 
 ### 產品產銷履歷 API (/api/traceability)
 - `GET /batches` - 列出登入者批次（可含加工步驟/羊隻關聯）
@@ -190,6 +202,12 @@ python debug_test.py
 
 # 執行手動功能測試
 python manual_functional_test.py
+```
+
+### 背景任務 Worker
+```bash
+# 啟動背景任務 Worker（需先啟動 Redis）
+python run_worker.py
 ```
 
 ## 🐳 Docker 部署

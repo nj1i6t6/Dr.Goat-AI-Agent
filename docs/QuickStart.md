@@ -1,4 +1,3 @@
-docker compose ps
 # 快速開始
 
 > 以下指令以 **Windows PowerShell** 為例；若使用 macOS/Linux，請將反斜線換為斜線並改用 `python3`。
@@ -15,6 +14,9 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
+# （可選）若本機尚無 Redis，請安裝或使用 Docker 啟動：
+# docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass simon7220
+
 # 前端相依
 cd ..\frontend
 npm install
@@ -26,6 +28,7 @@ npm install
 
 ```powershell
 cd backend
+$env:REDIS_PASSWORD="simon7220"
 $env:FLASK_ENV="development"
 $env:CORS_ORIGINS="http://localhost:5173"
 python run.py
@@ -55,7 +58,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-服務連接埠：前端 `3000 → 80`、後端 `5001`、PostgreSQL `5432`。詳細參考 [Deployment](./Deployment.md)。
+服務連接埠：前端 `3000 → 80`、後端 `5001`、PostgreSQL `5432`、Redis `6379`。詳細參考 [Deployment](./Deployment.md)。
 
 ## 4. 試跑幾個 API
 
@@ -75,6 +78,9 @@ start http://localhost:5173/trace/BATCH-001
 
 # 取得儀表板摘要
 Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/dashboard/data" -WebSession $s | ConvertTo-Json -Depth 4
+
+# 建立背景任務
+Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/tasks/example" -WebSession $s | ConvertTo-Json
 ```
 
 ## 5. 執行測試

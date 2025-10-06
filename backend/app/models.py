@@ -114,7 +114,10 @@ class Sheep(db.Model):
 
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    __table_args__ = (db.UniqueConstraint('user_id', 'EarNum', name='_user_ear_num_uc'),)
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'EarNum', name='_user_ear_num_uc'),
+        db.Index('ix_sheep_user_status', 'user_id', 'status'),
+    )
     
     historical_data = db.relationship('SheepHistoricalData', backref='sheep', lazy='dynamic', cascade="all, delete-orphan")
     batch_links = db.relationship('BatchSheepAssociation', back_populates='sheep', cascade="all, delete-orphan", overlaps='product_batches,sheep_links')
@@ -144,6 +147,11 @@ class SheepEvent(db.Model):
     
     sheep = db.relationship('Sheep', backref=db.backref('events', lazy=True, cascade="all, delete-orphan"))
 
+    __table_args__ = (
+        db.Index('ix_sheep_event_user_sheep_date', 'user_id', 'sheep_id', 'event_date'),
+        db.Index('ix_sheep_event_user_type_date', 'user_id', 'event_type', 'event_date'),
+    )
+
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
@@ -154,12 +162,16 @@ class SheepHistoricalData(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sheep_id = db.Column(db.Integer, db.ForeignKey('sheep.id', ondelete='CASCADE'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     record_date = db.Column(db.String(50), nullable=False)
     record_type = db.Column(db.String(100), nullable=False)
     value = db.Column(db.Float, nullable=False)
     notes = db.Column(db.Text)
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('ix_sheep_hist_user_type_date', 'user_id', 'record_type', 'record_date'),
+    )
     
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

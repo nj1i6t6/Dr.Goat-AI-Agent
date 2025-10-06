@@ -20,7 +20,7 @@ def internal_error(error):
 
 - **框架**：Flask 3、SQLAlchemy 2、Flask-Login、Pydantic 2。
 - **資料庫**：生產建議 PostgreSQL，開發預設 SQLite (`instance/app.db`)。
-- **模組**：Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability。
+- **模組**：Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability、Tasks。
 - **AI 整合**：Google Gemini (`X-Api-Key` 標頭)。
 - **部署**：Docker Compose（Waitress + Gunicorn），詳細見 `docs/Deployment.md`。
 
@@ -29,11 +29,12 @@ def internal_error(error):
 ```
 backend/
 ├── app/
-│   ├── __init__.py       # create_app、CORS、藍圖註冊
-│   ├── models.py         # User、Sheep、事件、歷史與 ESG 欄位
+│   ├── __init__.py       # create_app、CORS、藍圖註冊、Redis/輕量佇列初始化
+│   ├── cache.py          # Redis 儀表板快取 (setex + 分佈式鎖)
+│   ├── models.py         # User、Sheep、事件、歷史與 ESG 欄位（含複合索引）
 │   ├── schemas.py        # Pydantic 驗證模型
+│   ├── tasks.py          # 輕量佇列 & 示範任務
 │   ├── utils.py          # Gemini 呼叫、羊隻上下文
-│   ├── cache.py          # 儀表板記憶體快取 (threading.Lock)
 │   └── api/
 │       ├── auth.py
 │       ├── sheep.py
@@ -41,9 +42,10 @@ backend/
 │       ├── dashboard.py
 │       ├── agent.py
 │       ├── prediction.py
+│       ├── tasks.py      # 背景任務觸發端點
 │       └── traceability.py    # 產品批次 / 加工流程 / 公開履歷
 ├── tests/                # Pytest（含 Gemini mock Fixtures）
-├── migrations/           # Alembic 遷移腳本
+├── migrations/           # Alembic 遷移腳本（包含複合索引）
 ├── docs/                 # （本檔）
 ├── logs/                 # `app.log`
 ├── docker-entrypoint.sh
@@ -69,7 +71,7 @@ backend/
 
 ### 儀表板 (`app/api/dashboard.py`)
 - 提供提醒、停藥、健康警示、ESG 指標。
-- 透過 `app/cache.py` 以 `user_id` 為 key 記憶體快取 90 秒。
+- 透過 `app/cache.py` 搭配 Redis setex/Lock 快取 90 秒，支援跨實例共享。
 
 ### AI 代理 (`app/api/agent.py`)
 - 每日提示、營養建議、圖片/文字聊天。
@@ -80,6 +82,11 @@ backend/
 - 線性迴歸 (sklearn) + LLM 說明。
 - 先做資料品質檢查（數量、時間跨度、異常值）。
 - 回傳預測體重、平均日增重、參考範圍、AI Markdown 分析。
+
+### 背景任務 (`app/api/tasks.py`, `app/tasks.py`)
+- 使用 Redis + 輕量佇列作為 broker/work queue。
+- `/api/tasks/example` 建立示範任務，Worker 於 `run_worker.py` 啟動。
+- `tasks.py` 提供佇列存取與背景函數，可擴充報表、通知等情境。
 
 ### 產品產銷履歷 (`app/api/traceability.py`)
 - 為每位使用者提供批次管理、加工步驟與羊隻貢獻關聯。
@@ -94,6 +101,7 @@ backend/
 | Flask | `SECRET_KEY` | Session 密鑰 |
 | CORS | `CORS_ORIGINS` | 允許的前端來源（逗號分隔） |
 | DB | `POSTGRES_*` | 提供時使用 PostgreSQL，否則採 SQLite |
+| Redis | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis 連線設定（預設 `localhost:6379` / `simon7220`） |
 | AI | `GOOGLE_API_KEY` | 若未設定，AI 相關端點會回傳提示訊息 |
 
 開發模式可直接執行 `python run.py`，若 `.env` 不存在將自動建立 SQLite。
@@ -102,7 +110,9 @@ backend/
 
 - `create_app()` 會根據 `.env` 或 `DOTENV_PATH` 載入設定。
 - `debug_test.py` 於模組層建立 app，若保留 `.env` 內的 PostgreSQL 設定會在 Pytest 時造成連線錯誤；測試前請暫時改名 `.env`。
-- 儀表板快取：若測試需要即時資料，可呼叫 `from app.cache import clear_dashboard_cache`。
+- 儀表板快取：Redis setex 90 秒，測試需即時資料可呼叫 `from app.cache import clear_dashboard_cache`。
+- 測試環境已透過 `USE_FAKE_REDIS_FOR_TESTS=1` 啟用 fakeredis，避免外部依賴。
+- 背景任務：`from app.tasks import enqueue_example_task` 可用於測試輕量佇列。
 - 日誌：`logs/app.log`，部署時建議設定輪轉。
 
 ## 6. 測試
@@ -115,7 +125,7 @@ C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest --co
 Rename-Item ..\..\.env.bak ..\..\.env
 ```
 
-- 測試內容涵蓋 Auth、Sheep、Data Management、Dashboard、Agent、Prediction 與 Traceability。
+- 測試內容涵蓋 Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability 與背景任務。
 - `tests/test_traceability_api.py` 驗證批次 CRUD、步驟管理、羊隻關聯更新與公開端權限。
 - 覆蓋率總覽於 `../../docs/backend/coverage/index.html`，`app/api/dashboard.py` 仍為主要補強目標。
 - HTML 報告：`../../docs/backend/coverage/index.html`。
@@ -136,6 +146,9 @@ flask db upgrade
 python manual_functional_test.py
 python manual_test.py
 
+# 啟動背景任務 Worker
+python run_worker.py
+
 # 產出匯出範例
 python create_test_data.py
 ```
@@ -148,6 +161,7 @@ python create_test_data.py
 | AI 端點回傳缺少金鑰 | 確認請求標頭 `X-Api-Key` 或 `.env` 內的 `GOOGLE_API_KEY` |
 | 匯入 Excel 失敗 | 檔案副檔名、欄位名稱、日期格式 (`YYYY-MM-DD`) |
 | 儀表板沒有更新 | 呼叫 `clear_dashboard_cache(user_id)` 或等待 90 秒 |
+| Redis 連線失敗 | 檢查 Redis 服務是否啟動、`REDIS_HOST`/`REDIS_PASSWORD` 是否正確 |
 
 ## 9. 授權與文件
 

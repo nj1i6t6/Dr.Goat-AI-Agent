@@ -44,6 +44,7 @@
 | 生長預測 | LightGBM + 線性迴歸備援 | `app/api/prediction.py` | `PredictionView.vue` | `test_prediction_api.py`, `test_prediction_manual.py` |
 | 產銷履歷 | 批次、加工流程、公開頁 | `app/api/traceability.py` | `TraceabilityManagementView.vue`, `TraceabilityPublicView.vue` | `test_traceability_api.py`, `test_traceability_enhanced.py` |
 | ESG 協助 | ESG 欄位、建議、故事 | `models.py`、`agent.py` | Dashboard 卡片、AI 輸出 | `test_dashboard_enhanced.py` |
+| 背景任務 | 儀表板快照、匯出等耗時流程排程 | `app/api/tasks.py`、`app/tasks.py` | （未提供專屬前端頁，透過 API 觸發） | `test_tasks_api.py` |
 
 ---
 
@@ -72,13 +73,18 @@ graph TB
                 Prediction[Prediction Blueprint]
                 Agent[Agent Blueprint]
                 Traceability[Traceability Blueprint]
-                Cache[(In-memory Cache)]
+                Tasks[Tasks Blueprint]
         end
 
         subgraph DataTier[Persistence Layer]
                 Postgres[(PostgreSQL 13+/Prod)]
                 SQLite[(SQLite/Dev&Test)]
                 Filesystem[(模型與媒體檔案)]
+                Redis[(Redis Cache & Queue)]
+        end
+
+        subgraph Worker[Background Worker]
+                WorkerNode[Worker]
         end
 
         subgraph External[外部整合]
@@ -95,13 +101,17 @@ graph TB
 
         Auth --> Postgres
         Sheep --> Postgres
-        Dashboard --> Cache
+        Dashboard --> Redis
         Data --> Postgres
         Prediction --> Postgres
         Traceability --> Postgres
+        Tasks --> Redis
 
         Prediction --> Gemini
         Agent --> Gemini
+
+        WorkerNode --> Redis
+        WorkerNode --> Postgres
 ```
 
 ### 2.2 核心流程
@@ -127,17 +137,20 @@ graph TB
 - Waitress 3.0 作為 WSGI 伺服器
 - Pandas + OpenPyXL 處理 Excel
 - Google Generative AI SDK 0.8.5
+- Redis 5 + Flask-Session 0.5（Session/快取）
+- 輕量 RQ 風格佇列（背景任務）
 - pytest 8.2 + pytest-cov 作為單元/整合測試框架
 
 ### 3.2 應用結構
 
 ```
 backend/app/
-├── __init__.py        # App factory, Blueprint 註冊, DB/CORS/Login 設定
-├── cache.py           # 90 秒記憶體快取 + user-level lock
+├── __init__.py        # App factory, Blueprint 註冊, DB/CORS/Login、Redis/佇列設定
+├── cache.py           # Redis setex 快取 + 分佈式 Lock（90 秒）
 ├── error_handlers.py  # 全域例外對應 JSON 錯誤格式
-├── models.py          # ORM 模型（User, Sheep, Events, ESG, Traceability）
+├── models.py          # ORM 模型（含複合索引/ESG 欄位）
 ├── schemas.py         # Pydantic 模型 & 錯誤格式化
+├── tasks.py           # 輕量佇列工具與示範任務
 ├── utils.py           # Gemini API 呼叫、上下文組裝、圖片 base64
 └── api/               # Blueprint modules（詳見下表）
 ```
@@ -153,6 +166,7 @@ backend/app/
 | `prediction` | `/api/prediction` | LightGBM/線性回歸預測、圖表資料 | Joblib 模型、`utils.call_gemini_api` (ESG 文案) | `test_prediction_api.py`, `test_prediction_manual.py` |
 | `agent` | `/api/agent` | 每日提示、營養建議、圖片聊天、聊天記錄 | Gemini API、`ChatHistory` | `test_agent_api.py`, `test_agent_enhanced.py` |
 | `traceability` | `/api/traceability` | 產品批次、加工流程、羊隻貢獻、公開端 | `ProductBatch`, `ProcessingStep`, `BatchSheepAssociation` | `test_traceability_api.py`, `test_traceability_enhanced.py` |
+| `tasks` | `/api/tasks` | 透過 Redis + 輕量佇列觸發背景任務 | `tasks.py`, Redis Broker | `test_tasks_api.py` |
 
 ### 3.4 資料模型摘要
 
@@ -183,11 +197,16 @@ backend/app/
 - `export_excel`：將羊隻、事件、歷史與聊天紀錄分工作表輸出（無資料時提供 `Empty_Export` 說明頁）。
 
 ### 3.7 快取與鎖機制
-- `cache.CACHE_TTL_SECONDS = 90`，以 user_id 為 key 儲存 Dashboard 統計。
-- `get_user_lock` 提供 per-user `threading.Lock`，避免同時多次重算。
+- `cache.CACHE_TTL_SECONDS = 90`，透過 Redis `setex` 以 `dashboard-cache:<user>` 儲存儀表板統計。
+- `get_user_lock` 改採 Redis 分佈式 Lock，避免跨實例同時重算。
 - `clear_dashboard_cache(user_id)` 供 API/管理員強制刷新。
 
-### 3.8 日誌、錯誤與腳本
+### 3.8 背景任務
+- `tasks.py` 提供共用輕量佇列存取與 `example_generate_dashboard_snapshot` 示範任務。
+- `enqueue_example_task` 會推送至 Redis-backed Queue，Worker 於 `backend/run_worker.py` 啟動。
+- 可擴充為報表產生、通知寄送等長時間流程。
+
+### 3.9 日誌、錯誤與腳本
 - 日誌輸出預設在 `/app/logs/app.log`（Docker volume 對應 `backend/logs/`）。
 - `error_handlers.py` 將常見例外（驗證錯誤、401/403/404/500）標準化為 JSON。
 - 手動測試腳本：`debug_test.py`、`manual_functional_test.py`、`manual_test.py`、`auth_debug.py`。
@@ -469,7 +488,8 @@ docker compose cp backend:/app/logs ./logs-backup
 - **Excel AI 映射不準**：檢視 API 回傳的 `warnings`，必要時改採自訂映射模式。
 - **前端 401 無限循環**：Axios interceptor 已避免登出/登入請求觸發自動登出，若仍重現請檢查 API 伺服器 Session。
 - **Traceability 公開頁 404**：確認批次 `is_public` 設為 `true`，且 URL `batch_number` 正確。
-- **Dashboard 數據未更新**：呼叫 `/api/dashboard/clear-cache`（若有提供）或於後端使用 `clear_dashboard_cache(user_id)`。
+- **Dashboard 數據未更新**：呼叫 `/api/dashboard/clear-cache`（若有提供）或於後端使用 `clear_dashboard_cache(user_id)`；確認 Redis 服務運作正常。
+- **背景任務未執行**：確認有啟動 `python run_worker.py`，並檢查 Redis 內是否存在對應佇列。
 - **Docker 初次啟動後端失敗**：檢查 `GOOGLE_API_KEY`、`POSTGRES_*` 是否正確；查看 `docker compose logs backend`。
 
 ---
@@ -490,7 +510,8 @@ docker compose cp backend:/app/logs ./logs-backup
 ### 建議 Roadmap
 - [ ] 提升 Dashboard Blueprint 測試覆蓋率 ≥80%。
 - [ ] 擴充 `SettingsView.vue`、`SheepListView.vue` 的互動測試。
-- [ ] 導入 Redis/外部快取取代記憶體快取（多機部署）。
+- [x] 導入 Redis/外部快取取代記憶體快取（多機部署）。
+- [x] 建立輕量背景任務佇列基礎（示範任務 + Worker）。
 - [ ] 將 AI 金鑰安全儲存在伺服器端密鑰管家（可選）。
 - [ ] 建立 CI Pipeline（GitHub Actions）自動執行 pytest/vitest + Docker build。
 

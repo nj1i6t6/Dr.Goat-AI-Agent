@@ -86,11 +86,18 @@
 | DELETE | `/batches/{batch_id}/sheep/{sheep_id}` | 移除單筆羊隻關聯 | 需登入 |
 | GET | `/public/{batch_number}` | 不需登入即可取得公開批次故事、加工流程時間軸、羊隻摘要 | 公開 |
 
+## 背景任務 `/api/tasks`
+
+| Method | Path | 說明 | 備註 |
+|--------|------|------|------|
+| POST | `/example` | 建立示範性的儀表板快照任務並排入輕量佇列 | 需登入；回傳 `job_id` 可供 Worker 追蹤 |
+
 ## 通用規則
 
 - 例外處理：所有 Blueprint 會在失敗情況回傳 `{ "error": "..." }`，HTTP 狀態碼對應錯誤類型。
 - 日期格式：統一採 `YYYY-MM-DD`；Excel 匯入會自動排除 `1900-01-01` 等空值標記。
 - 權限：所有資料均依 `current_user.id` 隔離，無跨使用者操作。
-- 快取：儀表板資料以 user_id 鎖定，若需強制更新請呼叫 `/api/dashboard/data` 後端函式 `clear_dashboard_cache`。
+- 快取：儀表板資料以 Redis setex 儲存，若需強制更新請呼叫 `/api/dashboard/data` 後端函式 `clear_dashboard_cache`。
+- 背景任務：所有佇列皆使用 Redis 作為 Broker，Worker 可由 `backend/run_worker.py` 啟動。
 
 更多詳細欄位、Schema 與範例請開啟 Swagger UI 或檢視 `backend/openapi.yaml`。
