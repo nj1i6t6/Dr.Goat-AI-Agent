@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
 from typing import Optional
 
 
@@ -51,6 +52,7 @@ class InMemoryRedis:
         self._data: dict[str, str] = {}
         self._expirations: dict[str, float] = {}
         self._locks: dict[str, threading.Lock] = {}
+        self._lists: dict[str, deque[str]] = {}
         self._mutex = threading.Lock()
 
     def _purge(self, key: str) -> None:
@@ -58,11 +60,17 @@ class InMemoryRedis:
         if expire_at is not None and expire_at <= time.time():
             self._data.pop(key, None)
             self._expirations.pop(key, None)
+            self._lists.pop(key, None)
 
     def get(self, key: str) -> Optional[str]:
         with self._mutex:
             self._purge(key)
             return self._data.get(key)
+
+    def set(self, key: str, value: str) -> None:
+        with self._mutex:
+            self._data[key] = value
+            self._expirations.pop(key, None)
 
     def setex(self, key: str, ttl: int, value: str) -> None:
         with self._mutex:
@@ -73,6 +81,7 @@ class InMemoryRedis:
         with self._mutex:
             self._data.pop(key, None)
             self._expirations.pop(key, None)
+            self._lists.pop(key, None)
 
     def lock(self, name: str, timeout: Optional[int] = None, blocking_timeout: Optional[int] = None):
         return _InMemoryLock(self, name, timeout, blocking_timeout)
@@ -80,3 +89,19 @@ class InMemoryRedis:
     # Compatibility helpers
     def ping(self) -> bool:
         return True
+
+    # --- Minimal list operations for queue support ---
+    def rpush(self, key: str, value: str) -> None:
+        with self._mutex:
+            queue = self._lists.setdefault(key, deque())
+            queue.append(value)
+
+    def lpop(self, key: str) -> Optional[str]:
+        with self._mutex:
+            queue = self._lists.get(key)
+            if not queue:
+                return None
+            value = queue.popleft()
+            if not queue:
+                self._lists.pop(key, None)
+            return value
