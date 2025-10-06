@@ -1,5 +1,7 @@
 # 領頭羊博士（Goat Nutrition App）
 
+[中文 (README)](/README.md) | [English (Docs)](/docs/README.en.md)
+
 > 智慧化山羊營養管理平台，結合 Flask 後端、Vue 3 前端、AI 輔助決策與 Excel 資料流程，協助牧場即時掌握羊群營養與 ESG 指標。
 
 ## 目錄
@@ -31,65 +33,72 @@
 | 範疇 | 技術 | 重點模組 |
 |------|------|----------|
 | 後端 | Python 3.11、Flask 3、SQLAlchemy 2、Pydantic 2、Redis、輕量 RQ 佇列 | `app/api/*`（Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability、Tasks）、`app/cache.py`（Redis 儀表板快取）、`app/tasks.py`（背景任務） |
-| 前端 | Vue 3.5（Composition API）、Vite 7、Pinia、Element Plus、Chart.js/ECharts | `src/views/*`、`src/stores/*`、`src/api/index.js`（Axios Client） |
+| 前端 | Vue 3.x（Composition API）、Vite 7、Pinia、Element Plus、Chart.js/ECharts | `src/views/*`、`src/stores/*`、`src/api/index.js`（Axios Client） |
 | AI | Google Gemini API | `/api/agent/*`、`/api/prediction/*`（需 `X-Api-Key`） |
 | 基礎設施 | Docker Compose、Nginx、PostgreSQL 14+（生產）、SQLite（開發/測試） | `docker-compose.yml`、`frontend/nginx.conf`、`backend/docker-entrypoint.sh` |
 
 ## 系統架構
 
 ```mermaid
-graph LR
-    subgraph Frontend [Vue 3 SPA]
-        Router
-        Pinia
-        Components
-        ApiClient
-    end
+graph TB
+  subgraph Client["使用者瀏覽器"]
+    UI[Vue 3 SPA]
+    Pinia[Pinia Stores]
+  end
 
-    subgraph Backend [Flask App]
-        Auth[Auth Blueprint]
-        Sheep[Sheep Blueprint]
-        Data[Data Blueprint]
-        Agent[Agent Blueprint]
-        Dashboard[Dashboard Blueprint]
-        Prediction[Prediction Blueprint]
-        Tasks[Tasks Blueprint]
-    end
+  subgraph Frontend["Frontend (Vite build -> Nginx)"]
+    Router[Vue Router 4]
+    Components[Element Plus Components]
+    ApiClient[Axios API client]
+  end
 
-    subgraph Storage
-        Postgres[(PostgreSQL<br/>Production)]
-        SQLite[(SQLite<br/>Dev/Test)]
-    end
+  subgraph Backend["Backend (Flask 3)"]
+    Auth[Auth Blueprint]
+    Sheep[Sheep Blueprint]
+    Dashboard[Dashboard Blueprint]
+    Data[Data Management Blueprint]
+    Prediction[Prediction Blueprint]
+    Agent[Agent Blueprint]
+    Traceability[Traceability Blueprint]
+    Tasks[Tasks Blueprint]
+  end
 
-    subgraph Infrastructure
-        Redis[(Redis Cache & Queue)]
-    end
+  subgraph DataTier["Persistence Layer"]
+    Postgres[(PostgreSQL 13+ / Prod)]
+    SQLite[(SQLite / Dev & Test)]
+    Filesystem[(模型與媒體檔案)]
+    Redis[(Redis Cache & Queue)]
+  end
 
-    subgraph Worker
-        WorkerNode[Background Worker]
-    end
+  subgraph Worker["Background Worker"]
+    WorkerNode[Worker]
+  end
 
-    Router -->|REST/JSON| ApiClient
-    ApiClient -->|/api/*| Auth
-    ApiClient --> Sheep
-    ApiClient --> Data
-    ApiClient --> Agent
-    ApiClient --> Dashboard
-    ApiClient --> Prediction
-    ApiClient --> Tasks
+  subgraph External["外部整合"]
+    Gemini[Google Gemini API]
+  end
 
-    Sheep --> Postgres
-    Data --> Postgres
-    Dashboard --> Redis
-    Prediction --> Postgres
-    Auth --> Postgres
-    Agent --> Postgres
-    Tasks --> Redis
+  UI --> Router --> ApiClient --> Auth
+  ApiClient --> Sheep
+  ApiClient --> Dashboard
+  ApiClient --> Data
+  ApiClient --> Prediction
+  ApiClient --> Agent
+  ApiClient --> Traceability
 
-    WorkerNode --> Redis
-    WorkerNode --> Postgres
+  Auth --> Postgres
+  Sheep --> Postgres
+  Dashboard --> Redis
+  Data --> Postgres
+  Prediction --> Postgres
+  Traceability --> Postgres
+  Tasks --> Redis
 
-    Prediction -->|LLM prompt| Gemini[(Google Gemini)]
+  Prediction --> Gemini
+  Agent --> Gemini
+
+  WorkerNode --> Redis
+  WorkerNode --> Postgres
 ```
 
 ![部署架構示意](docs/assets/deployment.png)
@@ -134,7 +143,7 @@ goat-nutrition-app/
 │  ├─ backend/       # 後端覆蓋率 HTML
 │  └─ frontend/      # 前端覆蓋率 HTML
 ├─ docker-compose.yml
-├─ deploy*.sh/.ps1   # 部署輔助腳本
+├─ deploy*.sh, deploy*.ps1   # 部署輔助腳本
 └─ README.md         # 本文件
 ```
 
@@ -165,7 +174,7 @@ npm install
 
 ```powershell
 cd backend
-$env:REDIS_PASSWORD = "simon7220"  # 與 Docker/測試保持一致
+$env:REDIS_PASSWORD = "<REDIS_PASSWORD>"  # see .env.example
 $env:FLASK_ENV = "development"
 $env:CORS_ORIGINS = "http://localhost:5173"
 python run.py
@@ -174,7 +183,7 @@ python run.py
 啟動本機 Redis（若尚未執行，可使用 Docker 快速啟動）：
 
 ```powershell
-docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass simon7220
+docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass "$REDIS_PASSWORD"
 ```
 
 前端（Vite 開發伺服器）：
@@ -209,7 +218,7 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/dashboard/data" -W
 
 ## Docker Compose 部署
 
-1. 準備 `.env` 並填寫 `POSTGRES_*`、`SECRET_KEY`、`CORS_ORIGINS`、`GOOGLE_API_KEY`、`REDIS_PASSWORD`（預設 `simon7220`）等參數。
+1. 準備 `.env` 並填寫 `POSTGRES_*`、`SECRET_KEY`、`CORS_ORIGINS`、`GOOGLE_API_KEY`、`REDIS_PASSWORD`（請參考 `.env.example`）等參數。
 2. 啟動與檢查：
 
 ```powershell
@@ -312,4 +321,6 @@ HTML 覆蓋率報告：
 ---
 
 若需擴充文件或圖表，請延續 `docs/` 既有結構並將新的資產放入對應子資料夾，以維持專案文件一致性。
+
+📣 本文件為訪客導覽；**唯一事實來源 (SoT)**：/docs/README.en.md
 

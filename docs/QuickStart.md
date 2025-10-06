@@ -15,7 +15,8 @@ python -m venv .venv
 pip install -r requirements.txt
 
 # （可選）若本機尚無 Redis，請安裝或使用 Docker 啟動：
-# docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass simon7220
+$env:REDIS_PASSWORD="<REDIS_PASSWORD>"  # 參考 .env.example
+docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass "$REDIS_PASSWORD"
 
 # 前端相依
 cd ..\frontend
@@ -28,7 +29,7 @@ npm install
 
 ```powershell
 cd backend
-$env:REDIS_PASSWORD="simon7220"
+$env:REDIS_PASSWORD="<REDIS_PASSWORD>"  # 請參考 .env.example
 $env:FLASK_ENV="development"
 $env:CORS_ORIGINS="http://localhost:5173"
 python run.py

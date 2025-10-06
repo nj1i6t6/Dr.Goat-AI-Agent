@@ -101,7 +101,7 @@ backend/
 | Flask | `SECRET_KEY` | Session 密鑰 |
 | CORS | `CORS_ORIGINS` | 允許的前端來源（逗號分隔） |
 | DB | `POSTGRES_*` | 提供時使用 PostgreSQL，否則採 SQLite |
-| Redis | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis 連線設定（預設 `localhost:6379` / `simon7220`） |
+| Redis | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis 連線設定（預設 `localhost:6379` / 參考 `.env.example`） |
 | AI | `GOOGLE_API_KEY` | 若未設定，AI 相關端點會回傳提示訊息 |
 
 開發模式可直接執行 `python run.py`，若 `.env` 不存在將自動建立 SQLite。

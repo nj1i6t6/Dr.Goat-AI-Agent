@@ -11,6 +11,12 @@
 3. **Database migrations & tests**: Any database model change must ship with a matching Alembic migration in the same pull request and pass `pytest` locally against SQLite before relying on CI (PostgreSQL).
 4. **Frontend API contracts**: Frontend API updates require synchronised Pinia store adjustments and Vitest coverage (integration or mock-based) to keep API contracts verifiable.
 
+## Documentation Source of Truth
+- The canonical docs are **English** under `docs/` (e.g., `docs/README.en.md`, ADRs).
+- Update English docs first for any feature/API/architecture change.
+- Before merging, sync user-facing changes into the root **README.md (zh-TW)**.
+- Maintain a shared terminology map in `docs/glossary.md` to keep zh-TW wording consistent.
+
 ## Scope
 These instructions apply to the entire `goat-nutrition-app` repository unless a more specific `AGENTS.md` exists deeper in the tree.
 
@@ -18,13 +24,13 @@ These instructions apply to the entire `goat-nutrition-app` repository unless a 
 - `backend/`: Flask application, SQLAlchemy models, Alembic migrations, and background worker scripts.
 - `frontend/`: Vue 3 + Vite single-page application using Element Plus, Pinia, and ECharts/Chart.js.
 - `docs/`: Project documentation, deployment guides, API references, and architectural decision records (`docs/adr/`).
-- `docker-compose.yml`, `deploy*.sh|.bat`: Deployment and local development helpers.
+- `docker-compose.yml`, `deploy*.sh`, `deploy*.bat`: Deployment and local development helpers.
 - `generate_architecture.py`: Utility script that generates or updates architecture diagrams.
 - `test_image_upload.py`: End-to-end test harness for the media upload flow.
 
 ## Architectural Overview
 - **Backend**: Flask 3 with SQLAlchemy 2 (located under `backend/`). Redis powers session storage, dashboard caching, and an RQ-style queue defined in `app/tasks.py`. SQLite backs local dev while PostgreSQL drives production.
-- **Frontend**: Vue 3.5 SPA built with Vite and Element Plus (in `frontend/`). Pinia manages global state, Axios (configured in `src/api/index.js`) handles HTTP calls, and ECharts/Chart.js provide data visualisation.
+- **Frontend**: Vue 3.x SPA built with Vite and Element Plus (in `frontend/`). Pinia manages global state, Axios (configured in `src/api/index.js`) handles HTTP calls, and ECharts/Chart.js provide data visualisation.
 - **Background work**: `backend/run_worker.py` consumes jobs from Redis. Queue long-running work instead of blocking API handlers.
 - **Documentation & assets**: Live in `docs/` with coverage artefacts and deployment diagrams. Avoid committing large binaries.
 
@@ -41,7 +47,7 @@ These instructions apply to the entire `goat-nutrition-app` repository unless a 
   - Maintain state in Pinia stores under `src/stores/`. Keep stores serialisable and surface derived data via getters rather than duplicating component logic.
   - When adding routes, update both `src/router/index.js` and related navigation components.
 - **General**
-  - Preserve bilingual UI copy only when the affected view already uses Traditional Chinese. Align terminology with `README.md`.
+  - Preserve bilingual UI copy only when the affected view already uses Traditional Chinese. Align terminology with `docs/README.en.md` (SoT) and keep `docs/glossary.md` updated so the zh-TW README stays consistent.
   - Update relevant documentation (`README.md`, `docs/`, OpenAPI specs) whenever external behaviour changes.
   - Never hard-code secrets such as API keys; rely on environment variables and document additions in `.env.example`.
 
