@@ -27,7 +27,7 @@ notepad .env
 | `SECRET_KEY` | Flask Session 使用的密鑰 |
 | `CORS_ORIGINS` | 允許呼叫 API 的前端來源清單 |
 | `GOOGLE_API_KEY` | Google Gemini API 金鑰（若使用 AI 功能） |
-| `REDIS_PASSWORD` | Redis 驗證密碼（預設 `simon7220`，需與 docker-compose 一致） |
+| `REDIS_PASSWORD` | Redis 驗證密碼（請參考 `.env.example`，需與 docker-compose 一致） |
 
 ## 2. 佈署與檢查
 

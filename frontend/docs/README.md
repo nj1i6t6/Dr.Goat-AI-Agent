@@ -9,7 +9,7 @@ describe('API Client', () => {
 
 ## 1. 快速概覽
 
-- **框架**：Vue 3.5 + Composition API，建構工具為 Vite 7。
+- **框架**：Vue 3.x + Composition API，建構工具為 Vite 7。
 - **狀態**：Pinia stores（auth、sheep、dashboard、chat、consultation、settings、traceability）。
 - **圖表**：Chart.js + vue-chartjs、ECharts 5。
 - **測試**：Vitest + @vue/test-utils + happy-dom。

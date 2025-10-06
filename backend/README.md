@@ -101,7 +101,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 ```
-確保 `.env` 或系統環境變數中設定 `REDIS_PASSWORD`（預設 `simon7220`）與 `REDIS_HOST`（本機開發可為 `localhost`）。
+確保 `.env` 或系統環境變數中設定 `REDIS_PASSWORD`（請參考 `.env.example`）與 `REDIS_HOST`（本機開發可為 `localhost`）。
 
 4. **初始化資料庫**
 ```bash
@@ -110,7 +110,7 @@ flask db upgrade
 
 5. **啟動開發伺服器**
 ```bash
-export REDIS_PASSWORD=simon7220  # Windows 請使用 set / $env
+export REDIS_PASSWORD=<REDIS_PASSWORD>  # Windows 請使用 set / $env 並參考 .env.example
 python run.py
 ```
 

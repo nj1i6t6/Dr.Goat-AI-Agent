@@ -31,13 +31,13 @@ npm install
 1. 啟動 Flask：
 	```powershell
         cd backend
-        $env:REDIS_PASSWORD="simon7220"
+        $env:REDIS_PASSWORD="<REDIS_PASSWORD>"  # 參考 .env.example
         $env:FLASK_ENV="development"
         $env:CORS_ORIGINS="http://localhost:5173"
         python run.py
         ```
 2. 預設會使用 `instance/app.db`（SQLite）。若需 PostgreSQL，請於 `.env` 中填入 `POSTGRES_*` 後重新啟動。
-3. Redis 預設連線 `localhost:6379`，可使用 `docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass simon7220` 快速啟動。
+3. Redis 預設連線 `localhost:6379`，可使用 `docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass "$REDIS_PASSWORD"` 快速啟動。
 4. Swagger 文件位於 `http://localhost:5001/docs`，`/openapi.yaml` 可供匯入 Postman/Insomnia。
 5. Redis 快取：`/api/dashboard/data` 使用 `app/cache.py` setex 90 秒快取，可在需要時呼叫 `clear_dashboard_cache(user_id)` 清除。
 
