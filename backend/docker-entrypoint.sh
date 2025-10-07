@@ -7,19 +7,6 @@ set -e
 
 echo "=== 領頭羊博士 Docker 啟動腳本 ==="
 
-if [ -d "/app/.git" ]; then
-    echo "同步最新程式碼 (git pull + git lfs pull)..."
-    if ! git -C /app pull --ff-only; then
-        echo "警告：git pull 失敗，將沿用目前版本"
-    fi
-    if ! git -C /app lfs install --local; then
-        echo "警告：git lfs install 失敗，請確認容器已安裝 git-lfs"
-    fi
-    if ! git -C /app lfs pull; then
-        echo "警告：git lfs pull 失敗，向量檔可能缺失"
-    fi
-fi
-
 echo "確認 RAG 向量檔..."
 python - <<'PY'
 from app.rag_loader import ensure_vectors

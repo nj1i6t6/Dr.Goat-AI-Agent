@@ -67,6 +67,11 @@ class InMemoryRedis:
                 return None
             return value  # type: ignore[return-value]
 
+    def set(self, key: str, value: str) -> None:
+        with self._mutex:
+            self._data[key] = value
+            self._expirations.pop(key, None)
+
     def setex(self, key: str, ttl: int, value: str) -> None:
         with self._mutex:
             self._data[key] = value
