@@ -1,108 +1,98 @@
-在你的前端代码 frontend/src/stores/iot.js 中，定义了一个 DEVICE_TYPE_CATALOG，这便是你目前在系统中预设的所有设备类型及其分类：
-感测器 (Sensor):
-舍内环境监控 (主要模拟温度、湿度、气体浓度等)
-智慧颈圈/耳标 (主要模拟羊只体温、活动量等生理数据)
-电子药丸/瘤胃监测器
-自动体重计
-自动化挤乳系统
-智慧採食槽 (模拟采食量、时长)
-智慧饮水器 (模拟饮水量、频率)
-饲料/草料库存感测器
-GPS 定位项圈
-AI 视觉摄影机
-致动器 (Actuator):
-自动分群门
-自动风扇
-雾化降温系统
-遮阳网/窗簾控制器
-电磁阀
-自动喷雾/消毒系统
-手动添加并运行新测试 IoT 设备的完整流程
-我们将以添加一个**“智慧颈圈/耳标”**类型的模拟器为例。
-步骤 1：在前端创建新的 IoT 设备
-启动现有应用： 确保你的 Docker 环境正在运行 (docker compose up -d)。
-访问前端页面： 打开浏览器，进入 http://localhost:3000。
-登录并进入 IoT 管理： 登录你的账号，然后点击导航栏的「智慧牧场 IoT」。
-新增装置：
-点击「新增装置」按钮。
-名称： 填入一个有意义的名字，例如 模拟智慧颈圈-A001。
-装置类型： 从下拉列表中选择 智慧颈圈/耳標。
-分类： 确保选择的是 感测器。
-位置 (可选): 可以填入 A 区羊舍。
-点击「建立装置」。
-复制 API Key：
-创建成功后，会弹出一个对话框，里面有一串一次性显示的 API Key。
-立即复制这串新的 API Key！ 比如：a1b2c3d4e5f6g7h8i9j0...
-你现在有了一个新的设备记录在数据库里，并且拿到它的专属通行证 (API Key)。
-步骤 2：修改 docker-compose.yml 添加新的模拟器服务
-现在，我们要告诉 Docker Compose 启动第二个模拟器容器，专门模拟这个新的颈圈设备。
-打开 docker-compose.yml 文件。
-复制并修改： 复制现有的 iot_simulator 服务定义，然后把它贴在下面，并改名为 iot_simulator_wearable (或者任何你喜欢的名字)。
-code
-Yaml
-# docker-compose.yml
+# 智慧牧場 IoT 操作指南
 
-services:
-  # ... db, redis, backend, frontend, iot_simulator 的定义保持不变 ...
+本指南說明如何在系統內建立 IoT 裝置、串接模擬器並驗證自動化規則。建議先閱讀 [`docs/README.en.md`](./README.en.md#6-iot--automation-workflows) 取得整體架構概觀。
 
-  # ↓↓↓ 复制现有的 iot_simulator，然后修改成下面这样 ↓↓↓
-  iot_simulator_wearable: # <--- 1. 服务名称改成新的，不能重复
-    build:
-      context: ./iot_simulator
-      dockerfile: Dockerfile
-    container_name: goat-nutrition-simulator-wearable # <-- 2. 容器名也改一下
-    depends_on:
-      - backend
-    environment:
-      # 3. 把第一步复制的新 API Key 贴在这里！
-      API_KEY: "a1b2c3d4e5f6g7h8i9j0..." 
+## 裝置型別速覽
 
-      # 4. URL 保持不变
-      INGEST_URL: "http://backend:5001/api/iot/ingest"
+前端 `frontend/src/stores/iot.js` 預載以下裝置型別與分類，可直接使用於建立裝置：
 
-      # 5. 修改设备类型为你想要模拟的类型
-      DEVICE_TYPE: "wearable_tag"  # <-- 对应模拟器代码中的类型
-      
-      # 6. 发送间隔可以调一下，以便区分
-      SEND_INTERVAL_SECONDS: 25 
-    restart: unless-stopped
-    networks:
-      - goat-network
+| 類別 | 型別名稱 | 代表用途 |
+|------|----------|----------|
+| 感測器 | 舍內環境監控 | 溫濕度、氨氣濃度監測 |
+| 感測器 | 智慧頸圈/耳標 | 體溫、活動量、定位 |
+| 感測器 | 電子藥丸/瘤胃監測器 | 反芻與腸胃狀態 |
+| 感測器 | 自動體重計 | 體重走勢 |
+| 感測器 | 自動化擠乳系統 | 乳量、乳成分 |
+| 感測器 | 智慧採食槽 | 進食時段與份量 |
+| 感測器 | 智慧飲水器 | 飲水頻率與容量 |
+| 感測器 | 飼料/草料庫存感測器 | 庫存水位 |
+| 感測器 | GPS 定位項圈 | 定位與移動軌跡 |
+| 感測器 | AI 視覺攝影機 | 姿勢/健康偵測 |
+| 致動器 | 自動分群門 | 依健康狀態分流 |
+| 致動器 | 自動風扇 | 通風降溫 |
+| 致動器 | 霧化降溫系統 | 降溫與環境控制 |
+| 致動器 | 遮陽網/窗簾控制器 | 遮光、保溫 |
+| 致動器 | 電磁閥 | 給水/給料管路控制 |
+| 致動器 | 自動噴霧/消毒系統 | 疫病防治 |
 
-# ... volumes 和 networks 的定义保持不变 ...
-重要： DEVICE_TYPE 的值需要和你 iot_simulator.py 脚本中的 mapping 字典的键匹配。根据之前的代码，"智慧颈圈/耳標" 对应的模拟器类型是 "wearable_tag"。
-步骤 3：重新启动 Docker Compose
-现在你的编排文件已经更新，需要让 Docker Compose 应用这些变更。
-保存你修改后的 docker-compose.yml 文件。
-回到终端，执行以下指令：
-code
-Bash
-# 使用 up 指令，它会自动检测到新增的服务并只创建和启动它
-# --build 是好习惯，确保镜像也是最新的
-docker compose up --build -d
-Docker Compose 会发现多了一个 iot_simulator_wearable 服务，然后会为它构建镜像并启动容器。
-步骤 4：验证新模拟器是否正常工作
-查看新模拟器的日志：
-code
-Bash
+## 建立裝置並取得 API Key
+
+1. 以有權限帳號登入系統，開啟「智慧牧場 IoT」頁面。
+2. 按「新增裝置」，填寫以下欄位：
+   - **名稱**：內部辨識用途，例如「A 區智慧頸圈」。
+   - **裝置型別**：自上述清單選擇，系統會自動設定分類。
+   - **控制 URL（選填）**：若為致動器，可填入接收自動化指令的 HTTP Webhook。
+3. 送出後，後端 `POST /api/iot/devices` 會產生一次性 API Key，對話框僅顯示一次明文。請立即妥善保存並寫入裝置端設定。
+
+> 後端會以 `API_HMAC_SECRET` 對 API Key 做 HMAC 雜湊並存入 `api_key_digest`。若需重置，請刪除舊裝置並重新建立。
+
+## 啟動模擬器傳送感測資料
+
+專案提供 `iot_simulator/` 容器可模擬不同裝置。以下示範啟動一個智慧頸圈模擬器：
+
+```bash
+# 專案根目錄
+cp .env.example .env  # 確保有 REDIS 與 API_HMAC_SECRET
+
+# 於 docker-compose.yml 新增自訂服務（縮排與既有服務相同）
+cat >> docker-compose.override.yml <<'YAML'
+iot_simulator_wearable:
+  build:
+    context: ./iot_simulator
+    dockerfile: Dockerfile
+  environment:
+    API_KEY: "<剛才複製的 API Key>"
+    INGEST_URL: "http://backend:5001/api/iot/ingest"
+    DEVICE_TYPE: "wearable_tag"
+    SEND_INTERVAL_SECONDS: 25
+  depends_on:
+    - backend
+  restart: unless-stopped
+  networks:
+    - goat-network
+YAML
+
+docker compose up --build -d iot_simulator_wearable
 docker compose logs -f iot_simulator_wearable
-你应该会看到它每 25 秒发送一次数据，并且数据内容是关于体温 (body_temperature)、活动指数 (activity_index) 等，这证明它正在模拟颈圈设备。
-code
-Code
-[INFO] - 已送出模擬數據: {"data": {"ear_num": "E123", "body_temperature": 38.9, ...}}
-查看后端日志：
-code
-Bash
-docker compose logs -f backend
-你会看到 POST /api/iot/ingest 201 的日志交替出现，来源是两个不同的模拟器。
-回到前端页面：
-刷新「智慧牧场 IoT」页面。
-你应该会在设备列表中看到你新创建的 模拟智慧颈圈-A001 这个设备。
-它的状态应该很快会变成**“在线”**。
-点击这个新设备，在右侧的详情抽屉里，“最近读数”图表应该会开始显示出来自这个新模拟器的体温、活动指数等数据曲线。
-流程总结：
-前端/API 创建设备 -> 获得 Key
-docker-compose.yml 新增服务 -> 填入 Key 和设备类型
-docker compose up 启动新服务
-日志和前端验证
-通过这套流程，你可以根据需要启动任意多个、任意类型的模拟器，来完整地测试你的 IoT 系统。
+```
+
+日誌顯示 `已送出模擬數據` 即代表成功。裝置狀態會在後端 `device.mark_seen()` 後變為 Online。
+
+## 驗證感測讀數與自動化
+
+1. 在前端「智慧牧場 IoT」頁面點選剛建立的裝置，右側抽屜會顯示最近 `SensorReading`。可調整 `limit` 取得更多筆數。
+2. 若需設定自動化規則，可於頁面切換至「自動化規則」分頁，或直接呼叫 API：
+
+```bash
+curl -X POST http://localhost:5001/api/iot/rules \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+        "name": "體溫過高開啟風扇",
+        "trigger_source_device_id": 1,
+        "action_target_device_id": 2,
+        "trigger_condition": {"variable": "body_temperature", "operator": ">", "value": 39.5},
+        "action_command": {"action": "turn_on", "speed": "high"}
+      }'
+```
+
+3. 當模擬器送出的 `body_temperature` 高於 39.5 時，`app/iot/automation.py::process_sensor_payload` 會將命令寫入 `iot:control_queue`，並由 Worker 透過 `process_control_command` 建立 `DeviceControlLog`。若目標裝置設定了 `control_url`，還會同步觸發 HTTP POST。
+4. 可透過 `docker compose logs backend` 或資料庫中的 `device_control_log` 表確認指令執行情況。
+
+## 清除與重建
+
+- 刪除裝置：`DELETE /api/iot/devices/{id}` 會連帶移除感測資料、規則與控制紀錄。
+- 清空佇列：於 Python Shell 呼叫 `redis_client.delete('iot:sensor_queue', 'iot:control_queue')` 可重置佇列。
+- 重建 API Key：目前僅支援刪除後重建。請更新設備端設定並重新部署模擬器。
+
+完成上述流程即可快速驗證智慧牧場 IoT 管線與自動化邏輯，並在需要時擴充實體裝置整合。
