@@ -4,7 +4,7 @@ Pydantic 資料驗證模型
 """
 
 from pydantic import BaseModel, field_validator, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime, date
 
 
@@ -198,6 +198,91 @@ class ProcessingStepUpdateModel(BaseModel):
     sequence_order: Optional[int] = Field(None, ge=1)
     started_at: Optional[datetime] = Field(None)
     completed_at: Optional[datetime] = Field(None)
+
+
+# === IoT 模組模型 ===
+class IotDeviceBaseModel(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120, description="裝置名稱")
+    device_type: str = Field(..., min_length=1, max_length=120, description="裝置類型")
+    category: Literal['sensor', 'actuator']
+    location: Optional[str] = Field(None, max_length=120, description="安裝地點")
+    control_url: Optional[str] = Field(None, max_length=255, description="控制指令接收網址")
+    status: Optional[str] = Field(None, max_length=32, description="裝置狀態")
+
+
+class IotDeviceCreateModel(IotDeviceBaseModel):
+    api_key: Optional[str] = Field(None, min_length=12, max_length=128, description="自定義 API 金鑰")
+
+
+class IotDeviceUpdateModel(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=120)
+    device_type: Optional[str] = Field(None, min_length=1, max_length=120)
+    category: Optional[Literal['sensor', 'actuator']] = None
+    location: Optional[str] = Field(None, max_length=120)
+    control_url: Optional[str] = Field(None, max_length=255)
+    status: Optional[str] = Field(None, max_length=32)
+
+
+class AutomationRuleBaseModel(BaseModel):
+    name: str = Field(..., min_length=1, max_length=150)
+    trigger_source_device_id: int = Field(..., ge=1)
+    trigger_condition: Dict[str, Any] = Field(...)
+    action_target_device_id: int = Field(..., ge=1)
+    action_command: Dict[str, Any] = Field(...)
+    is_enabled: Optional[bool] = True
+
+    @field_validator('trigger_condition')
+    @classmethod
+    def validate_trigger_condition(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        required_keys = {'variable', 'operator', 'value'}
+        if not required_keys.issubset(value.keys()):
+            missing = ', '.join(sorted(required_keys - set(value.keys())))
+            raise ValueError(f'觸發條件缺少必要欄位: {missing}')
+        return value
+
+    @field_validator('action_command')
+    @classmethod
+    def validate_action_command(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        if 'command' not in value:
+            raise ValueError('action_command 必須包含 command 欄位')
+        return value
+
+
+class AutomationRuleCreateModel(AutomationRuleBaseModel):
+    pass
+
+
+class AutomationRuleUpdateModel(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=150)
+    trigger_source_device_id: Optional[int] = Field(None, ge=1)
+    trigger_condition: Optional[Dict[str, Any]] = None
+    action_target_device_id: Optional[int] = Field(None, ge=1)
+    action_command: Optional[Dict[str, Any]] = None
+    is_enabled: Optional[bool] = None
+
+    @field_validator('trigger_condition')
+    @classmethod
+    def validate_trigger_condition(cls, value: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if value is None:
+            return value
+        required_keys = {'variable', 'operator', 'value'}
+        if not required_keys.issubset(value.keys()):
+            missing = ', '.join(sorted(required_keys - set(value.keys())))
+            raise ValueError(f'觸發條件缺少必要欄位: {missing}')
+        return value
+
+    @field_validator('action_command')
+    @classmethod
+    def validate_action_command(cls, value: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if value is None:
+            return value
+        if 'command' not in value:
+            raise ValueError('action_command 必須包含 command 欄位')
+        return value
+
+
+class SensorIngestModel(BaseModel):
+    data: Dict[str, Any] = Field(..., description="感測器回傳的數據")
     evidence_url: Optional[str] = Field(None, max_length=255)
 
 

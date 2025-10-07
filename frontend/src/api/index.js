@@ -276,6 +276,38 @@ export default {
     return withErrorHandling(() => apiClient.get(`/api/traceability/public/${batchNumber}`), errorHandler);
   },
 
+  // IoT 裝置與自動化規則 API
+  getIotDevices(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/iot/devices'), errorHandler);
+  },
+  getIotDevice(deviceId, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/iot/devices/${deviceId}`), errorHandler);
+  },
+  createIotDevice(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/iot/devices', data), errorHandler);
+  },
+  updateIotDevice(deviceId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/iot/devices/${deviceId}`, data), errorHandler);
+  },
+  deleteIotDevice(deviceId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/iot/devices/${deviceId}`), errorHandler);
+  },
+  getDeviceSensorReadings(deviceId, params = {}, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/iot/devices/${deviceId}/readings`, { params }), errorHandler);
+  },
+  getAutomationRules(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/iot/rules'), errorHandler);
+  },
+  createAutomationRule(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/iot/rules', data), errorHandler);
+  },
+  updateAutomationRule(ruleId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/iot/rules/${ruleId}`, data), errorHandler);
+  },
+  deleteAutomationRule(ruleId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/iot/rules/${ruleId}`), errorHandler);
+  },
+
   // 原始錯誤處理包裝函數，供外部使用
   withErrorHandling
 };
