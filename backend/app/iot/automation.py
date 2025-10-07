@@ -157,63 +157,68 @@ def process_control_command(
     payload: Dict[str, Any],
     http_post: Optional[Callable[..., requests.Response]] = None,
 ) -> bool:
-     """Dispatch an automation command to the target device and persist a log."""
-     if http_post is None:
-         http_post = requests.post
- 
-     rule_id = payload.get('rule_id')
-     target_device_id = payload.get('target_device_id')
-     command = payload.get('command')
- 
-     if not (rule_id and target_device_id and isinstance(command, dict)):
-         _LOGGER.warning('Invalid control payload: %s', payload)
-         return False
- 
-     with app.app_context():
-         rule: Optional[AutomationRule] = db.session.get(AutomationRule, rule_id)
-         device: Optional[IotDevice] = db.session.get(IotDevice, target_device_id)
- 
-         if not device or not rule:
-             _LOGGER.warning('Control payload references missing rule/device (rule=%s, device=%s)', rule_id, target_device_id)
-             return False
- 
-         log_entry = DeviceControlLog(
-             rule_id=rule_id,
-             target_device_id=target_device_id,
-             command=command,
-             status='pending',
-             executed_at=datetime.utcnow(),
-         )
-         db.session.add(log_entry)
- 
-         response_payload: Dict[str, Any] | None = None
-         status = 'skipped'
- 
-         if device.control_url:
-             try:
-                 response = http_post(
-                     device.control_url,
-                     json={'command': command, 'metadata': payload.get('trigger')},
-                     timeout=10,
-                 )
-                 response_payload = {
-                     'status_code': response.status_code,
-                     'text': response.text,
-                 }
-                 status = 'success' if response.ok else 'error'
-             except Exception as exc:  # pragma: no cover - network failure guard
-                 current_app.logger.exception('Failed to deliver control command: %s', exc)
-                 response_payload = {'error': str(exc)}
-                 status = 'error'
-         else:
-             status = 'skipped'
- 
-         log_entry.status = status
-         log_entry.response_payload = response_payload
-         db.session.commit()
- 
-         if status == 'success':
-             device.status = 'online'
-             db.session.commit()
- 
-         return status == 'success'
+    """Dispatch an automation command to the target device and persist a log."""
+    if http_post is None:
+        http_post = requests.post
+
+    rule_id = payload.get('rule_id')
+    target_device_id = payload.get('target_device_id')
+    command = payload.get('command')
+
+    if not (rule_id and target_device_id and isinstance(command, dict)):
+        _LOGGER.warning('Invalid control payload: %s', payload)
+        return False
+
+    with app.app_context():
+        rule: Optional[AutomationRule] = db.session.get(AutomationRule, rule_id)
+        device: Optional[IotDevice] = db.session.get(IotDevice, target_device_id)
+
+        if not device or not rule:
+            _LOGGER.warning('Control payload references missing rule/device (rule=%s, device=%s)', rule_id, target_device_id)
+            return False
+
+        log_entry = DeviceControlLog(
+            rule_id=rule_id,
+            target_device_id=target_device_id,
+            command=command,
+            status='pending',
+            executed_at=datetime.utcnow(),
+        )
+        db.session.add(log_entry)
+
+        response_payload: Dict[str, Any] | None = None
+        status = 'skipped'
+
+        if device.control_url:
+            try:
+                response = http_post(
+                    device.control_url,
+                    json={'command': command, 'metadata': payload.get('trigger')},
+                    timeout=10,
+                )
+                response_payload = {
+                    'status_code': response.status_code,
+                    'text': response.text,
+                }
+                status = 'success' if response.ok else 'error'
+            except Exception as exc:  # pragma: no cover - network failure guard
+                current_app.logger.exception('Failed to deliver control command: %s', exc)
+                response_payload = {'error': str(exc)}
+                status = 'error'
+        else:
+            status = 'skipped'
+
+        try:
+            log_entry.status = status
+            log_entry.response_payload = response_payload
+
+            if status == 'success':
+                device.status = 'online'
+
+            db.session.commit()
+        except Exception as exc:  # pragma: no cover - defensive rollback
+            db.session.rollback()
+            _LOGGER.exception('Failed to finalize control command (rule=%s device=%s): %s', rule_id, target_device_id, exc)
+            return False
+
+        return status == 'success'

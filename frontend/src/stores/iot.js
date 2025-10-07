@@ -60,9 +60,10 @@ export const useIotStore = defineStore('iot', () => {
 
   async function createDevice(payload) {
     const created = await api.createIotDevice(payload);
-    devices.value = [created, ...devices.value.filter(device => device.id !== created.id)];
-    lastCreatedApiKey.value = created.api_key || null;
-    return created;
+    const { api_key: apiKey, ...device } = created;
+    devices.value = [device, ...devices.value.filter(existing => existing.id !== device.id)];
+    lastCreatedApiKey.value = apiKey || null;
+    return { ...device, api_key: apiKey };
   }
 
   async function updateDevice(deviceId, payload) {

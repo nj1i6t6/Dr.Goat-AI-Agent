@@ -47,11 +47,8 @@ def _rule_to_response(rule: AutomationRule) -> Dict:
 def _find_device_by_api_key(api_key: str) -> Optional[IotDevice]:
     if not api_key:
         return None
-    candidates = IotDevice.query.all()
-    for device in candidates:
-        if device.verify_api_key(api_key):
-            return device
-    return None
+    digest = IotDevice.compute_digest(api_key)
+    return IotDevice.query.filter_by(api_key_digest=digest).first()
 
 
 @bp.route('/devices', methods=['GET'])

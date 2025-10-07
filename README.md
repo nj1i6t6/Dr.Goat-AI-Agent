@@ -218,7 +218,7 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/dashboard/data" -W
 
 ## Docker Compose 部署
 
-1. 準備 `.env` 並填寫 `POSTGRES_*`、`SECRET_KEY`、`CORS_ORIGINS`、`GOOGLE_API_KEY`、`REDIS_PASSWORD`（請參考 `.env.example`）等參數。
+1. 準備 `.env` 並填寫 `POSTGRES_*`、`SECRET_KEY`、`API_HMAC_SECRET`（至少 32 bytes，用於 IoT API Key HMAC）、`CORS_ORIGINS`、`GOOGLE_API_KEY`、`REDIS_PASSWORD`（請參考 `.env.example`）等參數。
 2. 啟動與檢查：
 
 ```powershell

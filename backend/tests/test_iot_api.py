@@ -33,6 +33,7 @@ def test_device_crud_flow(authenticated_client, create_device):
     assert list_resp.status_code == 200
     devices = list_resp.get_json()
     assert any(d['id'] == device_id for d in devices)
+    assert all('api_key' not in d for d in devices)
 
     update_resp = authenticated_client.put(
         f'/api/iot/devices/{device_id}',
@@ -77,6 +78,7 @@ def test_sensor_ingest_and_queue(app, authenticated_client, create_device):
     with app.app_context():
         device = db.session.get(IotDevice, sensor['id'])
         assert device.status == 'online'
+        assert device.api_key_digest == IotDevice.compute_digest(api_key)
         readings = SensorReading.query.filter_by(device_id=device.id).all()
         assert len(readings) == 1
         assert readings[0].data['temperature'] == 30.5
@@ -87,6 +89,18 @@ def test_sensor_ingest_and_queue(app, authenticated_client, create_device):
         payload = json.loads(queued)
         assert payload['device_id'] == device.id
         assert payload['data']['humidity'] == 82
+
+
+def test_ingest_rejects_invalid_key_without_leaking(client, caplog):
+    caplog.set_level('WARNING')
+    resp = client.post(
+        '/api/iot/ingest',
+        json={'data': {'temperature': 22}},
+        headers={'X-API-Key': 'invalid-key'},
+    )
+    assert resp.status_code == 401
+    assert all('invalid-key' not in record.getMessage() for record in caplog.records)
+    assert all('digest' not in record.getMessage().lower() for record in caplog.records)
 
 
 def test_automation_rule_lifecycle(app, authenticated_client, create_device, monkeypatch):
@@ -136,3 +150,20 @@ def test_rule_validation_enforces_categories(authenticated_client, create_device
     resp = authenticated_client.post('/api/iot/rules', json=rule_payload)
     assert resp.status_code == 400
     assert '致動器' in resp.get_json()['error']
+
+
+def test_create_app_without_secret_fails(monkeypatch):
+    monkeypatch.delenv('API_HMAC_SECRET', raising=False)
+    monkeypatch.setenv('SECRET_KEY', 'test')
+    monkeypatch.setenv('CORS_ORIGINS', '*')
+    monkeypatch.setenv('GOOGLE_API_KEY', 'test')
+    monkeypatch.setenv('USE_FAKE_REDIS_FOR_TESTS', '1')
+    monkeypatch.setenv('DOTENV_PATH', 'NON_EXISTENT_.env')
+
+    import importlib
+
+    app_module = importlib.import_module('app.__init__')
+    importlib.reload(app_module)
+
+    with pytest.raises(RuntimeError):
+        app_module.create_app()

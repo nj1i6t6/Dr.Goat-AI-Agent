@@ -42,7 +42,7 @@ import api from '@/api';
 import IotManagementView from '@/views/IotManagementView.vue';
 
 const mockDevices = [
-  { id: 1, name: '環境感測器', device_type: '舍內環境監控', category: 'sensor', status: 'online', api_key_hint: 'abcd1234' },
+  { id: 1, name: '環境感測器', device_type: '舍內環境監控', category: 'sensor', status: 'online' },
   { id: 2, name: '降溫風扇', device_type: '自動風扇', category: 'actuator', status: 'offline' },
 ];
 

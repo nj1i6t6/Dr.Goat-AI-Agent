@@ -110,3 +110,59 @@ def test_process_control_command_creates_log(app, sensor_and_actuator, monkeypat
 
         actuator_refreshed = db.session.get(IotDevice, actuator_id)
         assert actuator_refreshed.status == 'online'
+
+
+def test_process_control_command_handles_http_error(app, sensor_and_actuator):
+    sensor_id, actuator_id, rule_id = sensor_and_actuator
+
+    command_payload = {
+        'rule_id': rule_id,
+        'target_device_id': actuator_id,
+        'command': {'command': 'turn_on'},
+        'trigger': {'device_id': sensor_id, 'value': 30},
+    }
+
+    def failing_post(url, json=None, timeout=10):  # pragma: no cover - simple stub
+        raise RuntimeError('network down')
+
+    success = process_control_command(app, command_payload, http_post=failing_post)
+    assert success is False
+
+    with app.app_context():
+        log = DeviceControlLog.query.filter_by(rule_id=rule_id).one()
+        assert log.status == 'error'
+        assert log.response_payload['error'] == 'network down'
+
+        actuator = db.session.get(IotDevice, actuator_id)
+        assert actuator.status != 'online'
+
+
+def test_process_control_command_rolls_back_on_commit_failure(app, sensor_and_actuator, monkeypatch):
+    sensor_id, actuator_id, rule_id = sensor_and_actuator
+
+    command_payload = {
+        'rule_id': rule_id,
+        'target_device_id': actuator_id,
+        'command': {'command': 'turn_on'},
+        'trigger': {'device_id': sensor_id, 'value': 30},
+    }
+
+    original_rollback = db.session.rollback
+    rollback_called = {'value': False}
+
+    def failing_commit():
+        raise RuntimeError('db unavailable')
+
+    def tracking_rollback():
+        rollback_called['value'] = True
+        return original_rollback()
+
+    monkeypatch.setattr(db.session, 'commit', failing_commit)
+    monkeypatch.setattr(db.session, 'rollback', tracking_rollback)
+
+    success = process_control_command(app, command_payload)
+    assert success is False
+    assert rollback_called['value'] is True
+
+    with app.app_context():
+        assert DeviceControlLog.query.count() == 0

@@ -17,6 +17,7 @@ def app():
     os.environ['CORS_ORIGINS'] = '*'
     os.environ['GOOGLE_API_KEY'] = 'test-gemini-api-key'
     os.environ['USE_FAKE_REDIS_FOR_TESTS'] = '1'
+    os.environ['API_HMAC_SECRET'] = 'test-hmac-secret-value-should-be-32+'
     # 清除資料庫相關環境變數，確保使用 SQLite，並避免載入專案根 .env
     for key in [
         'DB_USERNAME', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME',

@@ -54,16 +54,18 @@ describe('iot Store', () => {
     expect(store.sensorDevices[0].name).toBe('環境感測器');
   });
 
-  it('createDevice should insert device and store api key', async () => {
+  it('createDevice should insert device and store api key once', async () => {
     const created = { id: 3, name: '新感測器', device_type: '舍內環境監控', category: 'sensor', api_key: 'secret' };
     api.createIotDevice.mockResolvedValue(created);
     const store = useIotStore();
 
-    await store.createDevice({ name: created.name, device_type: created.device_type, category: created.category });
+    const result = await store.createDevice({ name: created.name, device_type: created.device_type, category: created.category });
 
     expect(api.createIotDevice).toHaveBeenCalledWith({ name: created.name, device_type: created.device_type, category: created.category });
     expect(store.devices[0].id).toBe(3);
+    expect(store.devices[0]).not.toHaveProperty('api_key');
     expect(store.lastCreatedApiKey).toBe('secret');
+    expect(result.api_key).toBe('secret');
   });
 
   it('updateDevice should replace existing entry', async () => {

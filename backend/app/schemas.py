@@ -223,6 +223,31 @@ class IotDeviceUpdateModel(BaseModel):
     status: Optional[str] = Field(None, max_length=32)
 
 
+def _validate_trigger_condition_payload(value: Optional[Dict[str, Any]], *, allow_none: bool = False) -> Optional[Dict[str, Any]]:
+    if value is None:
+        if allow_none:
+            return None
+        raise ValueError('觸發條件不得為空')
+
+    required_keys = {'variable', 'operator', 'value'}
+    missing = required_keys - set(value.keys())
+    if missing:
+        missing_keys = ', '.join(sorted(missing))
+        raise ValueError(f'觸發條件缺少必要欄位: {missing_keys}')
+    return value
+
+
+def _validate_action_command_payload(value: Optional[Dict[str, Any]], *, allow_none: bool = False) -> Optional[Dict[str, Any]]:
+    if value is None:
+        if allow_none:
+            return None
+        raise ValueError('action_command 不得為空')
+
+    if 'command' not in value:
+        raise ValueError('action_command 必須包含 command 欄位')
+    return value
+
+
 class AutomationRuleBaseModel(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     trigger_source_device_id: int = Field(..., ge=1)
@@ -234,18 +259,12 @@ class AutomationRuleBaseModel(BaseModel):
     @field_validator('trigger_condition')
     @classmethod
     def validate_trigger_condition(cls, value: Dict[str, Any]) -> Dict[str, Any]:
-        required_keys = {'variable', 'operator', 'value'}
-        if not required_keys.issubset(value.keys()):
-            missing = ', '.join(sorted(required_keys - set(value.keys())))
-            raise ValueError(f'觸發條件缺少必要欄位: {missing}')
-        return value
+        return _validate_trigger_condition_payload(value)
 
     @field_validator('action_command')
     @classmethod
     def validate_action_command(cls, value: Dict[str, Any]) -> Dict[str, Any]:
-        if 'command' not in value:
-            raise ValueError('action_command 必須包含 command 欄位')
-        return value
+        return _validate_action_command_payload(value)
 
 
 class AutomationRuleCreateModel(AutomationRuleBaseModel):
@@ -263,22 +282,12 @@ class AutomationRuleUpdateModel(BaseModel):
     @field_validator('trigger_condition')
     @classmethod
     def validate_trigger_condition(cls, value: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        if value is None:
-            return value
-        required_keys = {'variable', 'operator', 'value'}
-        if not required_keys.issubset(value.keys()):
-            missing = ', '.join(sorted(required_keys - set(value.keys())))
-            raise ValueError(f'觸發條件缺少必要欄位: {missing}')
-        return value
+        return _validate_trigger_condition_payload(value, allow_none=True)
 
     @field_validator('action_command')
     @classmethod
     def validate_action_command(cls, value: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        if value is None:
-            return value
-        if 'command' not in value:
-            raise ValueError('action_command 必須包含 command 欄位')
-        return value
+        return _validate_action_command_payload(value, allow_none=True)
 
 
 class SensorIngestModel(BaseModel):

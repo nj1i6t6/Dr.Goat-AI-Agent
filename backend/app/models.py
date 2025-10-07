@@ -1,7 +1,10 @@
 from . import db, login_manager
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
+from flask import current_app
 from datetime import datetime
+import hashlib
+import hmac
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -314,6 +317,15 @@ class BatchSheepAssociation(db.Model):
         return f'<BatchSheepAssociation BatchID:{self.batch_id} SheepID:{self.sheep_id}>'
 
 
+def _get_api_hmac_secret() -> bytes:
+    secret = current_app.config.get('API_HMAC_SECRET')
+    if not secret:
+        raise RuntimeError('API_HMAC_SECRET 未設定，無法處理 IoT 金鑰')
+    if isinstance(secret, str):
+        return secret.encode('utf-8')
+    return secret
+
+
 class IotDevice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -325,8 +337,7 @@ class IotDevice(db.Model):
     status = db.Column(db.String(32), default='offline', nullable=False)
     last_seen = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    api_key_hash = db.Column('api_key', db.String(255), nullable=False)
-    api_key_hint = db.Column(db.String(32))
+    api_key_digest = db.Column(db.String(64), unique=True, index=True, nullable=False)
 
     sensor_readings = db.relationship(
         'SensorReading',
@@ -357,14 +368,19 @@ class IotDevice(db.Model):
         db.Index('ix_iot_device_user_category', 'user_id', 'category'),
     )
 
+    @staticmethod
+    def compute_digest(raw_key: str) -> str:
+        secret = _get_api_hmac_secret()
+        return hmac.new(secret, raw_key.encode('utf-8'), hashlib.sha256).hexdigest()
+
     def set_api_key(self, raw_key: str) -> None:
-        self.api_key_hash = generate_password_hash(raw_key)
-        self.api_key_hint = raw_key[:8]
+        self.api_key_digest = self.compute_digest(raw_key)
 
     def verify_api_key(self, candidate: str) -> bool:
         if not candidate:
             return False
-        return check_password_hash(self.api_key_hash, candidate)
+        candidate_digest = self.compute_digest(candidate)
+        return hmac.compare_digest(candidate_digest, self.api_key_digest)
 
     def mark_seen(self) -> None:
         self.last_seen = datetime.utcnow()
@@ -380,7 +396,6 @@ class IotDevice(db.Model):
             'control_url': self.control_url,
             'status': self.status,
             'last_seen': self.last_seen.isoformat() if self.last_seen else None,
-            'api_key_hint': self.api_key_hint,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 

@@ -87,10 +87,8 @@
           <el-descriptions-item label="分類">{{ selectedDevice.category === 'sensor' ? '感測器' : '致動器' }}</el-descriptions-item>
           <el-descriptions-item label="位置">{{ selectedDevice.location || '未設定' }}</el-descriptions-item>
           <el-descriptions-item label="狀態">{{ formatStatus(selectedDevice.status) }}</el-descriptions-item>
-          <el-descriptions-item label="API Key 提示">
-            <el-tooltip content="新增或重新生成時才會顯示完整金鑰" placement="top">
-              <el-tag type="info">{{ selectedDevice.api_key_hint || '尚未產生' }}</el-tag>
-            </el-tooltip>
+          <el-descriptions-item label="API Key">
+            <span class="one-time-secret">僅在建立裝置時提供一次，請妥善保存。</span>
           </el-descriptions-item>
           <el-descriptions-item label="數據上傳 URL">{{ ingestUrl }}</el-descriptions-item>
           <el-descriptions-item v-if="selectedDevice.control_url" label="控制指令 URL">{{ selectedDevice.control_url }}</el-descriptions-item>
@@ -135,9 +133,10 @@
         type="success"
         :closable="false"
         class="api-key-alert"
-        title="請立即複製此 API Key："
-        :description="iotStore.lastCreatedApiKey"
-      />
+        title="API Key 僅顯示一次，請立即複製"
+      >
+        <code class="api-key-value">{{ iotStore.lastCreatedApiKey }}</code>
+      </el-alert>
     </el-dialog>
 
     <el-dialog v-model="ruleDialogVisible" :title="ruleDialogTitle" width="640px" destroy-on-close>
@@ -154,7 +153,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { useIotStore } from '../stores/iot';
 import AutomationRuleBuilder from '../components/iot/AutomationRuleBuilder.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -310,13 +309,15 @@ async function handleSubmitDevice() {
       if (isEditingDevice.value && deviceForm.id) {
         await iotStore.updateDevice(deviceForm.id, payload);
         ElMessage.success('裝置更新成功');
+        deviceDialogVisible.value = false;
       } else {
         const created = await iotStore.createDevice(payload);
         if (created.api_key) {
           ElMessage.success('裝置建立成功，請立即複製 API Key');
+        } else {
+          deviceDialogVisible.value = false;
         }
       }
-      deviceDialogVisible.value = false;
     } catch (error) {
       ElMessage.error(error?.response?.data?.error || error.message || '操作失敗');
     } finally {
@@ -358,6 +359,12 @@ async function fetchReadings(deviceId) {
 watch(selectedDeviceId, (value) => {
   if (value) {
     fetchReadings(value);
+  }
+});
+
+watch(deviceDialogVisible, (visible) => {
+  if (!visible) {
+    iotStore.lastCreatedApiKey = null;
   }
 });
 
@@ -415,6 +422,10 @@ async function toggleRule(rule, value) {
 
 onMounted(async () => {
   await Promise.all([iotStore.fetchDevices(), iotStore.fetchRules()]);
+});
+
+onBeforeUnmount(() => {
+  iotStore.lastCreatedApiKey = null;
 });
 </script>
 
@@ -479,6 +490,21 @@ onMounted(async () => {
 
 .api-key-alert {
   margin-top: 16px;
+}
+
+.api-key-alert .api-key-value {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: #1f2d3d;
+  color: #fff;
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  letter-spacing: 0.5px;
+}
+
+.one-time-secret {
+  color: #909399;
 }
 
 @media (max-width: 768px) {
