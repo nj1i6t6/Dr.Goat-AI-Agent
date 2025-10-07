@@ -3,14 +3,14 @@
 - Swagger UI：<http://localhost:5001/docs>
 - OpenAPI 規格：<http://localhost:5001/openapi.yaml>
 - 所有 `/api/*` 端點預設回傳 JSON，除 `export_excel` 為二進位檔案。
-- 除 `/api/auth/*`（部分）外，其餘端點皆需登入；登入後以 Cookie Session 維持狀態。
+- 除 `/api/auth/*`（部分）與 `/api/traceability/public/*` 外，其餘端點皆需登入並攜帶 Session Cookie。
 
 ## 認證模組 `/api/auth`
 
 | Method | Path | 說明 | 備註 |
 |--------|------|------|------|
-| POST | `/register` | 建立新帳號並自動登入 | 初次註冊會建立預設事件選項 |
-| POST | `/login` | 使用者登入 | 失敗回傳 401 |
+| POST | `/register` | 建立新帳號並自動登入 | 首次註冊會建立預設事件選項 |
+| POST | `/login` | 使用者登入 | 驗證失敗回傳 401 |
 | POST | `/logout` | 登出目前登入者 | 需登入 |
 | GET | `/status` | 回傳登入狀態與帳號資訊 | 可作健康檢查 |
 | GET | `/health` | 健康檢查 | Docker liveness probe |
@@ -37,13 +37,14 @@
 |--------|------|------|----------|
 | GET | `/export_excel` | 匯出羊隻、事件、歷史、聊天紀錄 | 回傳 `xlsx`，空資料時會提供說明工作表 |
 | POST | `/analyze_excel` | 分析上傳 Excel 結構並回傳欄位預覽 | `multipart/form-data`，檔案欄位為 `file` |
-| POST | `/process_import` | 導入 Excel | `is_default_mode=true` 使用內建映射，否則需提供 `mapping_config` JSON |
+| POST | `/ai_import_mapping` | 使用 Gemini 分析工作表用途與欄位映射 | 需提供 `file`；優先使用 header `X-Api-Key`，否則 fallback `GOOGLE_API_KEY` |
+| POST | `/process_import` | 導入 Excel | `is_default_mode=true` 使用內建映射；手動模式需附 `mapping_config` JSON |
 
 ## 儀表板 `/api/dashboard`
 
 | Method | Path | 說明 |
 |--------|------|------|
-| GET | `/data` | 聚合提醒、停藥、健康警示、ESG 指標；含 90 秒快取 |
+| GET | `/data` | 聚合提醒、停藥、健康警示、ESG 指標；含 Redis 90 秒快取 |
 | GET | `/farm_report` | 產生牧場統計報告（品種、性別、疾病統計） |
 | GET | `/event_options` | 取得自訂與預設事件類型（含描述） |
 | POST | `/event_types` | 新增事件類型 |
@@ -53,22 +54,22 @@
 
 ## AI 代理 `/api/agent`
 
-> 所有端點需在標頭帶入 `X-Api-Key: <Google Gemini API Key>`，若未提供會回傳 401。
+> 所有端點需在標頭帶入 `X-Api-Key: <Google Gemini API Key>`，若未提供且伺服器未設定 `GOOGLE_API_KEY` 會回傳 401。
 
 | Method | Path | 說明 |
 |--------|------|------|
 | GET | `/tip` | 根據季節產出每日飼養小提示（Markdown 轉 HTML） |
-| POST | `/recommendation` | 產生營養建議、ESG 分析與餵飼指引 | 需傳 `EarNum`、體重、日增重等欄位；可自動補入資料庫背景 |
-| POST | `/chat` | 與 AI 對話；支援文字 JSON 或 `multipart/form-data` 圖片上傳 | `image` 欄位支援 JPEG/PNG/GIF/WebP，最大 10MB |
+| POST | `/recommendation` | 產生營養建議、ESG 分析與餵飼指引 | 需傳 `api_key` 以及羊隻資訊；會自動補入資料庫背景 |
+| POST | `/chat` | 與 AI 對話；支援純 JSON 或 `multipart/form-data` 圖片上傳 | `image` 欄位支援 JPEG/PNG/GIF/WebP，最大 10 MB |
 
 ## 生長預測 `/api/prediction`
 
-> 需登入，且必須提供 `X-Api-Key`（同上）。
+> 需登入且必須提供 `X-Api-Key`。
 
 | Method | Path | 說明 |
 |--------|------|------|
-| GET | `/goats/{ear_tag}/prediction?target_days=30` | 以歷史體重做線性迴歸，回傳預測體重、平均日增重、數據品質檢查與 AI 說明 |
-| GET | `/goats/{ear_tag}/prediction/chart-data?target_days=30` | 取得圖表所需的歷史點、趨勢線、預測點 |
+| GET | `/goats/{ear_tag}/prediction?target_days=30` | 以歷史體重做 LightGBM/線性迴歸預測，回傳平均日增重、信賴區間、數據品質報告與 LLM 說明 |
+| GET | `/goats/{ear_tag}/prediction/chart-data?target_days=30` | 取得圖表所需的歷史點、趨勢線、預測點與信賴區間 |
 
 ## 產品產銷履歷 `/api/traceability`
 
@@ -86,18 +87,34 @@
 | DELETE | `/batches/{batch_id}/sheep/{sheep_id}` | 移除單筆羊隻關聯 | 需登入 |
 | GET | `/public/{batch_number}` | 不需登入即可取得公開批次故事、加工流程時間軸、羊隻摘要 | 公開 |
 
+## IoT 自動化 `/api/iot`
+
+| Method | Path | 說明 | 備註 |
+|--------|------|------|------|
+| GET | `/devices` | 列出登入使用者的裝置 | 需登入 |
+| POST | `/devices` | 建立裝置並產生一次性 API Key | 回傳 `api_key` 只顯示一次，請妥善保存 |
+| GET | `/devices/{device_id}` | 取得裝置詳細資訊 | 需登入 |
+| PUT | `/devices/{device_id}` | 更新裝置資料 | 不可透過此端點更新 API Key |
+| DELETE | `/devices/{device_id}` | 刪除裝置與相關資料 | 需登入 |
+| GET | `/devices/{device_id}/readings?limit=100` | 取得最近感測讀值 | 需登入，最多 500 筆 |
+| POST | `/ingest` | 感測資料上報 | 需於 Header 帶 `X-API-Key`（大小寫皆可）；驗證後寫入佇列 |
+| GET | `/rules` | 列出自動化規則 | 需登入 |
+| POST | `/rules` | 建立規則 | 需登入；觸發裝置必須為感測器、目標裝置必須為致動器 |
+| PUT | `/rules/{rule_id}` | 更新規則 | 需登入 |
+| DELETE | `/rules/{rule_id}` | 刪除規則 | 需登入 |
+
 ## 背景任務 `/api/tasks`
 
 | Method | Path | 說明 | 備註 |
 |--------|------|------|------|
-| POST | `/example` | 建立示範性的儀表板快照任務並排入輕量佇列 | 需登入；回傳 `job_id` 可供 Worker 追蹤 |
+| POST | `/example` | 建立示範性的儀表板快照任務並排入 `SimpleQueue` | 需登入；回傳 `job_id` 可供 Worker 追蹤 |
 
 ## 通用規則
 
-- 例外處理：所有 Blueprint 會在失敗情況回傳 `{ "error": "..." }`，HTTP 狀態碼對應錯誤類型。
-- 日期格式：統一採 `YYYY-MM-DD`；Excel 匯入會自動排除 `1900-01-01` 等空值標記。
-- 權限：所有資料均依 `current_user.id` 隔離，無跨使用者操作。
-- 快取：儀表板資料以 Redis setex 儲存，若需強制更新請呼叫 `/api/dashboard/data` 後端函式 `clear_dashboard_cache`。
-- 背景任務：所有佇列皆使用 Redis 作為 Broker，Worker 可由 `backend/run_worker.py` 啟動。
+- **錯誤格式**：失敗時回傳 `{ "error": "..." }`，必要時包含 `details` 或 `field_errors`。HTTP 狀態碼對應錯誤類型。
+- **日期格式**：統一採 `YYYY-MM-DD`；Excel 匯入會自動排除 `1900-01-01` 等空值標記。
+- **授權**：所有資料依 `current_user.id` 隔離，無跨使用者操作。IoT API Key 使用 HMAC 與常數時間比較驗證。
+- **快取**：儀表板資料以 Redis `setex` 儲存；若需強制更新可呼叫後端 `clear_dashboard_cache` 或等待 TTL。
+- **背景任務**：`SimpleQueue` 使用 Redis list；Worker 需啟動 `python backend/run_worker.py` 處理排隊工作與 IoT 控制佇列。
 
-更多詳細欄位、Schema 與範例請開啟 Swagger UI 或檢視 `backend/openapi.yaml`。
+完整欄位與範例請參閱 Swagger UI 或 `backend/openapi.yaml`。
