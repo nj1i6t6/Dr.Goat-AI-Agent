@@ -59,7 +59,7 @@
 | Method | Path | 說明 |
 |--------|------|------|
 | GET | `/tip` | 根據季節產出每日飼養小提示（Markdown 轉 HTML） |
-| POST | `/recommendation` | 產生營養建議、ESG 分析與餵飼指引 | 需傳 `api_key` 以及羊隻資訊；會自動補入資料庫背景 |
+| POST | `/recommendation` | 產生營養建議、ESG 分析與餵飼指引 | 需於標頭提供 X-Api-Key 以及羊隻資訊；會自動補入資料庫背景 |
 | POST | `/chat` | 與 AI 對話；支援純 JSON 或 `multipart/form-data` 圖片上傳 | `image` 欄位支援 JPEG/PNG/GIF/WebP，最大 10 MB |
 
 ## 生長預測 `/api/prediction`
