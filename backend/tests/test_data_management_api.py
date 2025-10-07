@@ -1,6 +1,7 @@
 import pytest
 import json
 import io
+import pandas as pd
 from unittest.mock import patch
 from app.models import Sheep, SheepEvent, SheepHistoricalData, ChatHistory
 
@@ -78,6 +79,115 @@ class TestDataManagementAPI:
         
         result = json.loads(response.data)
         assert 'error' in result
+
+    def test_ai_import_mapping_success(self, authenticated_client, monkeypatch):
+        """測試 AI 智慧導入成功回傳映射建議"""
+
+        class MockExcelFile:
+            def __init__(self):
+                self.sheet_names = ['Sheet1']
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        excel_content = b'PK\x03\x04'
+        mock_df = pd.DataFrame([
+            {"耳號": "TEST001", "品種": "波爾", "性別": "母"},
+            {"耳號": "TEST002", "品種": "努比亞", "性別": "公"}
+        ])
+
+        monkeypatch.setattr('app.api.data_management.call_gemini_api', lambda prompt, api_key, generation_config_override=None: {
+            "text": json.dumps({
+                "sheets": {
+                    "Sheet1": {
+                        "purpose": "basic_info",
+                        "confidence": 0.92,
+                        "columns": {
+                            "EarNum": "耳號",
+                            "Breed": "品種",
+                            "Sex": "性別"
+                        },
+                        "notes": "依據欄位名稱自動對應。"
+                    }
+                },
+                "summary": "建議將 Sheet1 匯入為羊隻基礎資料。"
+            })
+        })
+
+        with patch('pandas.ExcelFile', return_value=MockExcelFile()):
+            with patch('pandas.read_excel', return_value=mock_df.where(pd.notna(mock_df), None)):
+                data = {
+                    'file': (io.BytesIO(excel_content), 'test.xlsx')
+                }
+                response = authenticated_client.post(
+                    '/api/data/ai_import_mapping',
+                    data=data,
+                    content_type='multipart/form-data',
+                    headers={'X-Api-Key': 'test-api-key'}
+                )
+
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert payload['success'] is True
+        assert payload['mapping_config']['sheets']['Sheet1']['purpose'] == 'basic_info'
+        assert payload['mapping_config']['sheets']['Sheet1']['columns']['EarNum'] == '耳號'
+
+    def test_ai_import_mapping_missing_api_key(self, authenticated_client):
+        """測試未配置 API 金鑰時的錯誤回應"""
+        authenticated_client.application.config['GOOGLE_API_KEY'] = None
+
+        data = {
+            'file': (io.BytesIO(b'PK\x03\x04'), 'test.xlsx')
+        }
+        response = authenticated_client.post(
+            '/api/data/ai_import_mapping',
+            data=data,
+            content_type='multipart/form-data'
+        )
+
+        assert response.status_code == 401
+        payload = json.loads(response.data)
+        assert 'error' in payload
+
+    def test_ai_import_mapping_invalid_ai_response(self, authenticated_client, monkeypatch):
+        """測試 AI 回傳非 JSON 內容時的處理"""
+
+        class MockExcelFile:
+            def __init__(self):
+                self.sheet_names = ['Sheet1']
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        mock_df = pd.DataFrame([
+            {"耳號": "TEST001", "品種": "波爾"}
+        ])
+
+        monkeypatch.setattr('app.api.data_management.call_gemini_api', lambda prompt, api_key, generation_config_override=None: {
+            "text": "這不是 JSON"
+        })
+
+        with patch('pandas.ExcelFile', return_value=MockExcelFile()):
+            with patch('pandas.read_excel', return_value=mock_df.where(pd.notna(mock_df), None)):
+                data = {
+                    'file': (io.BytesIO(b'PK\x03\x04'), 'test.xlsx')
+                }
+                response = authenticated_client.post(
+                    '/api/data/ai_import_mapping',
+                    data=data,
+                    content_type='multipart/form-data',
+                    headers={'X-Api-Key': 'test-api-key'}
+                )
+
+        assert response.status_code == 502
+        payload = json.loads(response.data)
+        assert 'error' in payload
 
     def test_process_import_no_file(self, authenticated_client):
         """測試處理導入沒有文件"""
@@ -189,6 +299,7 @@ class TestDataManagementAPI:
         endpoints = [
             '/api/data/export_excel',
             '/api/data/analyze_excel',
+            '/api/data/ai_import_mapping',
             '/api/data/process_import'
         ]
         

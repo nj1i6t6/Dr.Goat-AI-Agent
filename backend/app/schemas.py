@@ -4,8 +4,8 @@ Pydantic 資料驗證模型
 """
 
 from pydantic import BaseModel, field_validator, Field
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+from typing import Optional, List, Dict, Any, Literal
+from datetime import datetime, date
 
 
 # === 認證相關模型 ===
@@ -138,6 +138,161 @@ class SuccessResponse(BaseModel):
     success: bool = Field(True, description="操作是否成功")
     message: Optional[str] = Field(None, description="成功訊息")
     data: Optional[Any] = Field(None, description="返回資料")
+
+
+# === 產銷履歷相關模型 ===
+class BatchSheepLinkModel(BaseModel):
+    sheep_id: int = Field(..., description="羊隻 ID")
+    contribution_type: Optional[str] = Field(None, max_length=100, description="貢獻類型")
+    quantity: Optional[float] = Field(None, ge=0, description="數量")
+    quantity_unit: Optional[str] = Field(None, max_length=50, description="數量單位")
+    role: Optional[str] = Field(None, max_length=100, description="角色")
+    notes: Optional[str] = Field(None, description="備註")
+
+
+class ProcessingStepInputModel(BaseModel):
+    title: str = Field(..., min_length=1, max_length=150, description="步驟標題")
+    description: Optional[str] = Field(None, description="步驟描述")
+    sequence_order: Optional[int] = Field(None, ge=1, description="排序")
+    started_at: Optional[datetime] = Field(None, description="開始時間")
+    completed_at: Optional[datetime] = Field(None, description="完成時間")
+    evidence_url: Optional[str] = Field(None, max_length=255, description="佐證連結")
+
+
+class ProductBatchBaseModel(BaseModel):
+    batch_number: str = Field(..., min_length=1, max_length=100, description="批次號")
+    product_name: str = Field(..., min_length=1, max_length=150, description="產品名稱")
+    product_type: Optional[str] = Field(None, max_length=100, description="產品類型")
+    description: Optional[str] = Field(None, description="產品描述")
+    esg_highlights: Optional[str] = Field(None, description="ESG 亮點")
+    production_date: Optional[date] = Field(None, description="生產日期")
+    expiration_date: Optional[date] = Field(None, description="到期日")
+    origin_story: Optional[str] = Field(None, description="品牌故事")
+    is_public: bool = Field(False, description="是否公開")
+
+
+class ProductBatchCreateModel(ProductBatchBaseModel):
+    sheep_links: Optional[List[BatchSheepLinkModel]] = Field(default_factory=list, description="羊隻關聯列表")
+    processing_steps: Optional[List[ProcessingStepInputModel]] = Field(default_factory=list, description="加工步驟列表")
+
+
+class ProductBatchUpdateModel(BaseModel):
+    product_name: Optional[str] = Field(None, min_length=1, max_length=150)
+    product_type: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = Field(None)
+    esg_highlights: Optional[str] = Field(None)
+    production_date: Optional[date] = Field(None)
+    expiration_date: Optional[date] = Field(None)
+    origin_story: Optional[str] = Field(None)
+    is_public: Optional[bool] = Field(None)
+    sheep_links: Optional[List[BatchSheepLinkModel]] = Field(default=None, description="重新設定羊隻關聯")
+
+
+class ProcessingStepCreateModel(ProcessingStepInputModel):
+    pass
+
+
+class ProcessingStepUpdateModel(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=150)
+    description: Optional[str] = Field(None)
+    sequence_order: Optional[int] = Field(None, ge=1)
+    started_at: Optional[datetime] = Field(None)
+    completed_at: Optional[datetime] = Field(None)
+
+
+# === IoT 模組模型 ===
+class IotDeviceBaseModel(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120, description="裝置名稱")
+    device_type: str = Field(..., min_length=1, max_length=120, description="裝置類型")
+    category: Literal['sensor', 'actuator']
+    location: Optional[str] = Field(None, max_length=120, description="安裝地點")
+    control_url: Optional[str] = Field(None, max_length=255, description="控制指令接收網址")
+    status: Optional[str] = Field(None, max_length=32, description="裝置狀態")
+
+
+class IotDeviceCreateModel(IotDeviceBaseModel):
+    api_key: Optional[str] = Field(None, min_length=12, max_length=128, description="自定義 API 金鑰")
+
+
+class IotDeviceUpdateModel(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=120)
+    device_type: Optional[str] = Field(None, min_length=1, max_length=120)
+    category: Optional[Literal['sensor', 'actuator']] = None
+    location: Optional[str] = Field(None, max_length=120)
+    control_url: Optional[str] = Field(None, max_length=255)
+    status: Optional[str] = Field(None, max_length=32)
+
+
+def _validate_trigger_condition_payload(value: Optional[Dict[str, Any]], *, allow_none: bool = False) -> Optional[Dict[str, Any]]:
+    if value is None:
+        if allow_none:
+            return None
+        raise ValueError('觸發條件不得為空')
+
+    required_keys = {'variable', 'operator', 'value'}
+    missing = required_keys - set(value.keys())
+    if missing:
+        missing_keys = ', '.join(sorted(missing))
+        raise ValueError(f'觸發條件缺少必要欄位: {missing_keys}')
+    return value
+
+
+def _validate_action_command_payload(value: Optional[Dict[str, Any]], *, allow_none: bool = False) -> Optional[Dict[str, Any]]:
+    if value is None:
+        if allow_none:
+            return None
+        raise ValueError('action_command 不得為空')
+
+    if 'command' not in value:
+        raise ValueError('action_command 必須包含 command 欄位')
+    return value
+
+
+class AutomationRuleBaseModel(BaseModel):
+    name: str = Field(..., min_length=1, max_length=150)
+    trigger_source_device_id: int = Field(..., ge=1)
+    trigger_condition: Dict[str, Any] = Field(...)
+    action_target_device_id: int = Field(..., ge=1)
+    action_command: Dict[str, Any] = Field(...)
+    is_enabled: Optional[bool] = True
+
+    @field_validator('trigger_condition')
+    @classmethod
+    def validate_trigger_condition(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        return _validate_trigger_condition_payload(value)
+
+    @field_validator('action_command')
+    @classmethod
+    def validate_action_command(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        return _validate_action_command_payload(value)
+
+
+class AutomationRuleCreateModel(AutomationRuleBaseModel):
+    pass
+
+
+class AutomationRuleUpdateModel(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=150)
+    trigger_source_device_id: Optional[int] = Field(None, ge=1)
+    trigger_condition: Optional[Dict[str, Any]] = None
+    action_target_device_id: Optional[int] = Field(None, ge=1)
+    action_command: Optional[Dict[str, Any]] = None
+    is_enabled: Optional[bool] = None
+
+    @field_validator('trigger_condition')
+    @classmethod
+    def validate_trigger_condition(cls, value: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        return _validate_trigger_condition_payload(value, allow_none=True)
+
+    @field_validator('action_command')
+    @classmethod
+    def validate_action_command(cls, value: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        return _validate_action_command_payload(value, allow_none=True)
+
+
+class SensorIngestModel(BaseModel):
+    data: Dict[str, Any] = Field(..., description="感測器回傳的數據")
+    evidence_url: Optional[str] = Field(None, max_length=255)
 
 
 # === 設定相關模型 ===

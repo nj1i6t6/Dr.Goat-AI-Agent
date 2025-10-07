@@ -12,6 +12,12 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/trace/:batchNumber',
+    name: 'TraceabilityPublic',
+    component: () => import('../views/TraceabilityPublicView.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/',
     name: 'AppLayout',
     component: AppLayout,
@@ -49,6 +55,16 @@ const routes = [
         component: () => import('../views/PredictionView.vue')
       },
       {
+        path: 'iot',
+        name: 'IotManagement',
+        component: () => import('../views/IotManagementView.vue')
+      },
+      {
+        path: 'traceability',
+        name: 'TraceabilityManagement',
+        component: () => import('../views/TraceabilityManagementView.vue')
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/SettingsView.vue')
@@ -69,7 +85,15 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
   if (!authStore.isAuthenticated && localStorage.getItem('user')) {
-    authStore.user = JSON.parse(localStorage.getItem('user'));
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        authStore.user = JSON.parse(userStr);
+      }
+    } catch (error) {
+      console.warn('解析 localStorage 中的用戶資料失敗:', error);
+      localStorage.removeItem('user');
+    }
   }
   
   const isAuthenticated = authStore.isAuthenticated

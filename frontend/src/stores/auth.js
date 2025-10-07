@@ -8,7 +8,18 @@ export const useAuthStore = defineStore('auth', () => {
   
   // --- State (狀態) ---
   // 使用 ref 來定義響應式狀態，類似於 Vue 組件中的 data
-  const user = ref(JSON.parse(localStorage.getItem('user')) || null)
+  const getUserFromStorage = () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (error) {
+      console.warn('解析 localStorage 中的用戶資料失敗:', error);
+      localStorage.removeItem('user');
+      return null;
+    }
+  };
+  const user = ref(getUserFromStorage())
+  const isLoggingOut = ref(false) // 添加登出狀態標誌
 
   // --- Getters (計算屬性) ---
   // 使用 computed 來定義計算屬性，類似於 Vue 組件中的 computed
@@ -55,6 +66,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    // 防止重複登出
+    if (isLoggingOut.value) {
+      console.log('正在登出中，跳過重複請求');
+      return;
+    }
+    
+    isLoggingOut.value = true;
+    
     try {
       // 即使後端請求失敗，前端也要完成登出操作
       await api.logout();
@@ -64,6 +83,8 @@ export const useAuthStore = defineStore('auth', () => {
       // 清空狀態和 localStorage
       user.value = null;
       localStorage.removeItem('user');
+      isLoggingOut.value = false;
+      
       // 跳轉到登入頁面 - 使用動態導入避免循環依賴
       // 使用 replace 防止用戶透過瀏覽器返回鍵回到需要登入的頁面
       const { default: router } = await import('../router')

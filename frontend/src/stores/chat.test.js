@@ -74,7 +74,8 @@ describe('Chat Store', () => {
         mockApiKey,
         mockUserMessage,
         chatStore.sessionId,
-        mockEarNumContext
+        mockEarNumContext,
+        null
       )
       
       expect(chatStore.messages).toHaveLength(3) // 初始訊息 + 用戶訊息 + AI回覆
@@ -155,7 +156,8 @@ describe('Chat Store', () => {
         mockApiKey,
         mockUserMessage,
         chatStore.sessionId,
-        ''
+        '',
+        null
       )
     })
 
@@ -204,8 +206,8 @@ describe('Chat Store', () => {
     it('應該生成新的 session ID', async () => {
       const originalSessionId = chatStore.sessionId
       
-      // 等待一毫秒確保時間戳不同
-      await new Promise(resolve => setTimeout(resolve, 1))
+      // 等待更長些以確保時間戳不同（避免毫秒碰撞）
+      await new Promise(resolve => setTimeout(resolve, 10))
       
       chatStore.clearChat()
       
@@ -250,10 +252,16 @@ describe('Chat Store', () => {
     it('應該處理空的用戶訊息', async () => {
       api.chatWithAgent.mockResolvedValue({ reply_html: '<p>回覆</p>' })
       
-      await chatStore.sendMessage('key', '', '')
+  await chatStore.sendMessage('key', '', '')
       
       expect(chatStore.messages[1].content).toBe('')
-      expect(api.chatWithAgent).toHaveBeenCalledWith('key', '', chatStore.sessionId, '')
+      expect(api.chatWithAgent).toHaveBeenCalledWith(
+        'key',
+        '請幫我分析這張山羊照片',
+        chatStore.sessionId,
+        '',
+        null
+      )
     })
 
     it('應該處理 null 的 API 回覆', async () => {

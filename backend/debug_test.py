@@ -6,6 +6,9 @@ import tempfile
 import sys
 sys.path.append('.')
 
+os.environ.setdefault('DOTENV_PATH', 'NON_EXISTENT_.env')
+os.environ.setdefault('API_HMAC_SECRET', 'debug-hmac-secret-value-should-be-32-bytes')
+
 from app import create_app, db
 
 # 設置測試環境

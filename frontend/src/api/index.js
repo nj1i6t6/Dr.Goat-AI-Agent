@@ -33,11 +33,21 @@ apiClient.interceptors.response.use(
     if (error.response) {
       switch (error.response.status) {
         case 401:
-          console.error("收到 401 未授權錯誤，執行登出。");
-          // 使用動態導入避免循環依賴
-          const { useAuthStore } = await import('../stores/auth');
-          const authStore = useAuthStore();
-          authStore.logout();
+          // 避免無限循環：只有在非登出請求時才自動登出
+          const isLogoutRequest = error.config.url && error.config.url.includes('/logout');
+          const isLoginRequest = error.config.url && error.config.url.includes('/login');
+          
+          if (!isLogoutRequest && !isLoginRequest) {
+            console.error("收到 401 未授權錯誤，執行登出。");
+            // 使用動態導入避免循環依賴
+            const { useAuthStore } = await import('../stores/auth');
+            const authStore = useAuthStore();
+            authStore.logout();
+          } else if (isLoginRequest) {
+            console.log("登入失敗：憑證無效");
+          } else {
+            console.log("登出請求失敗，但這是正常的");
+          }
           break;
         case 404:
           console.error("請求的資源不存在 (404)。");
@@ -175,6 +185,18 @@ export default {
       headers: { 'Content-Type': 'multipart/form-data' } 
     }), errorHandler);
   },
+  requestAiImportMapping(file, apiKey, errorHandler) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const headers = { 'Content-Type': 'multipart/form-data' };
+    if (apiKey) {
+      headers['X-Api-Key'] = apiKey;
+    }
+
+    return withErrorHandling(() => apiClient.post('/api/data/ai_import_mapping', formData, {
+      headers
+    }), errorHandler);
+  },
   processImport(file, isDefaultMode, mappingConfig = {}, errorHandler) {
     const formData = new FormData();
     formData.append('file', file);
@@ -215,6 +237,75 @@ export default {
   },
   getPredictionChartData(earTag, targetDays, errorHandler) {
     return withErrorHandling(() => apiClient.get(`/api/prediction/goats/${earTag}/prediction/chart-data?target_days=${targetDays}`), errorHandler);
+  },
+
+  // 產銷履歷 API
+  getTraceabilityBatches(includeDetails = false, errorHandler) {
+    const params = includeDetails ? { include_details: true } : undefined;
+    return withErrorHandling(() => apiClient.get('/api/traceability/batches', { params }), errorHandler);
+  },
+  createTraceabilityBatch(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/traceability/batches', data), errorHandler);
+  },
+  getTraceabilityBatch(batchId, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/traceability/batches/${batchId}`), errorHandler);
+  },
+  updateTraceabilityBatch(batchId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/traceability/batches/${batchId}`, data), errorHandler);
+  },
+  deleteTraceabilityBatch(batchId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/traceability/batches/${batchId}`), errorHandler);
+  },
+  replaceBatchSheepLinks(batchId, sheepLinks, errorHandler) {
+    const payload = { sheep_links: sheepLinks };
+    return withErrorHandling(() => apiClient.post(`/api/traceability/batches/${batchId}/sheep`, payload), errorHandler);
+  },
+  removeBatchSheep(batchId, sheepId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/traceability/batches/${batchId}/sheep/${sheepId}`), errorHandler);
+  },
+  addProcessingStep(batchId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.post(`/api/traceability/batches/${batchId}/steps`, data), errorHandler);
+  },
+  updateProcessingStep(stepId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/traceability/steps/${stepId}`, data), errorHandler);
+  },
+  deleteProcessingStep(stepId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/traceability/steps/${stepId}`), errorHandler);
+  },
+  getPublicTraceBatch(batchNumber, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/traceability/public/${batchNumber}`), errorHandler);
+  },
+
+  // IoT 裝置與自動化規則 API
+  getIotDevices(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/iot/devices'), errorHandler);
+  },
+  getIotDevice(deviceId, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/iot/devices/${deviceId}`), errorHandler);
+  },
+  createIotDevice(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/iot/devices', data), errorHandler);
+  },
+  updateIotDevice(deviceId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/iot/devices/${deviceId}`, data), errorHandler);
+  },
+  deleteIotDevice(deviceId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/iot/devices/${deviceId}`), errorHandler);
+  },
+  getDeviceSensorReadings(deviceId, params = {}, errorHandler) {
+    return withErrorHandling(() => apiClient.get(`/api/iot/devices/${deviceId}/readings`, { params }), errorHandler);
+  },
+  getAutomationRules(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/iot/rules'), errorHandler);
+  },
+  createAutomationRule(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/iot/rules', data), errorHandler);
+  },
+  updateAutomationRule(ruleId, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/iot/rules/${ruleId}`, data), errorHandler);
+  },
+  deleteAutomationRule(ruleId, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/iot/rules/${ruleId}`), errorHandler);
   },
 
   // 原始錯誤處理包裝函數，供外部使用

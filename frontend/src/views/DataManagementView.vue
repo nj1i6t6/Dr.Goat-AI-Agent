@@ -68,35 +68,96 @@
             :on-change="handleCustomFileChange"
             :limit="1"
             :on-exceed="handleFileExceed"
-            v-loading="analysisLoading"
+            v-loading="customAnalysisLoading"
           >
              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
             <div class="el-upload__text">將檔案拖曳至此，或<em>點擊上傳</em></div>
           </el-upload>
-          <div v-if="analyzedData">
+          <div v-if="customAnalyzedData">
             <el-divider />
             <h4>步驟二：設定工作表用途與欄位映射</h4>
-            <div v-for="(sheet, name) in analyzedData.sheets" :key="name" class="sheet-mapping-item">
-              <p><strong>工作表: {{ name }}</strong> (共 {{ sheet.rows }} 筆資料)</p>
-              <el-select v-model="mappingConfig[name].purpose" placeholder="請選擇此工作表的用途" style="width:100%; margin-bottom: 10px;">
-                <el-option v-for="opt in sheetPurposeOptions" :key="opt.value" :label="opt.text" :value="opt.value" />
-              </el-select>
-              <div v-if="systemFieldMappings[mappingConfig[name].purpose]">
-                <div v-for="field in systemFieldMappings[mappingConfig[name].purpose]" :key="field.key" class="field-mapping-row">
-                  <span class="system-field-label">
-                    {{ field.label }}
-                    <el-tag v-if="field.required" type="danger" size="small">必填</el-tag>
-                  </span>
-                  <el-select v-model="mappingConfig[name].columns[field.key]" placeholder="對應您的欄位" clearable style="width: 100%;">
-                    <el-option v-for="col in sheet.columns" :key="col" :label="col" :value="col" />
-                  </el-select>
-                </div>
-              </div>
-            </div>
+            <SheetMappingConfigurator
+              :sheets="customAnalyzedData.sheets"
+              :mapping-state="mappingConfig"
+              :sheet-purpose-options="sheetPurposeOptions"
+              :system-field-mappings="systemFieldMappings"
+              @update-mapping="handleCustomMappingUpdate"
+            />
             <el-divider />
             <h4>步驟三：執行導入</h4>
             <el-button type="primary" :loading="customImportLoading" @click="handleProcessImport(false)">執行導入</el-button>
             <div v-if="customImportResult" class="import-result" v-html="customImportResult"></div>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <!-- AI 智慧導入 -->
+      <el-tab-pane label="AI 智慧導入 (Beta)" name="ai">
+        <el-steps :active="aiStep" finish-status="success" simple>
+          <el-step title="上傳檔案" />
+          <el-step title="AI 分析與審核" />
+          <el-step title="執行導入" />
+        </el-steps>
+        <div class="step-content">
+          <h4>步驟一：上傳您的 Excel 檔案</h4>
+          <el-upload
+            drag
+            action="#"
+            :auto-upload="false"
+            :on-change="handleAiFileChange"
+            :limit="1"
+            :on-exceed="handleFileExceed"
+            v-loading="aiAnalysisLoading"
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">將檔案拖曳至此，或<em>點擊上傳</em></div>
+          </el-upload>
+
+          <div v-if="aiAnalysisLoading" class="ai-status">
+            <el-alert title="AI 分析中，請稍候..." type="info" :closable="false" show-icon />
+          </div>
+
+          <div v-if="aiAnalyzedData">
+            <el-divider />
+            <h4>步驟二：審核 AI 建議</h4>
+            <el-alert
+              v-if="aiSummary"
+              :title="aiSummary"
+              type="success"
+              show-icon
+              :closable="false"
+              class="ai-summary-alert"
+            />
+            <el-alert
+              v-for="(warning, index) in aiWarnings"
+              :key="`ai-warning-${index}`"
+              :title="warning"
+              type="warning"
+              show-icon
+              :closable="false"
+              class="ai-warning-alert"
+            />
+
+            <SheetMappingConfigurator
+              :sheets="aiAnalyzedData.sheets"
+              :mapping-state="aiMappingConfig"
+              :sheet-purpose-options="sheetPurposeOptions"
+              :system-field-mappings="systemFieldMappings"
+              :sheet-insights="aiInsights"
+              @update-mapping="handleAiMappingUpdate"
+            />
+
+            <el-divider />
+            <h4>步驟三：確認並執行導入</h4>
+            <el-button
+              type="primary"
+              :disabled="!aiFile"
+              :loading="aiImportLoading"
+              @click="handleAiImport"
+            >
+              使用 AI 建議執行導入
+            </el-button>
+            <div v-if="aiImportResult" class="import-result" v-html="aiImportResult"></div>
           </div>
         </div>
       </el-tab-pane>
@@ -105,14 +166,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive } from 'vue';
 import { Upload, Download, UploadFilled } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import api from '../api';
+import SheetMappingConfigurator from '../components/common/SheetMappingConfigurator.vue';
 import { sheetPurposeOptions, systemFieldMappings } from '../utils';
+import { useSettingsStore } from '../stores/settings';
 
 const activeTab = ref('default');
 const exportLoading = ref(false);
+
+const settingsStore = useSettingsStore();
 
 // Default Import State
 const defaultStep = ref(1);
@@ -123,11 +188,66 @@ const defaultImportResult = ref('');
 // Custom Import State
 const customStep = ref(0);
 const customFile = ref(null);
-const analysisLoading = ref(false);
-const analyzedData = ref(null);
+const customAnalysisLoading = ref(false);
+const customAnalyzedData = ref(null);
 const mappingConfig = reactive({});
 const customImportLoading = ref(false);
 const customImportResult = ref('');
+
+// AI Import State
+const aiStep = ref(0);
+const aiFile = ref(null);
+const aiAnalysisLoading = ref(false);
+const aiAnalyzedData = ref(null);
+const aiMappingConfig = reactive({});
+const aiInsights = reactive({});
+const aiWarnings = ref([]);
+const aiSummary = ref('');
+const aiImportLoading = ref(false);
+const aiImportResult = ref('');
+
+const getEffectiveApiKey = () => (
+  (settingsStore.apiKey || localStorage.getItem('geminiApiKey') || localStorage.getItem('gemini_api_key') || '').trim()
+);
+
+const resetReactiveObject = (target) => {
+  Object.keys(target).forEach((key) => delete target[key]);
+};
+
+const ensureSheetConfig = (target, sheetName) => {
+  if (!target[sheetName]) {
+    target[sheetName] = { purpose: '', columns: {} };
+  }
+  if (!target[sheetName].columns) {
+    target[sheetName].columns = {};
+  }
+  return target[sheetName];
+};
+
+const updateMappingConfig = (target, payload) => {
+  const { sheetName, purpose, fieldKey, column } = payload;
+  if (!sheetName) return;
+
+  const entry = ensureSheetConfig(target, sheetName);
+
+  if (purpose !== undefined) {
+    entry.purpose = purpose;
+    if (!purpose || purpose === 'ignore') {
+      entry.columns = {};
+    }
+  }
+
+  if (fieldKey) {
+    if (column) {
+      entry.columns[fieldKey] = column;
+    } else {
+      delete entry.columns[fieldKey];
+    }
+  }
+};
+
+const handleCustomMappingUpdate = (payload) => updateMappingConfig(mappingConfig, payload);
+const handleAiMappingUpdate = (payload) => updateMappingConfig(aiMappingConfig, payload);
 
 const handleExport = async () => {
   exportLoading.value = true;
@@ -170,75 +290,130 @@ const handleDefaultFileChange = (file) => {
 const handleCustomFileChange = async (file) => {
   customFile.value = file.raw;
   customStep.value = 1;
-  analysisLoading.value = true;
+  customAnalysisLoading.value = true;
   customImportResult.value = '';
-  analyzedData.value = null;
-  Object.keys(mappingConfig).forEach(key => delete mappingConfig[key]);
+  customAnalyzedData.value = null;
+  resetReactiveObject(mappingConfig);
 
   try {
     const result = await api.analyzeExcel(customFile.value);
-    analyzedData.value = result;
-    // 初始化映射配置
-    for (const sheetName in result.sheets) {
-      mappingConfig[sheetName] = {
-        purpose: '',
-        columns: {},
-      };
+    customAnalyzedData.value = result;
+    if (result?.sheets) {
+      Object.keys(result.sheets).forEach((sheetName) => {
+        mappingConfig[sheetName] = { purpose: '', columns: {} };
+      });
     }
     customStep.value = 2;
   } catch (error) {
     ElMessage.error(`檔案分析失敗: ${error.error || error.message}`);
     customStep.value = 0;
   } finally {
-    analysisLoading.value = false;
+    customAnalysisLoading.value = false;
   }
 };
 
-const handleProcessImport = async (isDefault) => {
-  const file = isDefault ? defaultFile.value : customFile.value;
+const handleAiFileChange = async (file) => {
+  aiFile.value = file.raw;
+  aiStep.value = 1;
+  aiImportResult.value = '';
+  aiSummary.value = '';
+  aiWarnings.value = [];
+  aiAnalyzedData.value = null;
+  resetReactiveObject(aiMappingConfig);
+  resetReactiveObject(aiInsights);
+
+  aiAnalysisLoading.value = true;
+  try {
+    const apiKey = getEffectiveApiKey();
+    if (!apiKey) {
+      throw { error: '請先在系統設定頁面儲存您的 Gemini API 金鑰。' };
+    }
+
+    const result = await api.requestAiImportMapping(aiFile.value, apiKey);
+    aiAnalyzedData.value = result.analysis || null;
+
+    const sheets = result.analysis?.sheets || {};
+    const suggested = result.mapping_config?.sheets || {};
+    const metadata = result.metadata || {};
+
+    aiWarnings.value = Array.isArray(result.warnings) ? result.warnings.map((msg) => String(msg)) : [];
+    if (Array.isArray(result.ai_notes)) {
+      aiWarnings.value = [...aiWarnings.value, ...result.ai_notes.map((msg) => String(msg))];
+    }
+    aiSummary.value = typeof result.summary === 'string' ? result.summary : '';
+
+    Object.keys(sheets).forEach((sheetName) => {
+      const suggestion = suggested[sheetName] || {};
+      aiMappingConfig[sheetName] = {
+        purpose: suggestion.purpose || '',
+        columns: { ...(suggestion.columns || {}) }
+      };
+      if (metadata[sheetName]) {
+        aiInsights[sheetName] = metadata[sheetName];
+      }
+    });
+
+    aiStep.value = 2;
+  } catch (error) {
+    ElMessage.error(`AI 分析失敗: ${error.error || error.message}`);
+    aiStep.value = 0;
+  } finally {
+    aiAnalysisLoading.value = false;
+  }
+};
+
+const handleProcessImport = async (isDefault, options = {}) => {
+  const file = options.file ?? (isDefault ? defaultFile.value : customFile.value);
   if (!file) {
     ElMessage.error('請先上傳檔案');
     return;
   }
 
-  if (isDefault) {
-    defaultImportLoading.value = true;
-    defaultImportResult.value = '';
-  } else {
-    customImportLoading.value = true;
-    customImportResult.value = '';
-  }
+  const stepRef = options.stepRef ?? (isDefault ? defaultStep : customStep);
+  const loadingRef = options.loadingRef ?? (isDefault ? defaultImportLoading : customImportLoading);
+  const resultRef = options.resultRef ?? (isDefault ? defaultImportResult : customImportResult);
+  const mappingSource = options.mapping ?? mappingConfig;
+  const successMessage = options.successMessage || '導入操作完成';
+
+  loadingRef.value = true;
+  resultRef.value = '';
 
   try {
-    const result = await api.processImport(file, isDefault, mappingConfig);
+    const mappingPayload = isDefault ? {} : JSON.parse(JSON.stringify(mappingSource));
+    const result = await api.processImport(file, isDefault, mappingPayload);
     let resultHtml = `<h4>導入報告</h4><p class="success">${result.message}</p>`;
     if (result.details && result.details.length > 0) {
       resultHtml += `<ul>${result.details.map(d => `<li><strong>${d.sheet}</strong>: ${d.message}</li>`).join('')}</ul>`;
     }
-    
-    if (isDefault) {
-      defaultImportResult.value = resultHtml;
-      defaultStep.value = 3;
-    } else {
-      customImportResult.value = resultHtml;
-      customStep.value = 3;
+
+    resultRef.value = resultHtml;
+    stepRef.value = 3;
+    ElMessage.success(successMessage);
+
+    if (typeof options.onSuccess === 'function') {
+      options.onSuccess(result);
     }
-    ElMessage.success('導入操作完成');
   } catch (error) {
     const errorHtml = `<p class="error">導入失敗: ${error.error || error.message}</p>`;
-    if (isDefault) {
-      defaultImportResult.value = errorHtml;
-    } else {
-      customImportResult.value = errorHtml;
-    }
+    resultRef.value = errorHtml;
     ElMessage.error('導入過程中發生錯誤');
-  } finally {
-    if (isDefault) {
-      defaultImportLoading.value = false;
-    } else {
-      customImportLoading.value = false;
+    if (typeof options.onError === 'function') {
+      options.onError(error);
     }
+  } finally {
+    loadingRef.value = false;
   }
+};
+
+const handleAiImport = () => {
+  handleProcessImport(false, {
+    file: aiFile.value,
+    mapping: aiMappingConfig,
+    stepRef: aiStep,
+    loadingRef: aiImportLoading,
+    resultRef: aiImportResult,
+    successMessage: 'AI 建議已成功導入'
+  });
 };
 </script>
 
@@ -263,23 +438,7 @@ const handleProcessImport = async (isDefault) => {
 .import-result :deep(p.success) { color: #67c23a; font-weight: bold; }
 .import-result :deep(p.error) { color: #f56c6c; font-weight: bold; }
 .import-result :deep(ul) { padding-left: 20px; }
-.sheet-mapping-item {
-  border: 1px solid #dcdfe6;
-  padding: 15px;
-  border-radius: 4px;
-  margin-bottom: 15px;
-}
-.field-mapping-row {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 10px;
-  padding: 8px;
-  background-color: #fafafa;
-  border-radius: 4px;
-}
-.system-field-label {
-  flex-basis: 40%;
-  font-size: 0.9em;
-}
+.ai-status { margin-top: 16px; }
+.ai-summary-alert { margin-bottom: 12px; }
+.ai-warning-alert { margin-bottom: 10px; }
 </style>

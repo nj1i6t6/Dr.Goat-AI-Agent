@@ -131,9 +131,9 @@ echo Step 4: Waiting for database to initialize - 15 seconds...
 timeout /t 15 /nobreak >nul
 echo.
 
-REM Run database migration
-echo Step 5: Running database migration...
-%DOCKER_COMPOSE_CMD% exec -T backend flask db upgrade
+REM Database migration is now handled automatically by the application
+echo Step 5: Database migration will be handled automatically...
+echo (No manual migration needed - the app handles this internally)
 echo.
 
 REM Check service status
@@ -159,10 +159,8 @@ echo View logs: %DOCKER_COMPOSE_CMD% logs -f
 echo Stop services: %DOCKER_COMPOSE_CMD% down
 echo Restart services: %DOCKER_COMPOSE_CMD% restart
 echo.
-echo Default admin account:
-echo Username: admin
-echo Password: admin123
-echo NOTE: Please change the password after first login
+echo Account notice:
+echo Please register a new account via the UI or API (/api/auth/register) before login.
 echo.
 echo Press any key to exit...
 pause >nul

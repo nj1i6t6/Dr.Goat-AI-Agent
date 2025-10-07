@@ -1,0 +1,426 @@
+openapi: 3.0.3
+info:
+  title: Goat Nutrition App API
+  version: 0.1.0
+  description: |
+    Minimal OpenAPI for key endpoints. Auth uses cookie session (Flask-Login).
+servers:
+  - url: http://localhost:5001
+paths:
+  /api/auth/register:
+    post:
+      summary: Register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '201': { description: Created }
+        '400': { description: Bad Request }
+        '409': { description: Conflict }
+  /api/auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+  /api/auth/logout:
+    post:
+      summary: Logout
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+  /api/auth/status:
+    get:
+      summary: Auth status
+      responses:
+        '200': { description: OK }
+  /api/auth/health:
+    get:
+      summary: Health check
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Unhealthy }
+  /api/sheep/:
+    get:
+      summary: List sheep (current user)
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+    post:
+      summary: Create sheep
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [EarNum]
+              properties:
+                EarNum: { type: string }
+                Breed: { type: string }
+                Sex: { type: string }
+                BirthDate: { type: string }
+      responses:
+        '201': { description: Created }
+        '400': { description: Validation error }
+        '409': { description: Duplicate EarNum }
+  /api/sheep/{ear_num}:
+    parameters:
+      - in: path
+        name: ear_num
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get one sheep (with events)
+      responses:
+        '200': { description: OK }
+        '404': { description: Not Found }
+    put:
+      summary: Update sheep (records history for key fields)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation error }
+        '404': { description: Not Found }
+    delete:
+      summary: Delete sheep
+      responses:
+        '200': { description: OK }
+        '404': { description: Not Found }
+  /api/sheep/{ear_num}/events:
+    parameters:
+      - in: path
+        name: ear_num
+        required: true
+        schema: { type: string }
+    get:
+      summary: List events
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Add event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_date, event_type]
+              properties:
+                event_date: { type: string }
+                event_type: { type: string }
+                description: { type: string }
+                medication: { type: string }
+                withdrawal_days: { type: integer }
+      responses:
+        '201': { description: Created }
+  /api/sheep/events/{event_id}:
+    parameters:
+      - in: path
+        name: event_id
+        required: true
+        schema: { type: integer }
+    put:
+      summary: Update event
+      responses:
+        '200': { description: OK }
+    delete:
+      summary: Delete event
+      responses:
+        '200': { description: OK }
+  /api/sheep/{ear_num}/history:
+    parameters:
+      - in: path
+        name: ear_num
+        required: true
+        schema: { type: string }
+    get:
+      summary: List historical data
+      responses:
+        '200': { description: OK }
+  /api/sheep/history/{record_id}:
+    parameters:
+      - in: path
+        name: record_id
+        required: true
+        schema: { type: integer }
+    delete:
+      summary: Delete historical record
+      responses:
+        '200': { description: OK }
+  /api/data/export_excel:
+    get:
+      summary: Export all data as Excel
+      responses:
+        '200': { description: File stream }
+  /api/data/analyze_excel:
+    post:
+      summary: Analyze uploaded Excel structure
+      responses:
+        '200': { description: OK }
+        '400': { description: Bad Request }
+  /api/data/process_import:
+    post:
+      summary: Import data from Excel (default template or custom mapping)
+      responses:
+        '200': { description: OK }
+        '400': { description: Bad Request }
+  /api/dashboard/data:
+    get:
+      summary: Dashboard aggregates
+      responses:
+        '200': { description: OK }
+  /api/dashboard/farm_report:
+    get:
+      summary: Farm report
+      responses:
+        '200': { description: OK }
+  /api/dashboard/event_options:
+    get:
+      summary: Event type/description options
+      responses:
+        '200': { description: OK }
+  /api/dashboard/event_types:
+    post:
+      summary: Add event type
+      responses:
+        '201': { description: Created }
+  /api/dashboard/event_types/{type_id}:
+    parameters:
+      - in: path
+        name: type_id
+        required: true
+        schema: { type: integer }
+    delete:
+      summary: Delete event type
+      responses:
+        '200': { description: OK }
+  /api/dashboard/event_descriptions:
+    post:
+      summary: Add event description
+      responses:
+        '201': { description: Created }
+  /api/dashboard/event_descriptions/{desc_id}:
+    parameters:
+      - in: path
+        name: desc_id
+        required: true
+        schema: { type: integer }
+    delete:
+      summary: Delete event description
+      responses:
+        '200': { description: OK }
+  /api/agent/tip:
+    get:
+      summary: Daily tip (requires X-Api-Key)
+      responses:
+        '200': { description: OK }
+        '401': { description: Missing API key }
+  /api/agent/recommendation:
+    post:
+      summary: Nutrition recommendation (JSON contains api_key)
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation error }
+  /api/agent/chat:
+    post:
+      summary: Chat with AI (text or image multipart; requires api_key)
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation error }
+  /api/prediction/goats/{ear_tag}/prediction:
+    parameters:
+      - in: path
+        name: ear_tag
+        required: true
+        schema: { type: string }
+      - in: query
+        name: target_days
+        required: false
+        schema: { type: integer, default: 30 }
+    get:
+      summary: Linear regression growth prediction (+ optional AI explanation)
+      responses:
+        '200': { description: OK }
+        '400': { description: Insufficient data }
+  /api/prediction/goats/{ear_tag}/prediction/chart-data:
+    parameters:
+      - in: path
+        name: ear_tag
+        required: true
+        schema: { type: string }
+      - in: query
+        name: target_days
+        required: false
+        schema: { type: integer, default: 30 }
+    get:
+      summary: Chart data for prediction
+      responses:
+        '200': { description: OK }
+        '400': { description: Insufficient data }
+  /api/iot/devices:
+    get:
+      summary: List IoT devices for current user
+      security:
+        - cookieAuth: []
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+    post:
+      summary: Register a new IoT device
+      description: |
+        Returns device metadata and a one-time `api_key` field. The API key is only returned in this response and
+        cannot be retrieved afterwards.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201': { description: Created with one-time API key }
+        '400': { description: Validation error }
+        '401': { description: Unauthorized }
+  /api/iot/devices/{device_id}:
+    parameters:
+      - in: path
+        name: device_id
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Retrieve IoT device details
+      security:
+        - cookieAuth: []
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+    put:
+      summary: Update IoT device metadata
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200': { description: Updated }
+        '400': { description: Validation error }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+    delete:
+      summary: Remove IoT device
+      security:
+        - cookieAuth: []
+      responses:
+        '200': { description: Deleted }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+  /api/iot/ingest:
+    post:
+      summary: Ingest sensor data from IoT device
+      description: Requires `X-API-Key` header signed with device secret. Returns 201 on success.
+      parameters:
+        - in: header
+          name: X-API-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+      responses:
+        '201': { description: Accepted and enqueued }
+        '400': { description: Invalid payload }
+        '401': { description: Missing or invalid API key }
+  /api/iot/rules:
+    get:
+      summary: List automation rules
+      security:
+        - cookieAuth: []
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+    post:
+      summary: Create automation rule
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201': { description: Created }
+        '400': { description: Validation error }
+        '401': { description: Unauthorized }
+  /api/iot/rules/{rule_id}:
+    parameters:
+      - in: path
+        name: rule_id
+        required: true
+        schema: { type: integer }
+    put:
+      summary: Update automation rule
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200': { description: Updated }
+        '400': { description: Validation error }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+    delete:
+      summary: Delete automation rule
+      security:
+        - cookieAuth: []
+      responses:
+        '200': { description: Deleted }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+security:
+  - cookieAuth: []

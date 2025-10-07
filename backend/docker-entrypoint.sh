@@ -28,18 +28,14 @@ if [ ! -d "migrations" ]; then
     flask db init
 fi
 
-# 檢查是否有待套用的遷移
-echo "檢查資料庫遷移狀態..."
+# 檢查資料庫連接
+echo "檢查資料庫狀態..."
 
-# 檢查是否存在遷移文件
-if [ -d "migrations/versions" ] && [ "$(ls -A migrations/versions)" ]; then
-    echo "發現遷移文件，執行資料庫升級..."
-    flask db upgrade
-else
-    echo "沒有發現遷移文件，創建初始遷移..."
-    flask db migrate -m "Initial migration"
-    flask db upgrade
-fi
+# 設定 Flask 應用程式
+export FLASK_APP=run.py
+
+# 簡化：應用程式會自動處理資料庫初始化
+echo "資料庫初始化將由應用程式自動處理"
 
 # 檢查是否需要創建預設用戶（可選）
 echo "檢查用戶資料..."

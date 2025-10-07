@@ -40,3 +40,4 @@ tzdata==2024.1
 urllib3==2.2.2
 waitress==3.0.0
 Werkzeug==3.0.3
+lightgbm==4.5.0

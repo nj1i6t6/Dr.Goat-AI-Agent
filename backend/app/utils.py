@@ -12,7 +12,7 @@ def call_gemini_api(prompt_text, api_key, generation_config_override=None, safet
     if not api_key or api_key == 'your-gemini-api-key-here':
         return {"error": "請設置有效的 Google Gemini API 金鑰。請在 .env 文件中設置 GOOGLE_API_KEY。"}
     
-    GEMINI_MODEL_NAME = "gemini-2.5-pro"
+    GEMINI_MODEL_NAME = "gemini-flash-latest"
     MAX_OUTPUT_TOKENS_GEMINI = 16384 
     GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL_NAME}:generateContent?key={api_key}"
     
