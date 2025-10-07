@@ -9,6 +9,7 @@
 | ESG | 永續 / ESG 指標 | Environmental, social, and governance metrics. |
 | Sensor Reading | 感測數據 | IoT ingestion payload stored per device. |
 | IoT Device | IoT 裝置 | Managed hardware endpoint for telemetry. |
+| Automation Rule | 自動化規則 | Maps sensor triggers to actuator commands. |
 | Background Task | 背景任務 | Redis-backed job executed by `run_worker.py`. |
 | Dashboard Cache | 儀表板快取 | Redis layer for cached analytics widgets. |
 | API Key | API 金鑰 | Must be hashed server-side; shown once to users. |
