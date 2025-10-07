@@ -149,7 +149,7 @@ def _attempt_git_lfs_pull() -> None:
         return
 
     try:
-        commands = (["git", "lfs", "install"], ["git", "lfs", "pull"])
+        commands = (["git", "lfs", "install", "--local"], ["git", "lfs", "pull"])
         for cmd_args in commands:
             result = subprocess.run(
                 cmd_args,

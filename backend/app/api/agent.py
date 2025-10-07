@@ -34,7 +34,7 @@ def _format_rag_context(chunks: list[dict[str, object]]) -> str:
     lines = ["\n--- 參考知識庫片段 ---"]
     for idx, chunk in enumerate(chunks, 1):
         source = chunk.get('doc', 'unknown')
-        chunk_idx = chunk.get('idx')
+        chunk_idx = chunk.get('idx', 'N/A')
         score = chunk.get('score', 0.0)
         lines.append(
             f"[{idx}] 來源: {source} (段落 {chunk_idx}, 相似度 {score:.2f})\n{chunk.get('text', '').strip()}"
@@ -258,7 +258,7 @@ def chat_with_agent():
     rag_chunks = rag_query(user_message + sheep_context_text, api_key=api_key)
     rag_context_text = _format_rag_context(rag_chunks)
     if rag_context_text:
-        current_user_message_with_context += rag_context_text
+        current_user_message_with_context = rag_context_text + "\n" + current_user_message_with_context
     
     # 如果有圖片，加入圖片部分
     user_message_parts = [{"text": current_user_message_with_context}]
