@@ -76,7 +76,7 @@ def ensure_vectors(path: str | os.PathLike[str] = _DEFAULT_VECTOR_PATH) -> List[
 
         # File missing; attempt to pull from Git LFS once.
         if not _VECTOR_MISSING_WARNED:
-            _attempt_git_lfs_pull(resolved_path)
+            _attempt_git_lfs_pull()
             if resolved_path.exists():
                 try:
                     _VECTOR_CACHE = load_vectors(resolved_path)
@@ -137,14 +137,24 @@ def _safe_json(value: object) -> Dict[str, object]:
         return {"raw": value}
 
 
-def _attempt_git_lfs_pull(target_path: Path) -> None:
+def _attempt_git_lfs_pull() -> None:
     repo_root = _REPO_ROOT
     git_dir = repo_root / ".git"
     if not git_dir.exists():
         return
 
     try:
-        subprocess.run(["git", "lfs", "install"], cwd=repo_root, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "lfs", "pull"], cwd=repo_root, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        commands = (["git", "lfs", "install"], ["git", "lfs", "pull"])
+        for cmd_args in commands:
+            result = subprocess.run(
+                cmd_args,
+                cwd=repo_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                stderr = result.stderr.strip()
+                LOGGER.warning("Command '%s' failed with code %s: %s", " ".join(cmd_args), result.returncode, stderr)
     except FileNotFoundError:  # pragma: no cover - git not available in some envs
         LOGGER.warning("git or git-lfs not available; cannot pull RAG vectors")

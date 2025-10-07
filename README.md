@@ -155,6 +155,7 @@ graph TB
 - **檢索增強生成（RAG）**：
   - 知識來源位於 `docs/rag_sources/`（Markdown / 純文字）。執行 `make rag-update` 可完成切塊、嵌入（Gemini `gemini-embedding-001`、768 維 L2 正規化）並輸出 `docs/rag_vectors/corpus.parquet` 至 Git LFS。
   - `scripts/ingest_docs.py` 採 800 字、重疊 100 的固定切塊策略，並透過 `app/ai/embedding.py` 批次呼叫嵌入 API。
+  - 向量快照依賴 `pyarrow` 讀寫 Parquet（已於 `backend/requirements.txt` 固定版本）；執行腳本前請先安裝後端依賴。
   - `app/rag_loader.ensure_vectors()` 啟動時載入 Parquet 向量；若檔案缺失會自動嘗試 `git lfs pull`，仍失敗則僅記錄警告並降級為無 context 模式。
   - `/api/agent/recommendation` 與 `/api/agent/chat` 在原有 Prompt 前加入 Top-k 參考片段（餘弦相似度 ≥0.75），維持既有前端與 API 契約。
 - **生長預測**（`app/api/prediction.py`）：

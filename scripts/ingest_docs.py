@@ -21,7 +21,6 @@ TARGET_PATH = REPO_ROOT / "docs" / "rag_vectors" / "corpus.parquet"
 SUPPORTED_EXTENSIONS = {".md", ".txt"}
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
-BATCH_SIZE = 32
 
 
 def iter_source_files() -> List[Path]:
@@ -75,11 +74,7 @@ def build_records(files: List[Path]) -> List[Dict[str, object]]:
 
 def embed_records(records: List[Dict[str, object]]) -> None:
     texts = [record["text"] for record in records]
-    embeddings: List[np.ndarray] = []
-    for start in range(0, len(texts), BATCH_SIZE):
-        batch = texts[start:start + BATCH_SIZE]
-        vectors = embed_documents(batch)
-        embeddings.extend(vectors)
+    embeddings = embed_documents(texts)
     if len(embeddings) != len(records):
         raise RuntimeError("Mismatch between generated embeddings and records")
     for record, vector in zip(records, embeddings):

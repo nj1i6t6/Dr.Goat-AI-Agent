@@ -11,6 +11,21 @@ import base64
 
 bp = Blueprint('agent', __name__)
 
+_RECOMMENDATION_FIELD_LABELS = {
+    'EarNum': '耳號',
+    'Breed': '品種',
+    'Body_Weight_kg': '體重 (kg)',
+    'Age_Months': '月齡 (月)',
+    'Sex': '性別',
+    'status': '生理狀態',
+    'target_average_daily_gain_g': '目標日增重 (g/天)',
+    'milk_yield_kg_day': '日產奶量 (kg/天)',
+    'milk_fat_percentage': '乳脂率 (%)',
+    'number_of_fetuses': '懷胎數',
+    'activity_level': '活動量',
+    'primary_forage_type': '主要草料',
+}
+
 
 def _format_rag_context(chunks):
     if not chunks:
@@ -26,6 +41,23 @@ def _format_rag_context(chunks):
         )
     lines.append("--- 參考片段結束 ---\n")
     return "\n".join(lines)
+
+
+def _build_recommendation_rag_query(data: dict, sheep_context: str) -> str:
+    query_lines = []
+    for key, label in _RECOMMENDATION_FIELD_LABELS.items():
+        value = data.get(key)
+        if value not in (None, ""):
+            query_lines.append(f"{label}: {value}")
+
+    other_notes = data.get('other_remarks')
+    if other_notes:
+        query_lines.append(f"其他備註: {other_notes}")
+
+    if sheep_context:
+        query_lines.append(sheep_context.strip())
+
+    return "\n".join(query_lines)
 
 @bp.route('/tip', methods=['GET'])
 @login_required
@@ -114,13 +146,7 @@ def get_recommendation():
     ]
     
     # 動態添加用戶輸入的數據
-    field_map = {
-        'EarNum': '耳號', 'Breed': '品種', 'Body_Weight_kg': '體重 (kg)',
-        'Age_Months': '月齡 (月)', 'Sex': '性別', 'status': '生理狀態',
-        'target_average_daily_gain_g': '目標日增重 (g/天)', 'milk_yield_kg_day': '日產奶量 (kg/天)',
-        'milk_fat_percentage': '乳脂率 (%)', 'number_of_fetuses': '懷胎數'
-    }
-    for key, label in field_map.items():
+    for key, label in _RECOMMENDATION_FIELD_LABELS.items():
         if data.get(key):
             prompt_parts.append(f"- {label}: {data[key]}")
 
@@ -128,7 +154,8 @@ def get_recommendation():
     if data.get('other_remarks'):
         full_prompt += f"\n\n--- 使用者提供的其他備註 ---\n{data.get('other_remarks')}"
 
-    rag_chunks = rag_query(full_prompt)
+    rag_query_text = _build_recommendation_rag_query(data, sheep_context_str)
+    rag_chunks = rag_query(rag_query_text)
     rag_context_text = _format_rag_context(rag_chunks)
     if rag_context_text:
         full_prompt = rag_context_text + "\n" + full_prompt
