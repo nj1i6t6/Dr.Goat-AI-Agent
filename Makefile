@@ -7,5 +7,5 @@ rag-update:
 	else \
 		git add docs/rag_vectors/corpus.parquet; \
 		git commit -m "Update RAG vectors"; \
-		git push; \
+		echo "Local commit created. Review changes and run 'git push' manually."; \
 	fi

@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
-import numpy as np
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -15,43 +14,10 @@ if str(BACKEND_PATH) not in sys.path:
     sys.path.insert(0, str(BACKEND_PATH))
 
 from app.ai import EmbeddingError, embed_documents  # noqa: E402
+from rag_utils import chunk_text, iter_source_files, read_text  # noqa: E402
 
 DEFAULT_SOURCE_DIR = REPO_ROOT / "docs" / "rag_sources"
 DEFAULT_TARGET_PATH = REPO_ROOT / "docs" / "rag_vectors" / "corpus.parquet"
-SUPPORTED_EXTENSIONS = {".md", ".txt"}
-CHUNK_SIZE = 800
-CHUNK_OVERLAP = 100
-
-
-def iter_source_files(source_dir: Path) -> List[Path]:
-    if not source_dir.exists():
-        raise FileNotFoundError(f"Source directory not found: {source_dir}")
-    files = [p for p in source_dir.rglob('*') if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS]
-    return sorted(files)
-
-
-def read_text(file_path: Path) -> str:
-    if file_path.suffix.lower() in {".md", ".txt"}:
-        return file_path.read_text(encoding='utf-8')
-    raise ValueError(f"Unsupported extension: {file_path.suffix}. TODO: add PDF support without blocking generation.")
-
-
-def chunk_text(text: str) -> List[str]:
-    if not text:
-        return []
-
-    chunks: List[str] = []
-    start = 0
-    length = len(text)
-    while start < length:
-        end = min(length, start + CHUNK_SIZE)
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        start += CHUNK_SIZE - CHUNK_OVERLAP
-        if start < 0:
-            break
-    return chunks
 
 
 def build_records(files: List[Path]) -> List[Dict[str, object]]:

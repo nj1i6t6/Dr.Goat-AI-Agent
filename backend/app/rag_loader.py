@@ -14,6 +14,13 @@ import pandas as pd
 
 from .ai import EmbeddingError, embed_query
 
+try:  # pragma: no cover - import tested indirectly via search path
+    import faiss  # type: ignore
+    _FAISS_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency fallback
+    faiss = None  # type: ignore
+    _FAISS_AVAILABLE = False
+
 LOGGER = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +30,9 @@ _VECTOR_CACHE: List[Dict[str, object]] = []
 _VECTOR_MTIME: float | None = None
 _VECTOR_LOCK = threading.Lock()
 _VECTOR_MISSING_WARNED = False
+_FAISS_INDEX: "faiss.Index" | None = None  # type: ignore[name-defined]
+_EMBEDDING_MATRIX: np.ndarray | None = None
+_FAISS_UNAVAILABLE_WARNED = False
 
 
 def load_vectors(path: str | os.PathLike[str] = _DEFAULT_VECTOR_PATH) -> List[Dict[str, object]]:
@@ -65,13 +75,13 @@ def ensure_vectors(path: str | os.PathLike[str] = _DEFAULT_VECTOR_PATH) -> List[
             if _VECTOR_MTIME != mtime:
                 try:
                     _VECTOR_CACHE = load_vectors(resolved_path)
+                    _rebuild_index(_VECTOR_CACHE)
                     _VECTOR_MTIME = mtime
                     _VECTOR_MISSING_WARNED = False
                     LOGGER.info("Loaded %s RAG chunks from %s", len(_VECTOR_CACHE), resolved_path)
                 except Exception as exc:  # pragma: no cover - defensive logging
                     LOGGER.error("Failed to load RAG vectors from %s: %s", resolved_path, exc)
-                    _VECTOR_CACHE = []
-                    _VECTOR_MTIME = None
+                    _clear_cache()
             return _VECTOR_CACHE
 
         # File missing; attempt to pull from Git LFS once.
@@ -80,13 +90,13 @@ def ensure_vectors(path: str | os.PathLike[str] = _DEFAULT_VECTOR_PATH) -> List[
             if resolved_path.exists():
                 try:
                     _VECTOR_CACHE = load_vectors(resolved_path)
+                    _rebuild_index(_VECTOR_CACHE)
                     _VECTOR_MTIME = resolved_path.stat().st_mtime
                     _VECTOR_MISSING_WARNED = False
                     LOGGER.info("Loaded %s RAG chunks from %s", len(_VECTOR_CACHE), resolved_path)
                 except Exception as exc:  # pragma: no cover - defensive logging
                     LOGGER.error("Failed to load RAG vectors from %s after git lfs pull: %s", resolved_path, exc)
-                    _VECTOR_CACHE = []
-                    _VECTOR_MTIME = None
+                    _clear_cache()
             if not resolved_path.exists():
                 LOGGER.warning("RAG vectors missing – fallback to no-context mode")
                 _VECTOR_MISSING_WARNED = True
@@ -113,24 +123,40 @@ def rag_query(
         LOGGER.warning("Failed to embed query for RAG lookup: %s", exc)
         return []
 
-    scores: List[Dict[str, object]] = []
-    for item in vectors:
-        vector = item["embedding"]
-        score = float(np.dot(query_vector, vector))
+    if not _FAISS_AVAILABLE:
+        return _linear_search(query_vector, vectors, top_k=top_k, min_sim=min_sim)
+
+    index = _FAISS_INDEX
+    embeddings = _EMBEDDING_MATRIX
+    if index is None or embeddings is None:
+        return []
+
+    query_vector = np.asarray(query_vector, dtype=np.float32)
+    faiss.normalize_L2(query_vector.reshape(1, -1))
+
+    search_k = min(len(vectors), max(top_k * 2, top_k))
+    distances, indices = index.search(query_vector.reshape(1, -1), search_k)
+
+    results: List[Dict[str, object]] = []
+    for score, idx in zip(distances[0], indices[0]):
+        if idx < 0:
+            continue
         if score < min_sim:
             continue
-        scores.append(
+        item = vectors[idx]
+        results.append(
             {
                 "text": item["text"],
                 "doc": item["doc"],
                 "idx": item["idx"],
-                "score": score,
+                "score": float(score),
                 "meta": item.get("meta", {}),
             }
         )
+        if len(results) >= top_k:
+            break
 
-    scores.sort(key=lambda chunk: chunk["score"], reverse=True)
-    return scores[:top_k]
+    return results
 
 
 def _safe_json(value: object) -> Dict[str, object]:
@@ -169,3 +195,83 @@ def _attempt_git_lfs_pull() -> None:
                 break
     except FileNotFoundError:  # pragma: no cover - git not available in some envs
         LOGGER.warning("git or git-lfs not available; cannot pull RAG vectors")
+
+
+def _rebuild_index(vectors: List[Dict[str, object]]) -> None:
+    """Build or refresh the FAISS index from in-memory vectors."""
+    global _FAISS_INDEX, _EMBEDDING_MATRIX
+    if not vectors:
+        _FAISS_INDEX = None
+        _EMBEDDING_MATRIX = None
+        return
+
+    embeddings = np.vstack([item["embedding"] for item in vectors]).astype(np.float32)
+    if _FAISS_AVAILABLE:
+        faiss.normalize_L2(embeddings)
+        index = faiss.IndexFlatIP(embeddings.shape[1])
+        index.add(embeddings)
+        _FAISS_INDEX = index
+    else:
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms[norms == 0.0] = 1.0
+        embeddings = embeddings / norms
+        _FAISS_INDEX = None
+    _EMBEDDING_MATRIX = embeddings
+
+
+def _clear_cache() -> None:
+    global _VECTOR_CACHE, _VECTOR_MTIME, _FAISS_INDEX, _EMBEDDING_MATRIX
+    _VECTOR_CACHE = []
+    _VECTOR_MTIME = None
+    _FAISS_INDEX = None
+    _EMBEDDING_MATRIX = None
+
+
+def _linear_search(
+    query_vector: np.ndarray,
+    vectors: List[Dict[str, object]],
+    *,
+    top_k: int,
+    min_sim: float,
+) -> List[Dict[str, object]]:
+    """Fallback cosine similarity search when FAISS is unavailable."""
+    global _FAISS_UNAVAILABLE_WARNED
+    if not _FAISS_UNAVAILABLE_WARNED:
+        LOGGER.warning(
+            "faiss-cpu not available; using linear scan fallback. Install the dependency for better RAG performance."
+        )
+        _FAISS_UNAVAILABLE_WARNED = True
+
+    if not vectors:
+        return []
+
+    embeddings = _EMBEDDING_MATRIX
+    if embeddings is None:
+        embeddings = np.vstack([item["embedding"] for item in vectors]).astype(np.float32)
+    query = np.asarray(query_vector, dtype=np.float32)
+    norm = np.linalg.norm(query)
+    if norm > 0:
+        query = query / norm
+
+    scores = embeddings @ query
+    top_indices = np.argsort(scores)[::-1]
+
+    results: List[Dict[str, object]] = []
+    for idx in top_indices:
+        score = float(scores[idx])
+        if score < min_sim:
+            continue
+        item = vectors[int(idx)]
+        results.append(
+            {
+                "text": item["text"],
+                "doc": item["doc"],
+                "idx": item["idx"],
+                "score": score,
+                "meta": item.get("meta", {}),
+            }
+        )
+        if len(results) >= top_k:
+            break
+
+    return results

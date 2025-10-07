@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import os
+import threading
 from dataclasses import dataclass
 from typing import Iterable, List, Sequence
 
 import numpy as np
 import requests
+from requests.adapters import HTTPAdapter
 
 EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_ENDPOINT = (
@@ -15,6 +17,9 @@ EMBEDDING_ENDPOINT = (
 DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT"
 QUERY_TASK_TYPE = "RETRIEVAL_QUERY"
 BATCH_SIZE = 32
+
+_SESSION: requests.Session | None = None
+_SESSION_LOCK = threading.Lock()
 
 
 class EmbeddingError(RuntimeError):
@@ -49,6 +54,18 @@ def _batch(items: list[_EmbeddingRequest], size: int) -> Iterable[list[_Embeddin
         yield items[i : i + size]
 
 
+def _get_session() -> requests.Session:
+    global _SESSION
+    with _SESSION_LOCK:
+        if _SESSION is None:
+            session = requests.Session()
+            adapter = HTTPAdapter(pool_maxsize=20)
+            session.mount("https://", adapter)
+            session.mount("http://", adapter)
+            _SESSION = session
+        return _SESSION
+
+
 def _perform_embedding_requests(requests_batch: List[_EmbeddingRequest], api_key: str) -> List[np.ndarray]:
     payload = {
         "requests": [
@@ -61,7 +78,8 @@ def _perform_embedding_requests(requests_batch: List[_EmbeddingRequest], api_key
     }
 
     try:
-        response = requests.post(
+        session = _get_session()
+        response = session.post(
             EMBEDDING_ENDPOINT,
             params={"key": api_key},
             json=payload,

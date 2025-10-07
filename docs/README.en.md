@@ -154,9 +154,10 @@ graph TB
   - `/api/prediction/*`: Summaries for weight forecasts and ESG narratives use the same helper with stricter safety settings.
 - **Retrieval-Augmented Generation**:
   - Knowledge sources live under `docs/rag_sources/` (Markdown/Text). Run `make rag-update` to chunk, embed (Gemini `gemini-embedding-001`, L2-normalised 768-d vectors), and publish `docs/rag_vectors/corpus.parquet` to Git LFS.
-  - `scripts/ingest_docs.py` performs deterministic chunking (800 char / 100 overlap) and batches embedding calls via `app/ai/embedding.py`.
-  - The ingestion and loader pipelines rely on `pyarrow` for Parquet support (already pinned in `backend/requirements.txt`). Install backend dependencies before running the script.
-  - `app/rag_loader.ensure_vectors()` loads the Parquet snapshot into memory, lazily triggering `git lfs pull` if the file is missing. Warnings are logged and the agent gracefully falls back to no-context responses when vectors are unavailable.
+- `scripts/ingest_docs.py` performs deterministic chunking (800 char / 100 overlap) and batches embedding calls via `app/ai/embedding.py`, which now reuses a shared `requests.Session` for lower latency.
+- The ingestion and loader pipelines rely on `pyarrow` for Parquet support and `faiss-cpu` for efficient similarity search (both pinned in `backend/requirements.txt`). Install backend dependencies before running the script.
+- `make rag-update` generates vectors and creates a local commit while leaving the final `git push` step to the developer.
+- `app/rag_loader.ensure_vectors()` loads the Parquet snapshot into memory, builds a FAISS index, and lazily triggers `git lfs pull` if the file is missing. Warnings are logged and the agent gracefully falls back to no-context responses when vectors are unavailable.
   - `/api/agent/recommendation` and `/api/agent/chat` prefix Gemini prompts with top-k retrieved snippets (cosine ≥0.75) without altering the existing request/response contracts.
 - **Growth Prediction** (`app/api/prediction.py`):
   - Blends LightGBM quantile models with linear regression fallback for juvenile goats (≤365 days).
