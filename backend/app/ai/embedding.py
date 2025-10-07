@@ -44,15 +44,9 @@ def _normalize_vector(values: Sequence[float]) -> np.ndarray:
     return vector / norm
 
 
-def _batch(iterable: Sequence[_EmbeddingRequest], size: int) -> Iterable[List[_EmbeddingRequest]]:
-    batch: List[_EmbeddingRequest] = []
-    for item in iterable:
-        batch.append(item)
-        if len(batch) == size:
-            yield batch
-            batch = []
-    if batch:
-        yield batch
+def _batch(items: list[_EmbeddingRequest], size: int) -> Iterable[list[_EmbeddingRequest]]:
+    for i in range(0, len(items), size):
+        yield items[i : i + size]
 
 
 def _perform_embedding_requests(requests_batch: List[_EmbeddingRequest], api_key: str) -> List[np.ndarray]:

@@ -16,17 +16,17 @@ if str(BACKEND_PATH) not in sys.path:
 
 from app.ai import EmbeddingError, embed_documents  # noqa: E402
 
-SOURCE_DIR = REPO_ROOT / "docs" / "rag_sources"
-TARGET_PATH = REPO_ROOT / "docs" / "rag_vectors" / "corpus.parquet"
+DEFAULT_SOURCE_DIR = REPO_ROOT / "docs" / "rag_sources"
+DEFAULT_TARGET_PATH = REPO_ROOT / "docs" / "rag_vectors" / "corpus.parquet"
 SUPPORTED_EXTENSIONS = {".md", ".txt"}
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
 
 
-def iter_source_files() -> List[Path]:
-    if not SOURCE_DIR.exists():
-        raise FileNotFoundError(f"Source directory not found: {SOURCE_DIR}")
-    files = [p for p in SOURCE_DIR.rglob('*') if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS]
+def iter_source_files(source_dir: Path) -> List[Path]:
+    if not source_dir.exists():
+        raise FileNotFoundError(f"Source directory not found: {source_dir}")
+    files = [p for p in source_dir.rglob('*') if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS]
     return sorted(files)
 
 
@@ -81,34 +81,30 @@ def embed_records(records: List[Dict[str, object]]) -> None:
         record["embedding"] = vector.astype(float).tolist()
 
 
-def save_vectors(records: List[Dict[str, object]]) -> None:
-    TARGET_PATH.parent.mkdir(parents=True, exist_ok=True)
+def save_vectors(records: List[Dict[str, object]], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(records, columns=["doc_path", "chunk_index", "text", "embedding", "meta"])
-    df.to_parquet(TARGET_PATH, index=False)
+    df.to_parquet(output_path, index=False)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate RAG vectors from project documentation.")
-    parser.add_argument("--source", type=str, default=str(SOURCE_DIR), help="Directory containing source documents")
-    parser.add_argument("--output", type=str, default=str(TARGET_PATH), help="Parquet file path to write")
+    parser.add_argument("--source", type=str, default=str(DEFAULT_SOURCE_DIR), help="Directory containing source documents")
+    parser.add_argument("--output", type=str, default=str(DEFAULT_TARGET_PATH), help="Parquet file path to write")
     args = parser.parse_args()
 
     source_dir = Path(args.source)
     output_path = Path(args.output)
 
-    global SOURCE_DIR, TARGET_PATH
-    SOURCE_DIR = source_dir
-    TARGET_PATH = output_path
-
     try:
-        files = iter_source_files()
+        files = iter_source_files(source_dir)
         if not files:
             print("No source documents found; nothing to embed.")
             return 0
         records = build_records(files)
         embed_records(records)
-        save_vectors(records)
-        print(f"saved: {TARGET_PATH} ({len(records)} chunks)")
+        save_vectors(records, output_path)
+        print(f"saved: {output_path} ({len(records)} chunks)")
         return 0
     except (EmbeddingError, FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)

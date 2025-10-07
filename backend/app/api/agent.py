@@ -27,7 +27,7 @@ _RECOMMENDATION_FIELD_LABELS = {
 }
 
 
-def _format_rag_context(chunks):
+def _format_rag_context(chunks: list[dict[str, object]]) -> str:
     if not chunks:
         return ""
 
@@ -155,7 +155,7 @@ def get_recommendation():
         full_prompt += f"\n\n--- 使用者提供的其他備註 ---\n{data.get('other_remarks')}"
 
     rag_query_text = _build_recommendation_rag_query(data, sheep_context_str)
-    rag_chunks = rag_query(rag_query_text)
+    rag_chunks = rag_query(rag_query_text, api_key=api_key)
     rag_context_text = _format_rag_context(rag_chunks)
     if rag_context_text:
         full_prompt = rag_context_text + "\n" + full_prompt
@@ -255,7 +255,7 @@ def chat_with_agent():
     # 準備用戶訊息
     current_user_message_with_context = user_message + sheep_context_text
 
-    rag_chunks = rag_query(user_message + sheep_context_text)
+    rag_chunks = rag_query(user_message + sheep_context_text, api_key=api_key)
     rag_context_text = _format_rag_context(rag_chunks)
     if rag_context_text:
         current_user_message_with_context += rag_context_text

@@ -93,7 +93,12 @@ def ensure_vectors(path: str | os.PathLike[str] = _DEFAULT_VECTOR_PATH) -> List[
         return _VECTOR_CACHE
 
 
-def rag_query(query: str, top_k: int = 5, min_sim: float = 0.75) -> List[Dict[str, object]]:
+def rag_query(
+    query: str,
+    top_k: int = 5,
+    min_sim: float = 0.75,
+    api_key: str | None = None,
+) -> List[Dict[str, object]]:
     """Return the top matching chunks for the provided query string."""
     if not query:
         return []
@@ -103,7 +108,7 @@ def rag_query(query: str, top_k: int = 5, min_sim: float = 0.75) -> List[Dict[st
         return []
 
     try:
-        query_vector = embed_query(query)
+        query_vector = embed_query(query, api_key=api_key)
     except EmbeddingError as exc:
         LOGGER.warning("Failed to embed query for RAG lookup: %s", exc)
         return []
@@ -155,6 +160,12 @@ def _attempt_git_lfs_pull() -> None:
             )
             if result.returncode != 0:
                 stderr = result.stderr.strip()
-                LOGGER.warning("Command '%s' failed with code %s: %s", " ".join(cmd_args), result.returncode, stderr)
+                LOGGER.warning(
+                    "Command '%s' failed with code %s: %s",
+                    " ".join(cmd_args),
+                    result.returncode,
+                    stderr,
+                )
+                break
     except FileNotFoundError:  # pragma: no cover - git not available in some envs
         LOGGER.warning("git or git-lfs not available; cannot pull RAG vectors")
