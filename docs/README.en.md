@@ -152,6 +152,11 @@ graph TB
   - `/api/agent/recommendation`: Fuses user input with stored sheep context to output nutrition + ESG instructions, leveraging history/events.
   - `/api/agent/chat`: Multimodal chat with optional images (JPEG/PNG/GIF/WebP ≤10 MB) and persisted conversation history.
   - `/api/prediction/*`: Summaries for weight forecasts and ESG narratives use the same helper with stricter safety settings.
+- **Retrieval-Augmented Generation**:
+  - Knowledge sources live under `docs/rag_sources/` (Markdown/Text). Run `make rag-update` to chunk, embed (Gemini `gemini-embedding-001`, L2-normalised 768-d vectors), and publish `docs/rag_vectors/corpus.parquet` to Git LFS.
+  - `scripts/ingest_docs.py` performs deterministic chunking (800 char / 100 overlap) and batches embedding calls via `app/ai/embedding.py`.
+  - `app/rag_loader.ensure_vectors()` loads the Parquet snapshot into memory, lazily triggering `git lfs pull` if the file is missing. Warnings are logged and the agent gracefully falls back to no-context responses when vectors are unavailable.
+  - `/api/agent/recommendation` and `/api/agent/chat` prefix Gemini prompts with top-k retrieved snippets (cosine ≥0.75) without altering the existing request/response contracts.
 - **Growth Prediction** (`app/api/prediction.py`):
   - Blends LightGBM quantile models with linear regression fallback for juvenile goats (≤365 days).
   - Performs data-quality checks (record counts, span, outliers) before forecasting.

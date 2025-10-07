@@ -3,12 +3,29 @@ from flask_login import login_required, current_user
 from app.utils import call_gemini_api, get_sheep_info_for_context, encode_image_to_base64
 from app.models import db, ChatHistory
 from app.schemas import AgentRecommendationModel, AgentChatModel, create_error_response
+from app.rag_loader import rag_query
 from pydantic import ValidationError
 from datetime import datetime
 import markdown
 import base64
 
 bp = Blueprint('agent', __name__)
+
+
+def _format_rag_context(chunks):
+    if not chunks:
+        return ""
+
+    lines = ["\n--- 參考知識庫片段 ---"]
+    for idx, chunk in enumerate(chunks, 1):
+        source = chunk.get('doc', 'unknown')
+        chunk_idx = chunk.get('idx')
+        score = chunk.get('score', 0.0)
+        lines.append(
+            f"[{idx}] 來源: {source} (段落 {chunk_idx}, 相似度 {score:.2f})\n{chunk.get('text', '').strip()}"
+        )
+    lines.append("--- 參考片段結束 ---\n")
+    return "\n".join(lines)
 
 @bp.route('/tip', methods=['GET'])
 @login_required
@@ -110,7 +127,12 @@ def get_recommendation():
     full_prompt = "\n".join(prompt_parts) + sheep_context_str
     if data.get('other_remarks'):
         full_prompt += f"\n\n--- 使用者提供的其他備註 ---\n{data.get('other_remarks')}"
-    
+
+    rag_chunks = rag_query(full_prompt)
+    rag_context_text = _format_rag_context(rag_chunks)
+    if rag_context_text:
+        full_prompt = rag_context_text + "\n" + full_prompt
+
     full_prompt += esg_prompt_instruction
     full_prompt += "\n\n請開始提供您的綜合建議。"
 
@@ -205,6 +227,11 @@ def chat_with_agent():
 
     # 準備用戶訊息
     current_user_message_with_context = user_message + sheep_context_text
+
+    rag_chunks = rag_query(user_message + sheep_context_text)
+    rag_context_text = _format_rag_context(rag_chunks)
+    if rag_context_text:
+        current_user_message_with_context += rag_context_text
     
     # 如果有圖片，加入圖片部分
     user_message_parts = [{"text": current_user_message_with_context}]

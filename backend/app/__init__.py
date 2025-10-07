@@ -14,6 +14,7 @@ except ImportError:  # pragma: no cover
 from .session_interface import RedisSessionInterface
 from .in_memory_redis import InMemoryRedis
 from .simple_queue import SimpleQueue
+from .rag_loader import ensure_vectors
 
 # 載入 .env 設定：優先採用 DOTENV_PATH，其次自動尋找專案根目錄的 .env
 dotenv_path = os.environ.get('DOTENV_PATH') or find_dotenv(usecwd=True)
@@ -233,5 +234,10 @@ def create_app():
                 return send_from_directory(app.static_folder, path)
             else:
                 return send_from_directory(app.static_folder, 'index.html')
+
+        try:
+            ensure_vectors()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            app.logger.warning("RAG preload failed: %s", exc)
 
         return app
