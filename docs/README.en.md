@@ -2,7 +2,7 @@
 
 [中文 (README)](/README.md) | [English (Docs)](/docs/README.en.md)
 
-> An intelligent goat nutrition management platform that blends a Flask backend, Vue 3 SPA, Gemini-powered AI assistance, and Excel automation to help farms monitor herds, trace products, and report ESG metrics in real time.
+> An intelligent goat nutrition management platform that blends a Flask backend, Vue 3 SPA, Gemini-powered decision support, Excel automation, and IoT automation so that farms can monitor herds, trace products, and report ESG metrics in real time.
 
 ---
 
@@ -13,56 +13,59 @@
 3. [Backend Services (Flask)](#3-backend-services-flask)
 4. [Frontend Application (Vue 3)](#4-frontend-application-vue-3)
 5. [AI & Machine Learning Capabilities](#5-ai--machine-learning-capabilities)
-6. [Local Development Environment](#6-local-development-environment)
-7. [Environment Variables & Configuration](#7-environment-variables--configuration)
-8. [Data Import & Export Pipelines](#8-data-import--export-pipelines)
-9. [Testing & Quality Assurance](#9-testing--quality-assurance)
-10. [Deployment & Operations](#10-deployment--operations)
-11. [Security & Privacy Guardrails](#11-security--privacy-guardrails)
-12. [Documentation & Asset Index](#12-documentation--asset-index)
-13. [Troubleshooting & Optimisation Tips](#13-troubleshooting--optimisation-tips)
-14. [Release Notes & Roadmap](#14-release-notes--roadmap)
+6. [Data Import & Export Pipelines](#6-data-import--export-pipelines)
+7. [IoT Automation Layer](#7-iot-automation-layer)
+8. [Caching, Background Tasks & Workers](#8-caching-background-tasks--workers)
+9. [Local Development Environment](#9-local-development-environment)
+10. [Environment Variables & Configuration](#10-environment-variables--configuration)
+11. [Testing & Quality Assurance](#11-testing--quality-assurance)
+12. [Deployment & Operations](#12-deployment--operations)
+13. [Documentation & Asset Index](#13-documentation--asset-index)
+14. [Troubleshooting & Optimisation Tips](#14-troubleshooting--optimisation-tips)
+15. [Release Notes & Roadmap](#15-release-notes--roadmap)
 
 ---
 
 ## 1. Mission & Product Value
 
 ### 1.1 Core Problems Addressed
-- Consolidate multi-source ranch data: sheep profiles, events, history, production batches, and ESG indicators.
-- Deliver AI-assisted nutrition advice, daily operational tips, image-enhanced diagnosis, and sustainability guidance via Gemini.
-- Surface growth forecasts with confidence intervals powered by regression models plus LLM interpretation.
-- Streamline Excel-based batch import/export with automatic column mapping, sheet templating, and approval workflows.
-- Publish shareable traceability stories with QR codes for consumer transparency.
+- Consolidate multi-source ranch data: individual sheep profiles, events, historical readings, production batches, and ESG indicators.
+- Deliver AI-assisted nutrition advice, daily operational tips, multimodal chat, and sustainability guidance via Gemini models.
+- Surface growth forecasts with confidence intervals from LightGBM/linear regression plus LLM interpretation.
+- Streamline Excel-based batch import/export with automatic column mapping, default templates, and validation feedback.
+- Publish shareable traceability stories, timeline views, and QR-friendly endpoints for consumer transparency.
+- Close the loop between virtual data and barn hardware through IoT ingest, rule evaluation, and control dispatch.
 
 ### 1.2 Feature Map
 
-| Domain | Representative Features | Backend Modules | Frontend Views / Components | Primary Tests |
-|--------|------------------------|-----------------|-----------------------------|---------------|
-| Authentication | Registration, login, session | `app/api/auth.py` | `LoginView.vue`, `auth` Pinia store | `test_auth_api.py`, `test_auth_agent_enhanced.py` |
-| Sheep Management | CRUD, events, historical metrics | `app/api/sheep.py` | `SheepListView.vue` + sheep components | `test_sheep_*` suite |
-| Data Management | Excel import/export, sheet templates | `app/api/data_management.py`, `app/utils/excel.py` | `DataImportView.vue`, `DataExportView.vue` | `test_excel_*` |
-| AI Assistant | Tips, nutrition advice, multimodal chat | `app/api/agent.py` | `AiAssistantView.vue` | `test_agent_api.py` |
-| Growth Prediction | Weight projection, ESG insights | `app/api/prediction.py`, `app/ml/*` | `PredictionView.vue` | `test_prediction_api.py` |
-| Traceability | Batch lifecycle, public story | `app/api/traceability.py` | `TraceabilityAdminView.vue`, `TraceabilityPublicView.vue` | `test_traceability_*` |
-| Dashboard | Aggregated alerts, ESG metrics | `app/api/dashboard.py`, `app/cache.py` | `DashboardView.vue` | `test_dashboard_api.py` |
-| Tasks | Redis-backed long jobs | `app/api/tasks.py`, `app/tasks.py` | `TasksView.vue` | `test_tasks_api.py` |
+| Domain | Representative Features | Backend Modules | Frontend Views / Stores | Primary Tests |
+|--------|------------------------|-----------------|-------------------------|---------------|
+| Authentication | Registration, login, health checks, seeded event options | `app/api/auth.py` | `LoginView.vue`, `stores/auth.js` | `tests/test_auth_api.py`, `tests/test_auth_agent_enhanced.py` |
+| Sheep Management | CRUD, auto history logging, reminders, custom event vocabularies | `app/api/sheep.py`, `app/models.py` | `SheepListView.vue`, `stores/sheep.js` | `tests/test_sheep_api.py`, `tests/test_sheep_events_api.py`, `tests/test_sheep_enhanced.py` |
+| Dashboard & Reports | Cached reminders, medication withdrawal checks, health alerts, farm summary | `app/api/dashboard.py`, `app/cache.py` | `DashboardView.vue`, `stores/dashboard` (computed from API) | `tests/test_dashboard_api.py`, `tests/test_dashboard_enhanced.py` |
+| Data Management | Excel export/import, AI-assisted mapping, chat history export | `app/api/data_management.py`, `app/utils.py` | `DataManagementView.vue`, `stores/data` | `tests/test_data_management_api.py`, `tests/test_data_management_enhanced.py`, `tests/test_data_management_error_handling.py` |
+| AI Assistant | Daily tips, nutrition/ESG recommendations, multimodal chat with history | `app/api/agent.py`, `app/utils.py`, `app/models.ChatHistory` | `ConsultationView.vue`, `ChatView.vue`, `stores/consultation.js`, `stores/chat.js` | `tests/test_agent_api.py` |
+| Growth Prediction | Weight projections, confidence bands, ESG-aware guidance | `app/api/prediction.py`, `backend/models/*.joblib` | `PredictionView.vue`, `stores/prediction.js` | `tests/test_prediction_api.py` |
+| Traceability | Batch lifecycle, steps, sheep contributions, public storytelling | `app/api/traceability.py` | `TraceabilityManagementView.vue`, `TraceabilityPublicView.vue`, `stores/traceability.js` | `tests/test_traceability_api.py` |
+| IoT Automation | Device registry, API-key HMAC, sensor ingest, rule execution, control logs | `app/api/iot.py`, `app/iot/automation.py` | `IotManagementView.vue`, `stores/iot.js` | `tests/test_iot_api.py`, `tests/test_iot_worker.py` |
+| Background Tasks | Lightweight queue wrapper and demo job endpoint | `app/tasks.py`, `app/simple_queue.py`, `app/api/tasks.py` | Triggered from settings/tasks UI | `tests/test_tasks_api.py` |
 
 ## 2. System Architecture & Data Flow
 
 ```mermaid
 graph TB
-  subgraph Client["使用者瀏覽器"]
+  subgraph Client["Browser"]
     UI[Vue 3 SPA]
     Pinia[Pinia Stores]
   end
 
-  subgraph Frontend["Frontend (Vite build -> Nginx)"]
+  subgraph Frontend["Vite build → Nginx"]
     Router[Vue Router 4]
     Components[Element Plus Components]
-    ApiClient[Axios API client]
+    ApiClient[Axios API Client]
   end
 
-  subgraph Backend["Backend (Flask 3)"]
+  subgraph Backend["Flask 3 Application"]
     Auth[Auth Blueprint]
     Sheep[Sheep Blueprint]
     Dashboard[Dashboard Blueprint]
@@ -70,21 +73,22 @@ graph TB
     Prediction[Prediction Blueprint]
     Agent[Agent Blueprint]
     Traceability[Traceability Blueprint]
+    Iot[IoT Blueprint]
     Tasks[Tasks Blueprint]
   end
 
   subgraph DataTier["Persistence Layer"]
-    Postgres[(PostgreSQL 13+ / Prod)]
-    SQLite[(SQLite / Dev & Test)]
-    Filesystem[(模型與媒體檔案)]
-    Redis[(Redis Cache & Queue)]
+    Postgres[(PostgreSQL 14+ / Prod)]
+    SQLite[(SQLite / Dev & Tests)]
+    Filesystem[(Model Artifacts & Media)]
+    Redis[(Sessions, Cache, Queues)]
   end
 
   subgraph Worker["Background Worker"]
-    WorkerNode[Worker]
+    WorkerNode[Simple Queue Worker]
   end
 
-  subgraph External["外部整合"]
+  subgraph External["Third-party Services"]
     Gemini[Google Gemini API]
   end
 
@@ -95,6 +99,8 @@ graph TB
   ApiClient --> Prediction
   ApiClient --> Agent
   ApiClient --> Traceability
+  ApiClient --> Iot
+  ApiClient --> Tasks
 
   Auth --> Postgres
   Sheep --> Postgres
@@ -102,6 +108,7 @@ graph TB
   Data --> Postgres
   Prediction --> Postgres
   Traceability --> Postgres
+  Iot --> Postgres
   Tasks --> Redis
 
   Prediction --> Gemini
@@ -115,53 +122,79 @@ graph TB
 
 ## 3. Backend Services (Flask)
 
-- **Framework & Tooling**: Python 3.11, Flask 3, SQLAlchemy 2, Pydantic 2, Redis, lightweight RQ-style queue.
-- **Blueprints**:
-  - `auth`: Registration/login, session and password reset flows.
-  - `sheep`: CRUD, history, events, and herd segmentation.
-  - `data_management`: Excel import/export plus schema validation helpers.
-  - `dashboard`: Aggregated alerts, ESG metrics, and caching helpers.
-  - `agent`: Gemini integrations for tips, nutrition prompts, and multimodal chat (requires `X-Api-Key`).
-  - `prediction`: Growth forecasts, ESG analysis, and result caching (requires `X-Api-Key`).
-  - `traceability`: Production batch pipeline and public storytelling endpoints.
-  - `tasks`: Queueing and polling endpoints for background jobs.
-- **Caching & Sessions**: Redis handles Flask-Session storage and dashboard cache with 90-second TTL. `clear_dashboard_cache(user_id)` invalidates user-specific snapshots.
-- **Background Jobs**: `backend/run_worker.py` executes queued jobs (Excel exports, reporting). Jobs are enqueued via `app/tasks.py` and persisted in Redis.
+- **Framework & Tooling**: Python 3.11, Flask 3, SQLAlchemy 2.0, Pydantic 2, Redis client abstraction (`InMemoryRedis` for tests), SimpleQueue wrapper for RQ-like semantics.
+- **Blueprint overview**:
+  - `auth`: Registration/login, seeded event vocabularies, logout, health checks.
+  - `sheep`: Sheep CRUD, event lifecycle, automatic historical logging for key metrics, reminder fields.
+  - `data_management`: Excel export/import, AI sheet mapping, template-driven transformations, history/chat export.
+  - `dashboard`: Reminder aggregation, medication withdrawal checks, growth/milk trend analysis, event option administration, Redis caching.
+  - `agent`: Gemini-backed daily tips, nutrition + ESG recommendations, multimodal chat with conversation persistence.
+  - `prediction`: LightGBM + linear regression blending, data-quality gating, ESG-aware LLM synthesis, chart data endpoints.
+  - `traceability`: Product batch CRUD, processing steps, sheep contribution links, public storytelling payloads.
+  - `iot`: Device registry with HMAC API keys, sensor ingest queueing, automation rule evaluation, control dispatch and logging.
+  - `tasks`: Demo endpoint for enqueueing background jobs through `SimpleQueue`.
+- **Models**: `app/models.py` captures everything from sheep data to chat history, IoT devices, automation rules, and control logs. Unique constraints enforce per-user isolation.
+- **Utilities**: `app/utils.py` centralises Gemini API calls, sheep context assembly, and image encoding; `app/cache.py` wraps Redis for dashboard TTL caching.
 
 ## 4. Frontend Application (Vue 3)
 
-- **Stack**: Vue 3.x (Composition API) + Vite 7, Element Plus, Pinia, Axios, Chart.js, and ECharts.
-- **State Management**: Pinia stores under `src/stores/` encapsulate session, sheep data, dashboards, predictions, and traceability contexts.
-- **Routing**: Vue Router 4 located in `src/router/index.js`; update navigation components when adding routes.
-- **API Layer**: `src/api/index.js` centralises Axios instance with auth interceptors, error handling, and API key propagation.
-- **Visualisation**: Chart.js for time-series analytics, ECharts for dashboards and comparisons. Components live alongside views for encapsulation.
-- **UI/UX Practices**: Element Plus components ensure consistent typography and form factors. Provide loading states, toast feedback, and responsive layouts (1280px desktop, 375px mobile) for each feature.
+- **Stack**: Vue 3 (Composition API + `<script setup>`), Vite 5, Pinia stores, Element Plus UI library, Axios, Chart.js, and ECharts.
+- **Routing**: `src/router/index.js` defines guarded routes: dashboard, consultation (nutrition), chat, flock management, data management, prediction, IoT, traceability, and settings. Public routes include `/login` and `/trace/:batchNumber`.
+- **State Management**: Pinia stores under `src/stores/` wrap API clients with optimistic updates and error helpers (`auth`, `sheep`, `consultation`, `chat`, `prediction`, `iot`, `traceability`, `settings`). Each store ships with Vitest coverage.
+- **API Layer**: `src/api/index.js` exposes strongly-typed helpers, consistent error handling, and header propagation for Gemini API keys and multipart requests.
+- **Views**: Each route has a dedicated view under `src/views/` accompanied by unit/behaviour tests (e.g., `DashboardView.test.js`, `ConsultationView.behavior.test.js`). Components encapsulate tables, forms, and charts with Element Plus primitives.
+- **UX Considerations**: Responsive layout via Element Plus grid, consistent loading states, toast notifications for async flows, Markdown rendering for AI output, and modals for API key reveal.
 
 ## 5. AI & Machine Learning Capabilities
 
-- **Gemini Integrations**:
-  - `/api/agent/tip`: Generates daily husbandry reminders.
-  - `/api/agent/recommendation`: Produces nutrition and ESG guidance using herd context.
-  - `/api/agent/chat`: Supports multimodal chat with optional image uploads.
-- **Growth Prediction**:
-  - Weighted regression + LLM rationale from `/api/prediction/*` endpoints.
-  - Validates dataset quality, surfaces confidence intervals, and issues sustainability suggestions.
-- **Model Assets**: Stored under `backend/app/ml/` and in the filesystem volume for production. Keep `.env.example` updated when new environment variables are required.
+- **Gemini Integrations** (`app/utils.call_gemini_api`):
+  - `/api/agent/tip`: Season-aware daily husbandry tips rendered as Markdown.
+  - `/api/agent/recommendation`: Fuses user input with stored sheep context to output nutrition + ESG instructions, leveraging history/events.
+  - `/api/agent/chat`: Multimodal chat with optional images (JPEG/PNG/GIF/WebP ≤10 MB) and persisted conversation history.
+  - `/api/prediction/*`: Summaries for weight forecasts and ESG narratives use the same helper with stricter safety settings.
+- **Growth Prediction** (`app/api/prediction.py`):
+  - Blends LightGBM quantile models with linear regression fallback for juvenile goats (≤365 days).
+  - Performs data-quality checks (record counts, span, outliers) before forecasting.
+  - Returns confidence intervals (q10/q90), daily forecast series, and breed-aware reference comparisons.
+  - Delegates ESG commentary to Gemini with templated prompts and fallback copy.
+- **Model Assets**: Stored under `backend/models/` with metadata describing feature order and categorical encodings. Update metadata when retraining.
 
-## 6. Local Development Environment
+## 6. Data Import & Export Pipelines
 
-> Examples below use **Windows PowerShell**. On macOS/Linux, switch to `python3`, adjust paths, and set environment variables accordingly.
+- **Export** (`GET /api/data/export_excel`): Multi-sheet workbook containing sheep basics, events, historical data, and chat history. Falls back to an explanatory sheet if no data exists.
+- **Analyze** (`POST /api/data/analyze_excel`): Returns column previews for each sheet; used to build manual mappings.
+- **AI Mapping** (`POST /api/data/ai_import_mapping`): Upload workbook + optional Gemini API key to receive suggested sheet purposes, column alignments, confidence scores, warnings, and metadata.
+- **Process Import** (`POST /api/data/process_import`): Supports default templates or custom mappings. Handles breed/sex code translation, date sanitisation, automatic event creation (e.g., kidding, mating), and history entries for weight/milk/fat records.
+- **Validation**: Required columns per sheet purpose are enforced; Pydantic models catch missing/invalid payloads. Errors are surfaced with contextual warnings.
 
-### 6.1 Bootstrap Dependencies
+## 7. IoT Automation Layer
 
-```powershell
+- **Device Registry** (`app/models.IotDevice`): Stores metadata, category (sensor/actuator), API key digests (HMAC-SHA256 via `API_HMAC_SECRET`), and last-seen timestamps.
+- **Sensor Ingest** (`POST /api/iot/ingest`): Validates API key, persists reading, marks device online, and queues payloads for rule evaluation.
+- **Automation Rules**: Define trigger device + condition + target device + command payload. Validation ensures sensors trigger actuators only.
+- **Queues & Workers**: `app/iot/automation.py` handles sensor and control queues backed by Redis lists. Workers evaluate conditions, enqueue control commands, perform HTTP callbacks to device control URLs, and persist logs.
+- **Simulator**: `iot_simulator/` provides Dockerised producers for common device types; see `docs/iot.md` for extending scenarios.
+
+## 8. Caching, Background Tasks & Workers
+
+- **Session & Cache**: Redis stores Flask sessions (`RedisSessionInterface`) and dashboard cache (`set_dashboard_cache`) with per-user locks to prevent thundering herds.
+- **SimpleQueue**: Minimal RQ-like abstraction using Redis lists for background jobs. `enqueue_example_task` demonstrates queue usage and is exercised in tests.
+- **Workers**: `backend/run_worker.py` and `start_*` scripts run blocking loops that pop from queues, dispatch tasks, and process IoT automation events.
+
+## 9. Local Development Environment
+
+> Commands assume macOS/Linux shells. For PowerShell, adjust path separators and environment variable syntax accordingly.
+
+### 9.1 Bootstrap Dependencies
+
+```bash
 # Project root
-Copy-Item .env.example .env
+cp .env.example .env  # fill in secrets as described below
 
 # Backend virtualenv
 cd backend
-python -m venv .venv
-./.venv/Scripts/Activate.ps1
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
 # Frontend dependencies
@@ -169,129 +202,105 @@ cd ../frontend
 npm install
 ```
 
-### 6.2 Start Development Services
+### 9.2 Start Development Services
 
-Backend (SQLite at `instance/app.db` by default):
-
-```powershell
-cd backend
-$env:REDIS_PASSWORD = "<REDIS_PASSWORD>"  # see .env.example
-$env:FLASK_ENV = "development"
-$env:CORS_ORIGINS = "http://localhost:5173"
-python run.py
-```
-
-Launch Redis locally (use Docker for convenience):
-
-```powershell
-$env:REDIS_PASSWORD = "<REDIS_PASSWORD>"  # ensure it matches .env
+```bash
+# Redis (optional: use docker)
 docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass "$REDIS_PASSWORD"
-```
 
-Frontend (Vite dev server):
+# Backend (SQLite by default)
+cd backend
+export FLASK_ENV=development
+export CORS_ORIGINS="http://localhost:5173"
+python run.py
 
-```powershell
-cd frontend
+# Frontend (Vite dev server)
+cd ../frontend
 npm run dev
 ```
 
-### 6.3 Service Endpoints
+Backend listens on `http://127.0.0.1:5001`, frontend dev server on `http://127.0.0.1:5173` (proxying `/api`).
 
-| Service | URL |
-|---------|-----|
-| Frontend SPA | <http://localhost:5173> |
-| Backend API | <http://localhost:5001> |
-| Swagger UI | <http://localhost:5001/docs> |
-| Health Check | <http://localhost:5001/api/auth/status> |
+### 9.3 Useful Commands
 
-### 6.4 Quick API Tour
+- Seed demo data: `python backend/create_test_data.py`.
+- Launch background worker: `python backend/run_worker.py` (requires Redis).
+- Simulate IoT device: `python iot_simulator/simulator.py --api-key <KEY> --device-type barn_environment`.
 
-```powershell
-# Register + login
-Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/auth/register" -ContentType "application/json" -Body '{"username":"demo","password":"demo123"}' -SessionVariable s
-Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/auth/login" -ContentType "application/json" -Body '{"username":"demo","password":"demo123"}' -WebSession $s
+## 10. Environment Variables & Configuration
 
-# List sheep
-Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/sheep" -WebSession $s
+- `SECRET_KEY`: Flask session signing key (required).
+- `API_HMAC_SECRET`: ≥32-byte secret for HMAC-ing IoT API keys (required).
+- `GOOGLE_API_KEY`: Gemini API key (used if clients omit `X-Api-Key`).
+- `POSTGRES_*`: Production database credentials. Omit to fall back to SQLite.
+- `REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`: Redis connection. Set `USE_FAKE_REDIS_FOR_TESTS=1` to use in-memory stub.
+- `CORS_ORIGINS`: Comma-separated whitelist for production deployments.
+- `RQ_QUEUE_NAME`: Queue name used by `SimpleQueue` and worker scripts.
+
+Review `.env.example` and deployment scripts for the complete list.
+
+## 11. Testing & Quality Assurance
+
+### 11.1 Backend (Pytest)
+
+```bash
+cd backend
+pytest
+pytest --cov=app --cov-report=term-missing
 ```
 
-## 7. Environment Variables & Configuration
+Key suites cover authentication, sheep CRUD/events/history, data import edge cases, dashboard caching, AI endpoints (mocked Gemini), prediction outputs, traceability flows, IoT ingestion/automation, and task queueing.
 
-| Variable | Description | Default / Example |
-|----------|-------------|-------------------|
-| `FLASK_ENV` | Environment mode (`development`, `production`) | `development` |
-| `SECRET_KEY` | Flask session secret | generate via `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `API_HMAC_SECRET` | 32-byte minimum secret used to derive IoT API key digests | generate via `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `DATABASE_URL` | SQLAlchemy database URI | `sqlite:///instance/app.db` for dev |
-| `POSTGRES_*` | Production database credentials | refer to `.env.example` |
-| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis connection settings | see `.env.example`; must match Docker Compose overrides |
-| `GEMINI_API_KEY` | Google Gemini key for AI endpoints | required for `/api/agent/*`, `/api/prediction/*` |
-| `CORS_ORIGINS` | Allowed origins for SPA | `http://localhost:5173` |
-| `FILE_STORAGE_PATH` | Local path for uploads/models | defaults to `instance/storage` |
+### 11.2 Frontend (Vitest + ESLint)
 
-Keep `.env.example` authoritative for new variables and mirror updates in `docker-compose.yml`.
+```bash
+cd frontend
+npm run test -- --run
+npm run lint
+```
 
-### 7.1 IoT Automation Notes
+Tests live alongside views/stores (`*.test.js`, `*.behavior.test.js`) and exercise route guards, form validation, store actions, and component rendering.
 
-- IoT device API keys are stored as HMAC-SHA256 digests using `API_HMAC_SECRET`. Rotate the secret carefully; existing devices will require re-provisioned keys.
-- `POST /api/iot/devices` returns the plain API key only once during creation. Persist it securely on the device side.
-- `POST /api/iot/ingest` validates the `X-API-Key` header and rejects missing keys (401) or malformed payloads (400) before queueing data.
+### 11.3 Integration
 
-## 8. Data Import & Export Pipelines
+- `docker compose up` for end-to-end sanity checks.
+- `test_image_upload.py` validates `/api/agent/chat` image handling.
+- `manual_test.py` scripts provide reproducible smoke test steps.
 
-- **Excel Import**: Drag-and-drop UI maps columns automatically; manual override available. Validation errors return row/column diagnostics.
-- **Excel Export**: Multi-sheet workbook (sheep summary, events, feed log, ESG metrics) with metadata sheet for auditing.
-- **Traceability Sync**: Batch, processing steps, and sheep contributions remain linked across import/export flows.
-- **API Hooks**: Data endpoints emit background jobs to avoid blocking requests; job IDs can be polled via `/api/tasks/<job_id>`.
+## 12. Deployment & Operations
 
-## 9. Testing & Quality Assurance
+- **Docker Compose**: `docker-compose.yml` provisions backend, frontend (Nginx), PostgreSQL, Redis, and IoT simulator. Ensure `.env` mirrors production secrets.
+- **Entry Points**: `backend/docker-entrypoint.sh` handles migrations (`flask db upgrade`), while `frontend/nginx.conf` serves the built SPA.
+- **Health Checks**: `/api/auth/health` for backend readiness, `/api/auth/status` for session validity, `/docs` for Swagger UI.
+- **Observability**: Enable backend logging via `FLASK_ENV=production` and monitor worker logs for queue backlogs.
+- **Backups**: Dump PostgreSQL volumes and persist `backend/models/` artifacts during upgrades.
 
-- **Backend**: 208 Pytest cases, ~85% coverage. Run `cd backend && pytest`. Targeted runs: `pytest tests/test_sheep_api.py -v`.
-- **Frontend**: 281 Vitest cases, 81.73% statements. Run `cd frontend && npm run test -- --run`. Update snapshots when modifying UI outputs.
-- **Linting**: `npm run lint` (frontend) and `ruff`/`flake8` optional for backend. Keep type hints updated for mypy adoption.
-- **Integration**: `docker compose up` should boot without intervention after Dockerfile or compose changes.
+## 13. Documentation & Asset Index
 
-## 10. Deployment & Operations
+| Category | File | Description |
+|----------|------|-------------|
+| Quick start | [`docs/QuickStart.md`](./QuickStart.md) | Local setup, sample workflows, API probes. |
+| Development | [`docs/Development.md`](./Development.md) | Code organisation, conventions, testing strategy. |
+| Deployment | [`docs/Deployment.md`](./Deployment.md) | Docker Compose, environment preparation, maintenance. |
+| API reference | [`docs/API.md`](./API.md) | Endpoint catalogue, auth rules, payload notes. |
+| FAQ | [`docs/FAQ.md`](./FAQ.md) | Common issues, debugging tips. |
+| IoT playbook | [`docs/iot.md`](./iot.md) | Simulator usage and multi-device orchestration. |
+| Glossary | [`docs/glossary.md`](./glossary.md) | Shared terminology across zh-TW/English docs. |
+| Roadmap | [`docs/project_roadmap.md`](./project_roadmap.md) | Planned milestones and ADR pointers. |
 
-- **Docker Compose**: Production-ish stack with Flask, Vue (built via Nginx), Postgres, Redis, and worker service. Ensure `REDIS_PASSWORD`, `POSTGRES_*`, and secrets are populated.
-- **Scripts**: `deploy*.sh`, `deploy*.ps1` assist with packaging, environment seeding, and rolling restarts.
-- **Worker Management**: Scale `worker` service replicas based on queue length; monitor with RQ dashboards or custom metrics.
-- **Logging**: Structured JSON logs forwarded to stdout; configure log aggregation (e.g., Loki, ELK) downstream.
-- **Backups**: Snapshot Postgres regularly and archive uploaded media. Document retention policy in `docs/Deployment.md`.
+## 14. Troubleshooting & Optimisation Tips
 
-## 11. Security & Privacy Guardrails
+- **401 after login**: Ensure browser accepts cookies; verify Redis session storage is reachable.
+- **Prediction denied**: Confirm sheep has ≥3 weight records and age between 60–365 days.
+- **AI errors**: Supply `X-Api-Key` header or configure `GOOGLE_API_KEY`. Review backend logs for Gemini quota issues.
+- **Excel import warnings**: Inspect `details` array for sheet-level messages; adjust mapping JSON accordingly.
+- **IoT device offline**: Regenerate API key (delete + recreate device) and confirm simulator uses the latest secret.
+- **Dashboard stale data**: Editing sheep/events/history triggers cache invalidation; if needed call `/api/dashboard/data` to refresh.
 
-- Enforce `X-Api-Key` headers for `/api/agent/*` and `/api/prediction/*`; rotate keys when compromised.
-- Sanitize uploads using helper functions in `app/utils.py`; restrict MIME types and file size.
-- Store hashed API keys and passwords; never log secrets in plaintext. Audit log output before releasing features.
-- Separate user data by account/tenant boundaries; tests cover access control regressions.
+## 15. Release Notes & Roadmap
 
-## 12. Documentation & Asset Index
-
-- `docs/README.en.md`: Single source of truth (this file).
-- `docs/README.md`: zh-TW quick navigation.
-- `docs/QuickStart.md`: Step-by-step bootstrap with PowerShell and POSIX examples.
-- `docs/Development.md`: Deep dive into tooling, coverage, and debugging tips.
-- `docs/Deployment.md`: Production checklist, container diagrams, scaling strategies.
-- `docs/adr/`: Architectural Decision Records (ADRs) for major choices (Flask, Redis queue, Vue stack, database strategy).
-- `docs/assets/`: Architecture diagrams, deployment illustrations, coverage reports.
-
-## 13. Troubleshooting & Optimisation Tips
-
-| Symptom | Diagnosis | Resolution |
-|---------|-----------|------------|
-| SPA cannot reach API | CORS or proxy misconfiguration | Update `CORS_ORIGINS` and dev proxy settings; verify ports. |
-| Redis auth failures | Password mismatch | Align `.env`, `docker-compose.yml`, and runtime env vars. |
-| Slow Excel import | Large workbook processed inline | Queue job via `/api/tasks/import` and monitor worker logs. |
-| Gemini errors | Invalid or rate-limited key | Confirm `GEMINI_API_KEY` validity; implement exponential backoff. |
-| Missing charts | API contract drift | Update Pinia stores, API client types, and Vitest mocks. |
-
-## 14. Release Notes & Roadmap
-
-- **Current Focus**: IoT ingestion pipeline, RFID-linked analytics, and sustainability reporting automation.
-- **Upcoming**: Enhanced alerting, multi-tenant dashboards, infrastructure-as-code templates.
-- **Versioning**: Track releases via Git tags; reference ADR IDs in PR descriptions for traceability.
+See [`docs/project_roadmap.md`](./project_roadmap.md) and ADRs under `docs/adr/` for architectural decisions, planned integrations, and upgrade history. Contributions should cross-reference relevant ADR IDs for traceability.
 
 ---
 
-📣 This document is the **single source of truth (SoT)** for the project. Sync zh-TW user-facing docs (root `README.md`, UI copy) after updating this guide.
+This document is the English source of truth. Synchronise key updates into the zh-TW README after changes.

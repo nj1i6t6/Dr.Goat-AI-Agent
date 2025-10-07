@@ -2,42 +2,55 @@
 
 [中文 (README)](/README.md) | [English (Docs)](/docs/README.en.md)
 
-> 智慧化山羊營養管理平台，結合 Flask 後端、Vue 3 前端、AI 輔助決策與 Excel 資料流程，協助牧場即時掌握羊群營養與 ESG 指標。
+> 智慧化山羊營養管理平台，結合 Flask 後端、Vue 3 前端、Gemini AI 決策支援、Excel 自動化與 IoT 自動化，協助牧場即時掌握羊群、產銷履歷與 ESG 指標。
+
+---
 
 ## 目錄
 
-- [專案介紹](#專案介紹)
-- [技術棧與核心模組](#技術棧與核心模組)
-- [系統架構](#系統架構)
-- [功能亮點](#功能亮點)
-- [目錄結構](#目錄結構)
-- [快速開始](#快速開始)
-- [Docker Compose 部署](#docker-compose-部署)
-- [測試與覆蓋率](#測試與覆蓋率)
-- [API 概覽](#api-概覽)
-- [開發工作流與最佳實務](#開發工作流與最佳實務)
-- [文件地圖](#文件地圖)
-- [常見問題 FAQ](#常見問題-faq)
-## 專案介紹
+1. [專案價值與定位](#1-專案價值與定位)
+2. [系統架構](#2-系統架構)
+3. [後端服務 (Flask)](#3-後端服務-flask)
+4. [前端應用 (Vue 3)](#4-前端應用-vue-3)
+5. [AI 與機器學習能力](#5-ai-與機器學習能力)
+6. [資料匯入匯出流程](#6-資料匯入匯出流程)
+7. [IoT 自動化層](#7-iot-自動化層)
+8. [快取、背景任務與 Worker](#8-快取背景任務與-worker)
+9. [本機開發環境](#9-本機開發環境)
+10. [環境變數與配置](#10-環境變數與配置)
+11. [測試與品質保證](#11-測試與品質保證)
+12. [部署與維運](#12-部署與維運)
+13. [文件索引](#13-文件索引)
+14. [疑難排解](#14-疑難排解)
+15. [Roadmap 與版本記錄](#15-roadmap-與版本記錄)
 
-- **定位**：提供羊隻資料管理、AI 營養諮詢、生長預測與儀表板分析的一站式解決方案。
-- **特色**：
-	- 紀錄羊隻基本、事件、歷史、生產與 ESG 資訊。
-	- 透過 Google Gemini API 產生每日提示、營養建議、圖片強化對話。
-	- 匯入匯出 Excel、支援欄位自動映射與匯出多工作表。
-	- 線性回歸結合 LLM 提供生長預測與永續建議。
-	- 後端 208 項 Pytest、前端 281 項 Vitest 覆蓋主要流程。
+---
 
-## 技術棧與核心模組
+## 1. 專案價值與定位
 
-| 範疇 | 技術 | 重點模組 |
-|------|------|----------|
-| 後端 | Python 3.11、Flask 3、SQLAlchemy 2、Pydantic 2、Redis、輕量 RQ 佇列 | `app/api/*`（Auth、Sheep、Data Management、Dashboard、Agent、Prediction、Traceability、Tasks）、`app/cache.py`（Redis 儀表板快取）、`app/tasks.py`（背景任務） |
-| 前端 | Vue 3.x（Composition API）、Vite 7、Pinia、Element Plus、Chart.js/ECharts | `src/views/*`、`src/stores/*`、`src/api/index.js`（Axios Client） |
-| AI | Google Gemini API | `/api/agent/*`、`/api/prediction/*`（需 `X-Api-Key`） |
-| 基礎設施 | Docker Compose、Nginx、PostgreSQL 14+（生產）、SQLite（開發/測試） | `docker-compose.yml`、`frontend/nginx.conf`、`backend/docker-entrypoint.sh` |
+### 1.1 核心問題
+- 整合牧場多來源資料：羊隻主檔、事件、歷史紀錄、產品批次與 ESG 指標。
+- 透過 Gemini 模型提供營養建議、每日提示、多模態對話與永續策略。
+- 使用 LightGBM/線性回歸結合 LLM，輸出帶信賴區間的生長預測與 ESG 解讀。
+- 自動化 Excel 匯入匯出，包含欄位對映、預設範本與錯誤提示。
+- 產出可分享的產銷履歷故事、時間軸與 QR code 友善資料。
+- 結合 IoT 裝置資料、規則判斷與控制指令，閉環連結虛實場域。
 
-## 系統架構
+### 1.2 功能地圖
+
+| 範疇 | 代表功能 | 後端模組 | 前端頁面 / Store | 主要測試 |
+|------|----------|----------|------------------|-----------|
+| 認證 | 註冊、登入、健康檢查、預設事件字典 | `app/api/auth.py` | `LoginView.vue`、`stores/auth.js` | `tests/test_auth_api.py`、`tests/test_auth_agent_enhanced.py` |
+| 羊群管理 | CRUD、歷史自動紀錄、提醒欄位、自訂事件詞庫 | `app/api/sheep.py`、`app/models.py` | `SheepListView.vue`、`stores/sheep.js` | `tests/test_sheep_api.py`、`tests/test_sheep_events_api.py`、`tests/test_sheep_enhanced.py` |
+| 儀表板與報表 | 提醒、停藥檢查、健康警示、牧場摘要、Redis 快取 | `app/api/dashboard.py`、`app/cache.py` | `DashboardView.vue` | `tests/test_dashboard_api.py`、`tests/test_dashboard_enhanced.py` |
+| 資料治理 | Excel 匯出/匯入、AI 導入建議、聊天紀錄匯出 | `app/api/data_management.py`、`app/utils.py` | `DataManagementView.vue`、`stores/data` | `tests/test_data_management_api.py`、`tests/test_data_management_enhanced.py`、`tests/test_data_management_error_handling.py` |
+| AI 協作 | 每日提示、營養/ESG 建議、多模態聊天 | `app/api/agent.py`、`app/utils.py`、`app/models.ChatHistory` | `ConsultationView.vue`、`ChatView.vue`、`stores/consultation.js`、`stores/chat.js` | `tests/test_agent_api.py` |
+| 生長預測 | 體重預估、信賴區間、ESG 說明 | `app/api/prediction.py`、`backend/models/*.joblib` | `PredictionView.vue`、`stores/prediction.js` | `tests/test_prediction_api.py` |
+| 產銷履歷 | 批次流程、加工步驟、羊隻貢獻、公眾故事 | `app/api/traceability.py` | `TraceabilityManagementView.vue`、`TraceabilityPublicView.vue`、`stores/traceability.js` | `tests/test_traceability_api.py` |
+| IoT 自動化 | 裝置註冊、HMAC API Key、資料攝取、規則判斷、控制紀錄 | `app/api/iot.py`、`app/iot/automation.py` | `IotManagementView.vue`、`stores/iot.js` | `tests/test_iot_api.py`、`tests/test_iot_worker.py` |
+| 背景任務 | 輕量佇列與示範任務端點 | `app/tasks.py`、`app/simple_queue.py`、`app/api/tasks.py` | 設定/維運頁面觸發 | `tests/test_tasks_api.py` |
+
+## 2. 系統架構
 
 ```mermaid
 graph TB
@@ -46,35 +59,36 @@ graph TB
     Pinia[Pinia Stores]
   end
 
-  subgraph Frontend["Frontend (Vite build -> Nginx)"]
+  subgraph Frontend["Vite build → Nginx"]
     Router[Vue Router 4]
-    Components[Element Plus Components]
-    ApiClient[Axios API client]
+    Components[Element Plus]
+    ApiClient[Axios API Client]
   end
 
-  subgraph Backend["Backend (Flask 3)"]
-    Auth[Auth Blueprint]
-    Sheep[Sheep Blueprint]
-    Dashboard[Dashboard Blueprint]
-    Data[Data Management Blueprint]
-    Prediction[Prediction Blueprint]
-    Agent[Agent Blueprint]
-    Traceability[Traceability Blueprint]
-    Tasks[Tasks Blueprint]
+  subgraph Backend["Flask 3 應用"]
+    Auth[Auth]
+    Sheep[Sheep]
+    Dashboard[Dashboard]
+    Data[Data]
+    Prediction[Prediction]
+    Agent[Agent]
+    Traceability[Traceability]
+    Iot[IoT]
+    Tasks[Tasks]
   end
 
-  subgraph DataTier["Persistence Layer"]
-    Postgres[(PostgreSQL 13+ / Prod)]
+  subgraph DataTier["資料儲存層"]
+    Postgres[(PostgreSQL 14+ / Prod)]
     SQLite[(SQLite / Dev & Test)]
-    Filesystem[(模型與媒體檔案)]
-    Redis[(Redis Cache & Queue)]
+    Filesystem[(模型/媒體)]
+    Redis[(Session / Cache / Queue)]
   end
 
-  subgraph Worker["Background Worker"]
-    WorkerNode[Worker]
+  subgraph Worker["背景 Worker"]
+    WorkerNode[Simple Queue Worker]
   end
 
-  subgraph External["外部整合"]
+  subgraph External["外部服務"]
     Gemini[Google Gemini API]
   end
 
@@ -85,6 +99,8 @@ graph TB
   ApiClient --> Prediction
   ApiClient --> Agent
   ApiClient --> Traceability
+  ApiClient --> Iot
+  ApiClient --> Tasks
 
   Auth --> Postgres
   Sheep --> Postgres
@@ -92,6 +108,7 @@ graph TB
   Data --> Postgres
   Prediction --> Postgres
   Traceability --> Postgres
+  Iot --> Postgres
   Tasks --> Redis
 
   Prediction --> Gemini
@@ -103,224 +120,184 @@ graph TB
 
 ![部署架構示意](docs/assets/deployment.png)
 
-## 功能亮點
+## 3. 後端服務 (Flask)
 
-### 資料治理
-- 羊隻 CRUD、事件管理與歷史數據追蹤均依使用者隔離。
-- Excel 匯入提供欄位自動對映與手動映射；匯出產生多張工作表與說明頁。
-- 產品批次、加工流程與羊隻貢獻紀錄串連，支援公開產銷履歷與內部管理。
+- **基礎**：Python 3.11、Flask 3、SQLAlchemy 2、Pydantic 2、Redis Session、`SimpleQueue` 佇列。
+- **Blueprint 重點**：
+  - `auth`：註冊/登入、預設事件詞庫、健康檢查。
+  - `sheep`：羊隻 CRUD、事件生命週期、關鍵欄位歷史自動紀錄、提醒欄位。
+  - `data_management`：Excel 匯出/匯入、AI 映射建議、匯出聊天紀錄。
+  - `dashboard`：提醒、停藥期、體重/奶量趨勢分析、事件選項管理、Redis 快取。
+  - `agent`：Gemini 每日提示、營養+ESG 建議、多模態聊天紀錄。
+  - `prediction`：LightGBM+線性回歸、數據品質檢查、ESG LLM 解讀、圖表資料。
+  - `traceability`：批次/加工步驟/羊隻關聯、公眾故事 payload。
+  - `iot`：裝置註冊與 HMAC API key、感測資料攝取、規則判斷、控制指令紀錄。
+  - `tasks`：透過 `SimpleQueue` 排程示範任務。
+- **資料模型**：`app/models.py` 涵蓋羊隻、事件、歷史、聊天、IoT 裝置、規則與控制紀錄，並以 Unique Constraint 確保用戶隔離。
+- **工具**：`app/utils.py` 統一 Gemini 呼叫、羊隻上下文、圖片編碼；`app/cache.py` 封裝 Redis 快取與鎖。
 
-### AI 協作
-- `/api/agent/tip` 生成每日照護提醒；`/api/agent/recommendation` 輸出營養/ESG 建議；`/api/agent/chat` 支援圖片互動。
-- `/api/prediction` 以線性回歸 + LLM 製作羊隻生長預測，評估資料品質並提供永續建議。
+## 4. 前端應用 (Vue 3)
 
-### 產品產銷履歷
-- 後端提供 `/api/traceability/batches` 系列端點管理批次、加工步驟與羊隻關聯。
-- 公開端 `/api/traceability/public/<batch_number>` 回傳面向消費者的故事、流程時間軸與 ESG 重點。
-- 前端新增 `/traceability` 管理頁與 `/trace/<批次號>` 公開頁，支援 QR Code 分享與 ngrok 暫時性網址。
+- **技術**：Vue 3 `<script setup>`、Vite、Pinia、Element Plus、Axios、Chart.js、ECharts。
+- **路由**：`src/router/index.js` 包含 Dashboard、Consultation、Chat、Flock、Data Management、Prediction、IoT、Traceability、Settings 等需登入路由，以及 `/login`、`/trace/:batchNumber` 公開頁面。
+- **狀態管理**：`src/stores/` 依功能拆分（auth、sheep、consultation、chat、prediction、iot、traceability、settings），皆附 Vitest 覆蓋。
+- **API 層**：`src/api/index.js` 統一錯誤處理、Gemini Header 注入、Multipart 上傳。
+- **視圖與測試**：每個頁面皆有對應測試 (`*.test.js` / `*.behavior.test.js`) 驗證路由守衛、表單驗證、Store 行為與 UI 呈現。
+- **UX**：Element Plus 排版、統一 loading/toast、AI Markdown 呈現、API Key 彈窗一次顯示。
 
-### 儀表板與快取
-- 儀表板聚合提醒、停藥紀錄、健康警示與 ESG 指標。
-- Redis 快取保留 90 秒，可透過 `clear_dashboard_cache(user_id)` 強制刷新並跨服務共享。
-- Flask-Session 改採 Redis 儲存，登入狀態對多實例部署更友善。
+## 5. AI 與機器學習能力
 
-### 背景任務
-- 內建輕量 RQ 風格佇列與 Redis broker，可處理報表、匯出等耗時流程。
-- `/api/tasks/example` 提供第一個測試任務，`backend/run_worker.py` 可啟動 Worker。
+- **Gemini 整合**（`app/utils.call_gemini_api`）：
+  - `/api/agent/tip`：依季節產出每日提示。
+  - `/api/agent/recommendation`：融合羊隻資料與歷史事件，提供營養與 ESG 建議。
+  - `/api/agent/chat`：支援圖片 (JPEG/PNG/GIF/WebP，≤10 MB) 與對話歷史。
+  - `/api/prediction/*`：使用相同 helper 產出預測解說與 ESG 建議。
+- **生長預測**（`app/api/prediction.py`）：
+  - LightGBM 分位數模型搭配線性迴歸備援，僅支援 60–365 天幼羊。
+  - 進行資料品質檢查（筆數、時間跨度、異常值）。
+  - 回傳 q10/q90 區間、每日預測序列、品種參考對照。
+  - 若 Gemini 失敗則提供備援說明文字。
+- **模型資產**：位於 `backend/models/`，包含特徵順序與類別編碼 metadata，重新訓練時請同步更新。
 
-### 全面測試
-- 後端 Pytest 208 項、覆蓋率 85%；前端 Vitest 281 項、Statements 81.73%。
-- 覆蓋率報告已收錄於 `docs/backend/coverage/` 與 `docs/frontend/coverage/`。
+## 6. 資料匯入匯出流程
 
-## 目錄結構
+- **匯出** `GET /api/data/export_excel`：輸出羊隻、事件、歷史、聊天紀錄，多工作表；無資料時提供提示頁。
+- **結構分析** `POST /api/data/analyze_excel`：回傳每張工作表欄位與預覽，供手動映射。
+- **AI 映射** `POST /api/data/ai_import_mapping`：上傳 Excel + Gemini API Key，取得建議用途、欄位映射、信心值與警示。
+- **匯入** `POST /api/data/process_import`：支援預設範本或自訂配置，包含品種/性別代碼轉換、日期清洗、事件/歷史自動建立。
+- **驗證**：依用途檢查必要欄位，Pydantic 回傳友善錯誤訊息與 `details` 說明。
 
-```
-goat-nutrition-app/
-├─ backend/          # Flask API、模型、遷移、測試
-├─ frontend/         # Vue 3 SPA、Pinia、測試、Dockerfile
-├─ docs/             # 文件、資產、覆蓋率報告
-│  ├─ assets/        # 架構圖、部署圖
-│  ├─ backend/       # 後端覆蓋率 HTML
-│  └─ frontend/      # 前端覆蓋率 HTML
-├─ docker-compose.yml
-├─ deploy*.sh, deploy*.ps1   # 部署輔助腳本
-└─ README.md         # 本文件
-```
+## 7. IoT 自動化層
 
-## 快速開始
+- **裝置註冊**：`IotDevice` 儲存類型、分類（sensor/actuator）、HMAC API Key digest、最後連線時間。
+- **資料攝取** `POST /api/iot/ingest`：驗證 API Key、儲存讀值、更新狀態並推送佇列。
+- **自動化規則**：定義觸發裝置/條件與致動裝置/指令；驗證只能由感測器觸發致動器。
+- **佇列與 Worker**：`app/iot/automation.py` 以 Redis list 實作感測/控制佇列，Worker 評估條件、發送 HTTP 指令並寫入控制紀錄。
+- **模擬器**：`iot_simulator/` 提供 Docker 化感測器，詳細流程請參閱 `docs/iot.md`。
 
-> 以下指令以 **Windows PowerShell** 為例；macOS/Linux 請改用 `python3` 並調整路徑符號。
+## 8. 快取、背景任務與 Worker
 
-### 1. 建立環境與安裝依賴
+- **Session 與快取**：Redis 作為 Flask Session；`app/cache.py` 針對 Dashboard 以 TTL + 鎖避免併發重算。
+- **SimpleQueue**：使用 Redis list，提供 `enqueue_example_task` 示範，並由 `app/tasks.py` 暴露 API。
+- **Worker**：`backend/run_worker.py`、`start_*` 腳本負責啟動背景任務與 IoT 控制流程。
 
-```powershell
-# 專案根目錄
-Copy-Item .env.example .env
+## 9. 本機開發環境
 
-# 後端虛擬環境
+> 以下以 macOS/Linux shell 為例，Windows PowerShell 請調整路徑與環境變數語法。
+
+### 9.1 建置依賴
+
+```bash
+cp .env.example .env  # 依下節說明填入密鑰
+
 cd backend
-python -m venv .venv
-./.venv/Scripts/Activate.ps1
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# 前端依賴
 cd ../frontend
 npm install
 ```
 
-### 2. 啟動開發服務
+### 9.2 啟動服務
 
-後端（預設使用 SQLite `instance/app.db`）：
-
-```powershell
-cd backend
-$env:REDIS_PASSWORD = "<REDIS_PASSWORD>"  # see .env.example
-$env:FLASK_ENV = "development"
-$env:CORS_ORIGINS = "http://localhost:5173"
-python run.py
-```
-
-啟動本機 Redis（若尚未執行，可使用 Docker 快速啟動）：
-
-```powershell
+```bash
+# Redis（可改用 Docker）
 docker run --rm -p 6379:6379 redis:7.2-alpine redis-server --requirepass "$REDIS_PASSWORD"
-```
 
-前端（Vite 開發伺服器）：
+# 後端（預設 SQLite）
+cd backend
+export FLASK_ENV=development
+export CORS_ORIGINS="http://localhost:5173"
+python run.py
 
-```powershell
-cd frontend
+# 前端（Vite）
+cd ../frontend
 npm run dev
 ```
 
-完成後可瀏覽：
+後端預設 `http://127.0.0.1:5001`，前端開發伺服器 `http://127.0.0.1:5173`，並透過 proxy 轉發 `/api`。
 
-| 項目 | URL |
-|------|-----|
-| 前端 SPA | <http://localhost:5173> |
-| 後端 API | <http://localhost:5001> |
-| Swagger UI | <http://localhost:5001/docs> |
-| 健康檢查 | <http://localhost:5001/api/auth/status> |
+### 9.3 常用指令
 
-### 3. 快速體驗 API
+- 建立範例資料：`python backend/create_test_data.py`
+- 啟動背景 Worker：`python backend/run_worker.py`
+- 模擬 IoT 裝置：`python iot_simulator/simulator.py --api-key <KEY> --device-type barn_environment`
 
-```powershell
-# 註冊 + 登入
-Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/auth/register" -ContentType "application/json" -Body '{"username":"demo","password":"demo123"}' -SessionVariable s
-Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/auth/login" -ContentType "application/json" -Body '{"username":"demo","password":"demo123"}' -WebSession $s
+## 10. 環境變數與配置
 
-# 建立羊隻
-Invoke-RestMethod -Method Post -Uri "http://localhost:5001/api/sheep/" -ContentType "application/json" -Body '{"EarNum":"A001","Breed":"台灣黑山羊","Sex":"母","BirthDate":"2024-01-15"}' -WebSession $s
+- `SECRET_KEY`：Flask Session 密鑰（必填）。
+- `API_HMAC_SECRET`：IoT API Key HMAC 密鑰（≥32 bytes，必填）。
+- `GOOGLE_API_KEY`：Gemini API Key（用戶未帶 `X-Api-Key` 時使用）。
+- `POSTGRES_*`：生產環境資料庫設定，未設置則使用 SQLite。
+- `REDIS_URL` 或 `REDIS_HOST/PORT/PASSWORD`：Redis 連線設定；測試可設 `USE_FAKE_REDIS_FOR_TESTS=1`。
+- `CORS_ORIGINS`：生產環境允許的前端來源（逗號分隔）。
+- `RQ_QUEUE_NAME`：背景任務佇列名稱。
 
-# 取得儀表板摘要
-Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/dashboard/data" -WebSession $s | ConvertTo-Json -Depth 4
+完整清單請參考 `.env.example` 與部署腳本。
+
+## 11. 測試與品質保證
+
+### 11.1 後端（Pytest）
+
+```bash
+cd backend
+pytest
+pytest --cov=app --cov-report=term-missing
 ```
 
-## Docker Compose 部署
+涵蓋認證、羊隻 CRUD/事件/歷史、匯入錯誤處理、儀表板快取、AI 端點（Gemini 模擬）、預測輸出、產銷履歷流程、IoT 攝取與自動化、背景任務排程。
 
-1. 準備 `.env` 並填寫 `POSTGRES_*`、`SECRET_KEY`、`API_HMAC_SECRET`（至少 32 bytes，用於 IoT API Key HMAC）、`CORS_ORIGINS`、`GOOGLE_API_KEY`、`REDIS_PASSWORD`（請參考 `.env.example`）等參數。
-2. 啟動與檢查：
+### 11.2 前端（Vitest + ESLint）
 
-```powershell
-Copy-Item .env.example .env
-docker compose up --build -d
-docker compose ps
+```bash
+cd frontend
+npm run test -- --run
+npm run lint
 ```
 
-3. 驗證常用端點：
+測試位於 `src/views/`、`src/stores/`，驗證路由守衛、表單驗證、Store 行為與元件渲染。
 
-| 項目 | URL | 正常回應 |
-|------|-----|-----------|
-| 前端 | <http://localhost:3000> | Vue SPA |
-| 後端健康檢查 | <http://localhost:5001/api/auth/status> | `{ "authenticated": false }` |
-| Swagger | <http://localhost:5001/docs> | Swagger UI |
-| PostgreSQL | `docker compose logs db` | `database system is ready` |
-| Redis | `docker compose logs redis` | `Ready to accept connections` |
+### 11.3 整合測試
 
-4. 維運指令：
+- `docker compose up` 檢查端對端。
+- `test_image_upload.py` 驗證 `/api/agent/chat` 圖片流程。
+- `manual_test.py`、`manual_functional_test.py` 提供手動腳本。
 
-```powershell
-docker compose logs -f backend
-docker compose restart backend
-docker compose exec backend flask db upgrade
-docker compose down
-```
+## 12. 部署與維運
 
-## 測試與覆蓋率
+- **Docker Compose**：`docker-compose.yml` 啟動 backend、frontend(Nginx)、PostgreSQL、Redis、IoT 模擬器。請確保 `.env` 與生產一致。
+- **啟動流程**：`backend/docker-entrypoint.sh` 執行 `flask db upgrade`；`frontend/nginx.conf` 服務打包後 SPA。
+- **健康檢查**：`/api/auth/health`（後端）、`/api/auth/status`（Session）、`/docs`（Swagger UI）。
+- **觀測性**：生產建議設 `FLASK_ENV=production` 並監看 worker log 以掌握佇列狀態。
+- **備份**：定期備份 PostgreSQL volume 與 `backend/models/` 模型資產。
 
-| 範疇 | 指令 | 結果摘要 |
-|------|------|-----------|
-| 後端單元/整合測試 | `C:/Users/7220s/AppData/Local/Programs/Python/Python311/python.exe -m pytest` | 主要路徑含產品產銷履歷 API；需注意 SQLAlchemy Legacy 警示。 |
-| 後端覆蓋率 | `... -m pytest --cov=app --cov-report=term-missing --cov-report=html` | HTML 報告生成於 `docs/backend/coverage/index.html`。 |
-| 前端測試 | `npm run test -- --run` / `npx vitest run traceability` | 覆蓋核心頁面、Pinia store 與新產銷履歷管理流程。 |
-| 前端覆蓋率 | `npm run test:coverage -- --run` | Statements 約 82%、Branches 約 86%、Functions 約 66%。 |
-
-HTML 覆蓋率報告：
-- 後端：`docs/backend/coverage/index.html`
-- 前端：`docs/frontend/coverage/index.html`
-
-> 提示：執行 Pytest 前請暫存 `.env`，避免 `debug_test.py` 嘗試連線 PostgreSQL。
-
-## API 概覽
-
-- Swagger UI：<http://localhost:5001/docs>
-- OpenAPI 檔：<http://localhost:5001/openapi.yaml>
-- 所有 `/api/*` 預設回傳 JSON；除 `/api/auth/*` 部分端點外，其餘均需登入。
-- `/api/agent/*` 與 `/api/prediction/*` 必須提供標頭 `X-Api-Key: <Google Gemini API Key>`。
-
-| 模組 | 端點重點 |
-|------|-----------|
-| `/api/auth` | 註冊、登入、登出、健康檢查。 |
-| `/api/sheep` | 羊隻 CRUD、事件、歷史資料管理。 |
-| `/api/data` | Excel 匯出、結構分析、匯入流程。 |
-| `/api/dashboard` | 儀表板數據、提醒、事件類型管理。 |
-| `/api/agent` | 每日提示、營養建議、聊天（含圖片上傳）。 |
-| `/api/prediction` | 生長預測、圖表資料（線性迴歸 + LLM）。 |
-| `/api/tasks` | 背景任務觸發與示範佇列。 |
-
-完整欄位與範例請參閱 [`docs/API.md`](docs/API.md) 或 Swagger。
-
-## 開發工作流與最佳實務
-
-- **後端**：
-        - 啟動 `python run.py`，預設使用 SQLite；設定 `POSTGRES_*` 可切換 PostgreSQL。
-        - `app/cache.py` 透過 Redis 快取儀表板資料；測試需即時資料時可呼叫 `clear_dashboard_cache`。
-        - 主要模組：`agent.py`（AI）、`data_management.py`（匯入匯出）、`prediction.py`（生長預測）、`models.py`（資料模型）、`tasks.py`（背景任務）。
-- **前端**：
-	- `npm run dev` 啟動 Vite，透過代理將 `/api` 指向 `http://127.0.0.1:5001`。
-	- Pinia store 位於 `src/stores`，登入資訊同步存放 `localStorage`。
-	- `PredictionView.vue` 展示 ECharts 與 AI 說明，`ChatView.vue` 支援 Markdown 與圖片上傳。
-- **測試策略**：
-	- 後端 `tests/conftest.py` 會清除 PostgreSQL 環境變數並建立 `authenticated_client`。
-	- 前端測試採 happy-dom，建議使用 `npm run test -- --run` 避免互動模式阻塞。
-- **資料品質與 AI 提示**：遵循《羊隻生長預測開發建議 v2.0》，在預測前進行數據健康檢查（資料量、時間跨度、異常值），並由 LLM 產出包含 ESG 建議的報告。
-
-## 文件地圖
+## 13. 文件索引
 
 | 範疇 | 文件 | 說明 |
 |------|------|------|
-| 快速啟動 | [`docs/QuickStart.md`](docs/QuickStart.md) | 本機開發、Docker、API 試跑。 |
-| 部署 | [`docs/Deployment.md`](docs/Deployment.md) | Docker Compose、維運指令、備份還原。 |
-| 開發 | [`docs/Development.md`](docs/Development.md) | 推薦環境、模組說明、測試策略。 |
-| API | [`docs/API.md`](docs/API.md) | 分模組端點與授權需求。 |
-| FAQ | [`docs/FAQ.md`](docs/FAQ.md) | 常見問題與排錯建議。 |
-| 後端指南 | [`backend/docs/README.md`](backend/docs/README.md) | 模型、快取、測試、故障排除。 |
-| 前端指南 | [`frontend/docs/README.md`](frontend/docs/README.md) | 視圖、狀態管理、測試、效能。 |
-| 生長預測建議 | [`docs/羊隻生長預測開發建議`](docs/%E7%BE%8A%E9%9A%BB%E7%94%9F%E9%95%B7%E9%A0%90%E6%B8%AC%E9%96%8B%E7%99%BC%E5%BB%BA%E8%AD%B0) | 生長預測功能分階段規劃與提示詞設計。 |
+| 快速啟動 | [`docs/QuickStart.md`](docs/QuickStart.md) | 本機建置、常用流程、API 驗證 |
+| 開發指南 | [`docs/Development.md`](docs/Development.md) | 程式架構、命名慣例、測試策略 |
+| 部署指南 | [`docs/Deployment.md`](docs/Deployment.md) | Docker Compose、環境準備、維運指引 |
+| API 參考 | [`docs/API.md`](docs/API.md) | 端點清單、授權規則、欄位說明 |
+| FAQ | [`docs/FAQ.md`](docs/FAQ.md) | 常見問題與除錯建議 |
+| IoT 指南 | [`docs/iot.md`](docs/iot.md) | 模擬器與多裝置場景操作 |
+| 術語表 | [`docs/glossary.md`](docs/glossary.md) | 中英對照術語維護一致性 |
+| Roadmap | [`docs/project_roadmap.md`](docs/project_roadmap.md) | 里程碑與 ADR 參考 |
 
-## 常見問題 FAQ
+## 14. 疑難排解
 
-- **登入 API 回傳 401？** 先呼叫 `POST /api/auth/register` 建立帳號；確認瀏覽器允許 Cookie 或 API 客戶端是否攜帶 Session Cookie。
-- **後端測試連線 PostgreSQL 失敗？** 測試前暫時改名 `.env` 或設定 `$env:DOTENV_PATH="NON_EXISTENT_.env"`，避免 `debug_test.py` 誤用 Postgres。
-- **AI 端點回傳缺少 API 金鑰？** 在請求頭加入 `X-Api-Key: <Google Gemini API Key>`，或於 `.env` 設定 `GOOGLE_API_KEY`。
-- **Excel 匯入錯誤？** 確認副檔名為 `.xlsx/.xls`，日期採 `YYYY-MM-DD`，自訂模式需提供 `mapping_config` JSON。
-- **Docker 啟動後前端空白？** 檢查 `docker compose logs frontend`、確認 `.env` 內 `CORS_ORIGINS` 包含 `http://localhost:3000`，並清除瀏覽器快取。
-- **埠號衝突？** 前端 3000（對外 80）、後端 5001、PostgreSQL 5432，可修改 `docker-compose.yml` 或 `.env`。
+- **登入後仍 401**：確認瀏覽器允許 Cookie，或檢查 Redis Session 是否正常連線。
+- **預測被拒**：需至少 3 筆體重紀錄且羊齡介於 60–365 天。
+- **AI 失敗**：補上 `X-Api-Key` 或設定 `GOOGLE_API_KEY`，檢查後端 log 是否出現配額錯誤。
+- **Excel 匯入警示**：檢視回傳的 `details` 陣列調整映射設定。
+- **IoT 裝置離線**：重新建立裝置取得新 API Key，確認模擬器或裝置使用最新密鑰。
+- **儀表板資料未更新**：羊隻/事件/歷史更新會觸發快取失效，如需強制更新可再次呼叫 `/api/dashboard/data`。
 
-更多問答詳見 [`docs/FAQ.md`](docs/FAQ.md)。
+## 15. Roadmap 與版本記錄
+
+請參閱 [`docs/project_roadmap.md`](docs/project_roadmap.md) 與 `docs/adr/` 以了解架構決策、未來規劃與升級歷程。提交 PR 時請盡量引用相關 ADR 以維持可追蹤性。
+
 ---
 
-若需擴充文件或圖表，請延續 `docs/` 既有結構並將新的資產放入對應子資料夾，以維持專案文件一致性。
-
-📣 本文件為訪客導覽；**唯一事實來源 (SoT)**：/docs/README.en.md
-
+本文件為對外導覽；最新且唯一事實來源為 `/docs/README.en.md`，請優先更新英文版後再同步此處內容。
