@@ -48,7 +48,7 @@ class _InMemoryLock:
 
 class InMemoryRedis:
     def __init__(self):
-        self._data: dict[str, str] = {}
+        self._data: dict[str, object] = {}
         self._expirations: dict[str, float] = {}
         self._locks: dict[str, threading.Lock] = {}
         self._mutex = threading.Lock()
@@ -62,7 +62,10 @@ class InMemoryRedis:
     def get(self, key: str) -> Optional[str]:
         with self._mutex:
             self._purge(key)
-            return self._data.get(key)
+            value = self._data.get(key)
+            if isinstance(value, list):
+                return None
+            return value  # type: ignore[return-value]
 
     def setex(self, key: str, ttl: int, value: str) -> None:
         with self._mutex:
@@ -80,3 +83,45 @@ class InMemoryRedis:
     # Compatibility helpers
     def ping(self) -> bool:
         return True
+
+    # Queue helpers for testing environments
+    def _get_list(self, key: str) -> list:
+        value = self._data.get(key)
+        if value is None:
+            value = []
+            self._data[key] = value
+        if not isinstance(value, list):
+            raise TypeError(f"Key {key} is not list-backed")
+        return value
+
+    def rpush(self, key: str, *values: str) -> int:
+        with self._mutex:
+            lst = self._get_list(key)
+            lst.extend(values)
+            return len(lst)
+
+    def lpop(self, key: str) -> Optional[str]:
+        with self._mutex:
+            lst = self._data.get(key)
+            if not isinstance(lst, list) or not lst:
+                return None
+            value = lst.pop(0)
+            if not lst:
+                self._data.pop(key, None)
+            return value
+
+    def blpop(self, key: str, timeout: int = 0):
+        deadline = time.time() + timeout if timeout else None
+        while True:
+            with self._mutex:
+                lst = self._data.get(key)
+                if isinstance(lst, list) and lst:
+                    value = lst.pop(0)
+                    if not lst:
+                        self._data.pop(key, None)
+                    return key, value
+            if timeout == 0:
+                return None
+            if deadline is not None and time.time() >= deadline:
+                return None
+            time.sleep(0.05)

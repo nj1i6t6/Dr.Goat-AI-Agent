@@ -1,5 +1,7 @@
 from __future__ import with_statement
 
+import os
+
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from logging.config import fileConfig
@@ -8,7 +10,15 @@ from flask import current_app
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    config_path = config.config_file_name
+    if not os.path.isabs(config_path) and not os.path.exists(config_path):
+        base_dir = os.path.dirname(__file__)
+        candidate = os.path.join(base_dir, '..', os.path.basename(config_path))
+        if os.path.exists(candidate):
+            config_path = candidate
+        else:
+            config_path = os.path.join(base_dir, '..', config_path)
+    fileConfig(config_path)
 
 config.set_main_option('sqlalchemy.url', str(current_app.config.get('SQLALCHEMY_DATABASE_URI')))
 

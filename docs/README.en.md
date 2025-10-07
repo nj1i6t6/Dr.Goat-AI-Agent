@@ -221,6 +221,7 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/sheep" -WebSession
 |----------|-------------|-------------------|
 | `FLASK_ENV` | Environment mode (`development`, `production`) | `development` |
 | `SECRET_KEY` | Flask session secret | generate via `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `API_HMAC_SECRET` | 32-byte minimum secret used to derive IoT API key digests | generate via `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `DATABASE_URL` | SQLAlchemy database URI | `sqlite:///instance/app.db` for dev |
 | `POSTGRES_*` | Production database credentials | refer to `.env.example` |
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis connection settings | see `.env.example`; must match Docker Compose overrides |
@@ -229,6 +230,12 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:5001/api/sheep" -WebSession
 | `FILE_STORAGE_PATH` | Local path for uploads/models | defaults to `instance/storage` |
 
 Keep `.env.example` authoritative for new variables and mirror updates in `docker-compose.yml`.
+
+### 7.1 IoT Automation Notes
+
+- IoT device API keys are stored as HMAC-SHA256 digests using `API_HMAC_SECRET`. Rotate the secret carefully; existing devices will require re-provisioned keys.
+- `POST /api/iot/devices` returns the plain API key only once during creation. Persist it securely on the device side.
+- `POST /api/iot/ingest` validates the `X-API-Key` header and rejects missing keys (401) or malformed payloads (400) before queueing data.
 
 ## 8. Data Import & Export Pipelines
 

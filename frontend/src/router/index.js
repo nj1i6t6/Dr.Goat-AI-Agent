@@ -55,6 +55,11 @@ const routes = [
         component: () => import('../views/PredictionView.vue')
       },
       {
+        path: 'iot',
+        name: 'IotManagement',
+        component: () => import('../views/IotManagementView.vue')
+      },
+      {
         path: 'traceability',
         name: 'TraceabilityManagement',
         component: () => import('../views/TraceabilityManagementView.vue')

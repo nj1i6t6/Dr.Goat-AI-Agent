@@ -1,7 +1,10 @@
 from . import db, login_manager
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
+from flask import current_app
 from datetime import datetime
+import hashlib
+import hmac
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -14,6 +17,8 @@ class User(UserMixin, db.Model):
     event_type_options = db.relationship('EventTypeOption', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
     event_description_options = db.relationship('EventDescriptionOption', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
     product_batches = db.relationship('ProductBatch', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
+    iot_devices = db.relationship('IotDevice', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
+    automation_rules = db.relationship('AutomationRule', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
 
 
     def set_password(self, password):
@@ -310,3 +315,143 @@ class BatchSheepAssociation(db.Model):
 
     def __repr__(self):
         return f'<BatchSheepAssociation BatchID:{self.batch_id} SheepID:{self.sheep_id}>'
+
+
+def _get_api_hmac_secret() -> bytes:
+    secret = current_app.config.get('API_HMAC_SECRET')
+    if not secret:
+        raise RuntimeError('API_HMAC_SECRET 未設定，無法處理 IoT 金鑰')
+    if isinstance(secret, str):
+        return secret.encode('utf-8')
+    return secret
+
+
+class IotDevice(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    device_type = db.Column(db.String(120), nullable=False)
+    category = db.Column(db.String(20), nullable=False)
+    location = db.Column(db.String(120))
+    control_url = db.Column(db.String(255))
+    status = db.Column(db.String(32), default='offline', nullable=False)
+    last_seen = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    api_key_digest = db.Column(db.String(64), unique=True, index=True, nullable=False)
+
+    sensor_readings = db.relationship(
+        'SensorReading',
+        backref='device',
+        lazy='dynamic',
+        cascade="all, delete-orphan"
+    )
+    trigger_rules = db.relationship(
+        'AutomationRule',
+        foreign_keys='AutomationRule.trigger_source_device_id',
+        backref='trigger_device',
+        lazy='dynamic'
+    )
+    target_rules = db.relationship(
+        'AutomationRule',
+        foreign_keys='AutomationRule.action_target_device_id',
+        backref='target_device',
+        lazy='dynamic'
+    )
+    control_logs = db.relationship(
+        'DeviceControlLog',
+        foreign_keys='DeviceControlLog.target_device_id',
+        backref='target_device',
+        lazy='dynamic'
+    )
+
+    __table_args__ = (
+        db.Index('ix_iot_device_user_category', 'user_id', 'category'),
+    )
+
+    @staticmethod
+    def compute_digest(raw_key: str) -> str:
+        secret = _get_api_hmac_secret()
+        return hmac.new(secret, raw_key.encode('utf-8'), hashlib.sha256).hexdigest()
+
+    def set_api_key(self, raw_key: str) -> None:
+        self.api_key_digest = self.compute_digest(raw_key)
+
+    def verify_api_key(self, candidate: str) -> bool:
+        if not candidate:
+            return False
+        candidate_digest = self.compute_digest(candidate)
+        return hmac.compare_digest(candidate_digest, self.api_key_digest)
+
+    def mark_seen(self) -> None:
+        self.last_seen = datetime.utcnow()
+        self.status = 'online'
+
+    def to_safe_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'name': self.name,
+            'device_type': self.device_type,
+            'category': self.category,
+            'location': self.location,
+            'control_url': self.control_url,
+            'status': self.status,
+            'last_seen': self.last_seen.isoformat() if self.last_seen else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def __repr__(self):
+        return f'<IotDevice {self.name} ({self.category})>'
+
+
+class SensorReading(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.Integer, db.ForeignKey('iot_device.id'), nullable=False)
+    data = db.Column(db.JSON, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index('ix_sensor_reading_device_created_at', 'device_id', 'created_at'),
+    )
+
+    def __repr__(self):
+        return f'<SensorReading device={self.device_id} at {self.created_at}>'
+
+
+class AutomationRule(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name = db.Column(db.String(150), nullable=False)
+    trigger_source_device_id = db.Column(db.Integer, db.ForeignKey('iot_device.id'), nullable=False)
+    trigger_condition = db.Column(db.JSON, nullable=False)
+    action_target_device_id = db.Column(db.Integer, db.ForeignKey('iot_device.id'), nullable=False)
+    action_command = db.Column(db.JSON, nullable=False)
+    is_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    control_logs = db.relationship(
+        'DeviceControlLog',
+        backref='rule',
+        lazy='dynamic',
+        cascade="all, delete-orphan"
+    )
+
+    def __repr__(self):
+        return f'<AutomationRule {self.name} enabled={self.is_enabled}>'
+
+
+class DeviceControlLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    rule_id = db.Column(db.Integer, db.ForeignKey('automation_rule.id'), nullable=False)
+    target_device_id = db.Column(db.Integer, db.ForeignKey('iot_device.id'), nullable=False)
+    command = db.Column(db.JSON, nullable=False)
+    status = db.Column(db.String(32), default='pending', nullable=False)
+    response_payload = db.Column(db.JSON)
+    executed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index('ix_device_control_log_rule', 'rule_id', 'executed_at'),
+    )
+
+    def __repr__(self):
+        return f'<DeviceControlLog rule={self.rule_id} device={self.target_device_id}>'

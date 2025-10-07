@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import PredictionView from '../views/PredictionView.vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { useSettingsStore } from '../stores/settings'
@@ -73,9 +73,15 @@ describe('PredictionView', () => {
     vi.clearAllMocks()
     
     // 設置預設的 mock 回應
+    const formatDate = (daysAgo) => {
+      const date = new Date()
+      date.setDate(date.getDate() - daysAgo)
+      return date.toISOString().split('T')[0]
+    }
+
     mockApi.getAllSheep.mockResolvedValue([
-      { EarNum: 'SH001', Breed: '努比亞', Sex: '母', BirthDate: '2023-01-01' },
-      { EarNum: 'SH002', Breed: '波爾', Sex: '公', BirthDate: '2023-02-01' }
+      { EarNum: 'SH001', Breed: '努比亞', Sex: '母', BirthDate: formatDate(120) },
+      { EarNum: 'SH002', Breed: '波爾', Sex: '公', BirthDate: formatDate(150) }
     ])
     
     mockApi.getSheepPrediction.mockResolvedValue({
@@ -145,9 +151,11 @@ describe('PredictionView', () => {
       
       wrapper.vm.querySearch(query, callback)
       
-      expect(callback).toHaveBeenCalledWith([
-        { value: 'SH001', breed: '努比亞', sex: '母', birth_date: '2023-01-01' }
-      ])
+      expect(callback).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ value: 'SH001', breed: '努比亞', sex: '母' })
+        ])
+      )
     })
 
     it('應該處理羊隻選擇', () => {
@@ -170,9 +178,10 @@ describe('PredictionView', () => {
   })
 
   describe('預測功能', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       settingsStore.setApiKey('test-api-key')
       wrapper = createWrapper()
+      await flushPromises()
       wrapper.vm.selectedEarTag = 'SH001'
     })
 

@@ -66,6 +66,17 @@ def _init_redis_client(app: Flask):
     app.extensions['redis_client'] = client
     return client
 
+def _load_api_hmac_secret() -> bytes:
+    secret_value = os.environ.get('API_HMAC_SECRET')
+    if not secret_value:
+        raise RuntimeError('API_HMAC_SECRET 未設定，無法啟動應用程式')
+
+    secret_bytes = secret_value.encode('utf-8')
+    if len(secret_bytes) < 32:
+        raise ValueError('API_HMAC_SECRET 長度不足，至少需要 32 bytes')
+    return secret_bytes
+
+
 def create_app():
     # --- 【修改一：配置靜態檔案路徑】 ---
     # 告訴 Flask，我們的靜態檔案（打包後的前端）在哪裡
@@ -78,6 +89,7 @@ def create_app():
     # --- 配置 ---
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
     app.config['GOOGLE_API_KEY'] = os.environ.get('GOOGLE_API_KEY')
+    app.config['API_HMAC_SECRET'] = _load_api_hmac_secret()
     
     # --- 【檔案上傳大小限制】 ---
     # 設定最大檔案上傳大小為 50MB
@@ -158,6 +170,7 @@ def create_app():
             prediction as prediction_bp,
             traceability as traceability_bp,
             tasks as tasks_bp,
+            iot as iot_bp,
         )
         app.register_blueprint(auth_bp.bp, url_prefix='/api/auth')
         app.register_blueprint(sheep_bp.bp, url_prefix='/api/sheep')
@@ -167,6 +180,7 @@ def create_app():
         app.register_blueprint(prediction_bp.bp, url_prefix='/api/prediction')
         app.register_blueprint(traceability_bp.bp, url_prefix='/api/traceability')
         app.register_blueprint(tasks_bp.bp, url_prefix='/api/tasks')
+        app.register_blueprint(iot_bp.bp, url_prefix='/api/iot')
 
         # --- OpenAPI 規格與 Swagger UI ---
         @app.route('/openapi.yaml')
