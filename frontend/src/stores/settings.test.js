@@ -382,7 +382,7 @@ describe('settings Store', () => {
     })
 
     it('應該在 API Key 改變時能夠重新獲取提示', async () => {
-      setupLocalStorageMock({ apiKey: 'old-key' });
+      setupLocalStorageMocks({ apiKey: 'old-key' });
       const store = useSettingsStore()
       
       api.getAgentTip.mockResolvedValue({ tip_html: '舊提示' })
