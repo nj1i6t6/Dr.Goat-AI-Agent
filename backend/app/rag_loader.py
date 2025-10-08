@@ -145,7 +145,7 @@ def rag_query(
     query_vector = np.asarray(query_vector, dtype=np.float32)
     faiss.normalize_L2(query_vector.reshape(1, -1))
 
-    search_k = min(len(vectors), max(top_k * 2, top_k))
+    search_k = min(len(vectors), top_k * 2)
     distances, indices = index.search(query_vector.reshape(1, -1), search_k)
 
     results: List[Dict[str, object]] = []
@@ -245,16 +245,14 @@ def _load_cache_from_redis(
 
     vectors: List[Dict[str, object]] = []
     for meta_item, vector in zip(metadata, matrix):
-        if isinstance(meta_item, dict):
-            text = meta_item.get("text", "")
-            doc = meta_item.get("doc", "unknown")
-            idx_value = meta_item.get("idx", 0)
-            chunk_meta = meta_item.get("meta", {})
-        else:
-            text = ""
-            doc = "unknown"
-            idx_value = 0
-            chunk_meta = {}
+        if not isinstance(meta_item, dict):
+            LOGGER.warning("Skipping corrupted metadata item in RAG cache: %r", meta_item)
+            continue
+
+        text = meta_item.get("text", "")
+        doc = meta_item.get("doc", "unknown")
+        idx_value = meta_item.get("idx", 0)
+        chunk_meta = meta_item.get("meta", {})
 
         if not isinstance(chunk_meta, dict):
             chunk_meta = _safe_json(chunk_meta)
@@ -292,6 +290,7 @@ def _cache_in_redis(
         return
 
     try:
+        # Persist the full snapshot without a TTL; mtime-based invalidation keeps the cache fresh.
         metadata = [
             {
                 "text": item["text"],
@@ -321,10 +320,7 @@ def _cache_in_redis(
             ensure_ascii=False,
         )
 
-        if hasattr(redis_client, "set"):
-            redis_client.set(_REDIS_CACHE_KEY, payload)
-        else:  # pragma: no cover - compatibility with minimal clients
-            redis_client.setex(_REDIS_CACHE_KEY, 7 * 24 * 60 * 60, payload)
+        redis_client.set(_REDIS_CACHE_KEY, payload)
     except Exception as exc:  # pragma: no cover - cache best effort
         LOGGER.warning("Failed to persist RAG cache to Redis: %s", exc)
 

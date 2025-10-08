@@ -85,7 +85,7 @@ def _perform_embedding_requests(requests_batch: List[_EmbeddingRequest], api_key
             EMBEDDING_ENDPOINT,
             params={"key": api_key},
             json=payload,
-            timeout=120,
+            timeout=30,
         )
     except requests.RequestException as exc:  # pragma: no cover - network errors handled below
         raise EmbeddingError(f"Failed to call Gemini embedding API: {exc}") from exc
