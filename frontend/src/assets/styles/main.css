@@ -1,0 +1,29 @@
+/* --- Global Styles --- */
+body {
+    font-family: 'Noto Sans TC', 'Roboto', sans-serif;
+    margin: 0;
+    color: #334155;
+    line-height: 1.65;
+    font-size: 15px;
+}
+
+body .el-container {
+    height: 100%;
+}
+
+.el-drawer__header {
+    margin-bottom: 0 !important;
+    padding-bottom: 15px !important;
+}
+
+/* 
+  為 Element Plus 的可排序表格標題添加鼠標指針
+  並確保排序圖示可見
+*/
+.el-table .sort-caret {
+  display: inline-flex !important;
+}
+
+.el-table th.is-sortable .cell {
+    cursor: pointer;
+}
