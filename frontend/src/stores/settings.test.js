@@ -27,17 +27,23 @@ import { useSettingsStore, FONT_SCALE } from './settings'
 import api from '../api'
 
 describe('settings Store', () => {
+  // 1. 建立可重用的輔助函式
+  const setupLocalStorageMocks = ({ apiKey = '', fontScale = FONT_SCALE.DEFAULT } = {}) => {
+    localStorageMock.getItem.mockImplementation((key) => {
+      if (key === 'geminiApiKey') return apiKey;
+      if (key === 'uiFontScale') return fontScale;
+      return '';
+    });
+  };
+
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.fontScale = FONT_SCALE.DEFAULT
     }
-    localStorageMock.getItem.mockImplementation((key) => {
-      if (key === 'geminiApiKey') return ''
-      if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-      return ''
-    })
+    // 2. 在 beforeEach 中設定預設的 mock 狀態
+    setupLocalStorageMocks();
   })
 
   describe('初始狀態', () => {
@@ -55,11 +61,8 @@ describe('settings Store', () => {
 
     it('應該從 localStorage 載入已儲存的 API Key', () => {
       const savedApiKey = 'saved-api-key-123'
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return savedApiKey
-        if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-        return ''
-      })
+      // 3. 在需要特定狀態的測試中呼叫輔助函式
+      setupLocalStorageMocks({ apiKey: savedApiKey });
       
       const store = useSettingsStore()
       
@@ -93,11 +96,7 @@ describe('settings Store', () => {
 
     describe('clearApiKey', () => {
       it('應該清除 API Key', () => {
-        localStorageMock.getItem.mockImplementation((key) => {
-          if (key === 'geminiApiKey') return 'existing-key'
-          if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-          return ''
-        })
+        setupLocalStorageMocks({ apiKey: 'existing-key' });
         const store = useSettingsStore()
         
         expect(store.apiKey).toBe('existing-key')
@@ -112,11 +111,7 @@ describe('settings Store', () => {
     describe('fetchAndSetAgentTip', () => {
       it('應該成功獲取 Agent 提示', async () => {
         const mockTip = '<p>今日提示：注意山羊的營養平衡</p>'
-        localStorageMock.getItem.mockImplementation((key) => {
-          if (key === 'geminiApiKey') return 'valid-api-key'
-          if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-          return ''
-        })
+        setupLocalStorageMocks({ apiKey: 'valid-api-key' });
         
         const store = useSettingsStore()
         api.getAgentTip.mockResolvedValue({ tip_html: mockTip })
@@ -130,11 +125,7 @@ describe('settings Store', () => {
       })
 
       it('應該處理獲取提示失敗', async () => {
-        localStorageMock.getItem.mockImplementation((key) => {
-          if (key === 'geminiApiKey') return 'invalid-key'
-          if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-          return ''
-        })
+        setupLocalStorageMocks({ apiKey: 'invalid-key' });
         
         const store = useSettingsStore()
         api.getAgentTip.mockRejectedValue({ error: 'API 錯誤' })
@@ -147,11 +138,7 @@ describe('settings Store', () => {
       })
 
       it('loading 狀態應該正確切換', async () => {
-        localStorageMock.getItem.mockImplementation((key) => {
-          if (key === 'geminiApiKey') return 'test-key'
-          if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-          return ''
-        })
+        setupLocalStorageMocks({ apiKey: 'test-key' });
         const store = useSettingsStore()
 
         let resolvePromise
@@ -169,11 +156,7 @@ describe('settings Store', () => {
       })
 
       it('應該處理沒有 API Key 的情況', async () => {
-        localStorageMock.getItem.mockImplementation((key) => {
-          if (key === 'geminiApiKey') return ''
-          if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-          return ''
-        })
+        // 使用 beforeEach 的預設 mock (apiKey: '') 即可
         const store = useSettingsStore()
 
         await store.fetchAndSetAgentTip()
@@ -183,30 +166,20 @@ describe('settings Store', () => {
       })
 
       it('應該避免重複獲取（已載入）', async () => {
-        localStorageMock.getItem.mockImplementation((key) => {
-          if (key === 'geminiApiKey') return 'test-key'
-          if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-          return ''
-        })
+        setupLocalStorageMocks({ apiKey: 'test-key' });
         
         const store = useSettingsStore()
         api.getAgentTip.mockResolvedValue({ tip_html: '初次提示' })
 
-        // 第一次調用
         await store.fetchAndSetAgentTip()
         expect(api.getAgentTip).toHaveBeenCalledTimes(1)
 
-        // 第二次調用應該跳過
         await store.fetchAndSetAgentTip()
-        expect(api.getAgentTip).toHaveBeenCalledTimes(1) // 仍然是 1 次
+        expect(api.getAgentTip).toHaveBeenCalledTimes(1)
       })
 
       it('應該避免重複獲取（載入中）', async () => {
-        localStorageMock.getItem.mockImplementation((key) => {
-          if (key === 'geminiApiKey') return 'test-key'
-          if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-          return ''
-        })
+        setupLocalStorageMocks({ apiKey: 'test-key' });
         
         const store = useSettingsStore()
         
@@ -215,7 +188,6 @@ describe('settings Store', () => {
           resolveFirst = resolve
         }))
 
-        // 同時發起兩個請求
         const promise1 = store.fetchAndSetAgentTip()
         const promise2 = store.fetchAndSetAgentTip()
 
@@ -229,11 +201,7 @@ describe('settings Store', () => {
 
   describe('字體大小設定', () => {
     it('初始化時會從 localStorage 載入字級偏好並套用', () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return ''
-        if (key === 'uiFontScale') return FONT_SCALE.LARGE
-        return ''
-      })
+      setupLocalStorageMocks({ fontScale: FONT_SCALE.LARGE });
 
       const store = useSettingsStore()
 
@@ -280,14 +248,11 @@ describe('settings Store', () => {
     it('hasApiKey 應該根據 apiKey 正確計算', () => {
       const store = useSettingsStore()
       
-      // 初始狀態：無 API Key
       expect(store.hasApiKey).toBe(false)
       
-      // 設置 API Key
       store.setApiKey('test-key')
       expect(store.hasApiKey).toBe(true)
       
-      // 清除 API Key
       store.clearApiKey()
       expect(store.hasApiKey).toBe(false)
     })
@@ -295,11 +260,7 @@ describe('settings Store', () => {
 
   describe('localStorage 整合', () => {
     it('應該在初始化時從 localStorage 載入 API Key', () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return 'stored-key'
-        if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-        return ''
-      })
+      setupLocalStorageMocks({ apiKey: 'stored-key' });
 
       const store = useSettingsStore()
       
@@ -312,7 +273,7 @@ describe('settings Store', () => {
       global.localStorage = null
       
       expect(() => {
-        const store = useSettingsStore()
+        useSettingsStore()
       }).toThrow()
 
       global.localStorage = originalLocalStorage
@@ -324,18 +285,14 @@ describe('settings Store', () => {
       })
       
       expect(() => {
-        const store = useSettingsStore()
+        useSettingsStore()
       }).toThrow()
     })
   })
 
   describe('邊界條件處理', () => {
     it('應該處理網路錯誤', async () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return 'test-key'
-        if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-        return ''
-      })
+      setupLocalStorageMocks({ apiKey: 'test-key' });
       const store = useSettingsStore()
       
       api.getAgentTip.mockRejectedValue({ message: 'Network Error' })
@@ -347,11 +304,7 @@ describe('settings Store', () => {
     })
 
     it('應該處理未知錯誤', async () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return 'test-key'
-        if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-        return ''
-      })
+      setupLocalStorageMocks({ apiKey: 'test-key' });
       const store = useSettingsStore()
       
       api.getAgentTip.mockRejectedValue({})
@@ -383,22 +336,17 @@ describe('settings Store', () => {
     })
 
     it('應該處理並發的 fetchAndSetAgentTip 請求', async () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return 'test-key'
-        if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-        return ''
-      })
+      setupLocalStorageMocks({ apiKey: 'test-key' });
       const store = useSettingsStore()
       
       api.getAgentTip.mockImplementation(() => 
         new Promise(resolve => setTimeout(() => resolve({ tip_html: '並發測試提示' }), 50))
       )
 
-      // 同時發送多個請求
       const promises = Array(3).fill().map(() => store.fetchAndSetAgentTip())
       await Promise.all(promises)
 
-      expect(api.getAgentTip).toHaveBeenCalledTimes(1) // 只調用一次
+      expect(api.getAgentTip).toHaveBeenCalledTimes(1)
       expect(store.agentTip.html).toBe('並發測試提示')
     })
 
@@ -417,21 +365,15 @@ describe('settings Store', () => {
 
   describe('狀態重置', () => {
     it('應該能夠重置 agentTip 狀態', async () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return 'test-key'
-        if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-        return ''
-      })
+      setupLocalStorageMocks({ apiKey: 'test-key' });
       const store = useSettingsStore()
       
-      // 先獲取提示
       api.getAgentTip.mockResolvedValue({ tip_html: '初始提示' })
       await store.fetchAndSetAgentTip()
       
       expect(store.agentTip.loaded).toBe(true)
       expect(store.agentTip.html).toBe('初始提示')
 
-      // 重置狀態
       store.agentTip.loaded = false
       store.agentTip.html = ''
 
@@ -440,23 +382,16 @@ describe('settings Store', () => {
     })
 
     it('應該在 API Key 改變時能夠重新獲取提示', async () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return 'old-key'
-        if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-        return ''
-      })
+      setupLocalStorageMock({ apiKey: 'old-key' });
       const store = useSettingsStore()
       
-      // 使用舊 key 獲取提示
       api.getAgentTip.mockResolvedValue({ tip_html: '舊提示' })
       await store.fetchAndSetAgentTip()
       expect(store.agentTip.html).toBe('舊提示')
 
-      // 更改 API Key 並重置狀態
       store.setApiKey('new-key')
       store.agentTip.loaded = false
 
-      // 使用新 key 獲取提示
       api.getAgentTip.mockResolvedValue({ tip_html: '新提示' })
       await store.fetchAndSetAgentTip()
       
