@@ -143,7 +143,9 @@ graph TB
 - **狀態管理**：`src/stores/` 依功能拆分（auth、sheep、consultation、chat、prediction、iot、traceability、settings），皆附 Vitest 覆蓋。
 - **API 層**：`src/api/index.js` 統一錯誤處理、Gemini Header 注入、Multipart 上傳。
 - **視圖與測試**：每個頁面皆有對應測試 (`*.test.js` / `*.behavior.test.js`) 驗證路由守衛、表單驗證、Store 行為與 UI 呈現。
-- **UX**：Element Plus 排版、統一 loading/toast、AI Markdown 呈現、API Key 彈窗一次顯示。
+- **UX**：
+  - Element Plus 排版、統一 loading/toast、AI Markdown 呈現、API Key 彈窗一次顯示。
+  - 系統設定新增「字體大小」切換（預設／大字），同步調整 Element Plus 基準字級與全域 CSS 變數，方便熟齡牧場管理者以較大的字體操作系統。
 
 ## 5. AI 與機器學習能力
 

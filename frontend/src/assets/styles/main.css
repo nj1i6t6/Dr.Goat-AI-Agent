@@ -1,22 +1,47 @@
 /* --- Global Styles --- */
-body {
+:root {
+    --app-line-height: 1.65;
+    --app-background: #f5f7fa;
+    --app-text-color: #334155;
+    --el-font-size-base: 1rem;
     font-family: 'Noto Sans TC', 'Roboto', sans-serif;
+    font-size: 100%;
+    color: var(--app-text-color);
+    background-color: var(--app-background);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+    min-height: 100%;
+}
+
+html[data-font-scale='large'] {
+    font-size: 112.5%;
+    --el-font-size-base: 1.125rem;
+}
+
+html[data-font-scale='extra-large'] {
+    font-size: 125%;
+    --el-font-size-base: 1.25rem;
+}
+
+body {
     margin: 0;
-    color: #334155;
-    line-height: 1.65;
-    font-size: 15px;
+    min-height: 100vh;
+    line-height: var(--app-line-height);
 }
 
 body .el-container {
-    height: 100%;
+    min-height: 100%;
 }
 
 .el-drawer__header {
     margin-bottom: 0 !important;
-    padding-bottom: 15px !important;
+    padding-bottom: 0.9375rem !important;
 }
 
-/* 
+/*
   為 Element Plus 的可排序表格標題添加鼠標指針
   並確保排序圖示可見
 */

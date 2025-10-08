@@ -143,7 +143,9 @@ graph TB
 - **State Management**: Pinia stores under `src/stores/` wrap API clients with optimistic updates and error helpers (`auth`, `sheep`, `consultation`, `chat`, `prediction`, `iot`, `traceability`, `settings`). Each store ships with Vitest coverage.
 - **API Layer**: `src/api/index.js` exposes strongly-typed helpers, consistent error handling, and header propagation for Gemini API keys and multipart requests.
 - **Views**: Each route has a dedicated view under `src/views/` accompanied by unit/behaviour tests (e.g., `DashboardView.test.js`, `ConsultationView.behavior.test.js`). Components encapsulate tables, forms, and charts with Element Plus primitives.
-- **UX Considerations**: Responsive layout via Element Plus grid, consistent loading states, toast notifications for async flows, Markdown rendering for AI output, and modals for API key reveal.
+- **UX Considerations**:
+  - Responsive layout via Element Plus grid, consistent loading states, toast notifications for async flows, Markdown rendering for AI output, and modals for API key reveal.
+  - System Settings includes a persistent font size toggle (default vs. large) that updates the Element Plus base size and CSS variables so older farmers can switch to larger typography across the entire SPA.
 
 ## 5. AI & Machine Learning Capabilities
 
