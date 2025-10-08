@@ -15,6 +15,7 @@
 | API Key | API 金鑰 | Must be hashed server-side; shown once to users. |
 | Growth Prediction | 生長預測 | ML-powered forecast served via `/api/prediction`. |
 | Daily Tip | 每日提示 | Gemini-generated guidance for caretakers. |
+| Font Scale | 字級設定 | User preference that enlarges global typography. |
 | Intake Form | 匯入表單 | Excel-powered batch data ingestion forms. |
 | Pinia Store | Pinia Store 狀態 | Vue global state container. |
 | Element Plus | Element Plus 元件庫 | Frontend UI component library. |

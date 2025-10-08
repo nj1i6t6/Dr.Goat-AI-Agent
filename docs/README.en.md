@@ -144,6 +144,7 @@ graph TB
 - **API Layer**: `src/api/index.js` exposes strongly-typed helpers, consistent error handling, and header propagation for Gemini API keys and multipart requests.
 - **Views**: Each route has a dedicated view under `src/views/` accompanied by unit/behaviour tests (e.g., `DashboardView.test.js`, `ConsultationView.behavior.test.js`). Components encapsulate tables, forms, and charts with Element Plus primitives.
 - **UX Considerations**: Responsive layout via Element Plus grid, consistent loading states, toast notifications for async flows, Markdown rendering for AI output, and modals for API key reveal.
+- **Accessibility & Personalisation**: The system settings view now exposes a "Default" vs. "Large" font scale toggle backed by Pinia + CSS variables, so typographic sizing (including Element Plus `--el-font-size-base`) scales globally for senior farmers without manual zooming.
 
 ## 5. AI & Machine Learning Capabilities
 

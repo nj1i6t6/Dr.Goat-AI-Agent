@@ -3,8 +3,14 @@ import { ref, computed } from 'vue';
 import api from '../api'; // 導入 api 模組
 
 export const useSettingsStore = defineStore('settings', () => {
+  const FONT_SCALE_STORAGE_KEY = 'appFontScale';
+  const FONT_SCALE_OPTIONS = ['default', 'large'];
+
+  const normaliseFontScale = (value) => (FONT_SCALE_OPTIONS.includes(value) ? value : 'default');
+
   // --- State ---
   const apiKey = ref(localStorage.getItem('geminiApiKey') || '');
+  const fontScale = ref(normaliseFontScale(localStorage.getItem(FONT_SCALE_STORAGE_KEY)));
   // 新增：用於緩存 AI 每日提示的狀態
   const agentTip = ref({
     html: '',       // 提示的 HTML 內容
@@ -14,6 +20,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // --- Getters ---
   const hasApiKey = computed(() => !!apiKey.value);
+  const isLargeFont = computed(() => fontScale.value === 'large');
 
   // --- Actions ---
   function setApiKey(newKey) {
@@ -24,6 +31,12 @@ export const useSettingsStore = defineStore('settings', () => {
   function clearApiKey() {
     apiKey.value = '';
     localStorage.removeItem('geminiApiKey');
+  }
+
+  function setFontScale(newScale) {
+    const nextScale = normaliseFontScale(newScale);
+    fontScale.value = nextScale;
+    localStorage.setItem(FONT_SCALE_STORAGE_KEY, nextScale);
   }
 
   // 新增：獲取並緩存 AI 每日提示的 action
@@ -52,10 +65,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     apiKey,
+    fontScale,
     hasApiKey,
+    isLargeFont,
     agentTip, // 導出 agentTip 狀態
     setApiKey,
     clearApiKey,
+    setFontScale,
     fetchAndSetAgentTip, // 導出新的 action
   };
 });

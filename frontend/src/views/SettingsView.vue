@@ -18,6 +18,28 @@
       </el-button>
     </el-card>
 
+    <!-- 字級設定 -->
+    <el-card shadow="never" class="font-scale-card">
+      <template #header><div class="card-header">介面字級</div></template>
+      <p>
+        依據使用者回饋，我們提供預設與大字兩種介面字級。預設字級符合一般建議值，大字級則放大整個系統的文字與行距，適合長時間使用或銀髮族群。
+      </p>
+      <el-radio-group v-model="fontScale" class="font-scale-group">
+        <el-radio-button label="default">預設字級（建議）</el-radio-button>
+        <el-radio-button label="large">大字級（放大 12.5%）</el-radio-button>
+      </el-radio-group>
+      <div class="font-scale-preview">
+        <div class="preview-sample" data-scale="default">
+          <span class="preview-title">預設字級</span>
+          <span class="preview-text">常用段落會以 16px 為基準。</span>
+        </div>
+        <div class="preview-sample" data-scale="large">
+          <span class="preview-title">大字級</span>
+          <span class="preview-text">放大至約 18px，適合需要更高可讀性的使用情境。</span>
+        </div>
+      </div>
+    </el-card>
+
     <!-- 事件選項管理 -->
     <el-card shadow="never" class="event-options-card">
       <template #header><div class="card-header">事件選項管理</div></template>
@@ -86,6 +108,10 @@ const settingsStore = useSettingsStore();
 const apiKeyInput = ref('');
 const testLoading = ref(false);
 const apiKeyStatus = reactive({ type: 'info', message: '尚未設定 API 金鑰。' });
+const fontScale = computed({
+  get: () => settingsStore.fontScale,
+  set: (value) => settingsStore.setFontScale(value),
+});
 
 // Event Options State
 const optionsLoading = ref(false);
@@ -214,6 +240,42 @@ onMounted(() => {
 .page-title .el-icon { margin-right: 10px; }
 .card-header { font-size: 1.2em; font-weight: bold; }
 .el-card { margin-bottom: 20px; }
+
+.font-scale-group {
+  margin-top: 12px;
+}
+
+.font-scale-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.preview-sample {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #ffffff;
+  line-height: 1.6;
+}
+
+.preview-sample[data-scale='large'] {
+  font-size: 1.125rem;
+}
+
+.preview-title {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.preview-text {
+  color: #4b5563;
+}
 
 .api-key-status {
   margin: 10px 0;

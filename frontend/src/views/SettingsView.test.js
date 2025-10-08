@@ -51,6 +51,8 @@ describe('SettingsView', () => {
           'el-card': true,
           'el-input': true,
           'el-button': true,
+          'el-radio-group': true,
+          'el-radio-button': true,
           'el-collapse': true,
           'el-collapse-item': true,
           'el-empty': true,
@@ -78,6 +80,7 @@ describe('SettingsView', () => {
     localStorage.removeItem.mockReset()
     localStorage.getItem.mockImplementation((key) => {
       if (key === 'geminiApiKey') return ''
+      if (key === 'appFontScale') return 'default'
       return null
     })
   })
@@ -208,5 +211,23 @@ describe('SettingsView', () => {
 
     expect(mounted.vm.apiKeyStatus.type).toBe('success')
     expect(mounted.vm.apiKeyStatus.message).toContain('已載入儲存的 API 金鑰')
+  })
+
+  it('切換字級會更新 store 與 localStorage', async () => {
+    apiMock.getEventOptions.mockResolvedValue([])
+    const mounted = await mountView()
+    const store = useSettingsStore()
+
+    expect(store.fontScale).toBe('default')
+
+    mounted.vm.fontScale = 'large'
+
+    expect(store.fontScale).toBe('large')
+    expect(localStorage.setItem).toHaveBeenCalledWith('appFontScale', 'large')
+
+    mounted.vm.fontScale = 'invalid-value'
+
+    expect(store.fontScale).toBe('default')
+    expect(localStorage.setItem).toHaveBeenLastCalledWith('appFontScale', 'default')
   })
 })

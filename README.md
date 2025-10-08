@@ -144,6 +144,7 @@ graph TB
 - **API 層**：`src/api/index.js` 統一錯誤處理、Gemini Header 注入、Multipart 上傳。
 - **視圖與測試**：每個頁面皆有對應測試 (`*.test.js` / `*.behavior.test.js`) 驗證路由守衛、表單驗證、Store 行為與 UI 呈現。
 - **UX**：Element Plus 排版、統一 loading/toast、AI Markdown 呈現、API Key 彈窗一次顯示。
+- **無障礙 / 個人化**：系統設定頁提供「預設字級 / 大字級」切換，透過 Pinia 與 CSS 變數同步調整全域字級與 Element Plus `--el-font-size-base`，方便年長使用者閱讀。
 
 ## 5. AI 與機器學習能力
 
