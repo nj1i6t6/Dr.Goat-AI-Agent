@@ -39,7 +39,7 @@
           :class="{ active: fontScaleValue === FONT_SCALE.EXTRA_LARGE }"
         >
           <div class="preview-title">超大字級</div>
-          <div class="preview-description">放大至約 20px，適合需要更非常高可讀性的使用情境。</div>
+          <div class="preview-description">放大至約 20px，適合需要非常高可讀性的使用情境。</div>
         </div>
       </div>
       <p class="font-scale-hint">此設定會記住在瀏覽器中，重新整理或再次登入都會維持目前字級。</p>
