@@ -5,17 +5,10 @@ import api from '../api'; // 導入 api 模組
 export const FONT_SCALE = Object.freeze({
   DEFAULT: 'default',
   LARGE: 'large',
+  EXTRA_LARGE: 'extra-large',
 });
 
 const FONT_SCALE_STORAGE_KEY = 'uiFontScale';
-const FONT_SCALE_MULTIPLIER = {
-  [FONT_SCALE.DEFAULT]: '1',
-  [FONT_SCALE.LARGE]: '1.125',
-};
-const FONT_SCALE_BASE_SIZE = {
-  [FONT_SCALE.DEFAULT]: '1rem',
-  [FONT_SCALE.LARGE]: '1.125rem',
-};
 
 function normaliseFontScale(value) {
   return Object.values(FONT_SCALE).includes(value) ? value : FONT_SCALE.DEFAULT;
@@ -26,8 +19,6 @@ function applyFontScale(scale) {
   const htmlEl = document.documentElement;
   const normalised = normaliseFontScale(scale);
   htmlEl.setAttribute('data-font-scale', normalised);
-  htmlEl.style.setProperty('--app-font-scale', FONT_SCALE_MULTIPLIER[normalised]);
-  htmlEl.style.setProperty('--el-font-size-base', FONT_SCALE_BASE_SIZE[normalised]);
 }
 
 export const useSettingsStore = defineStore('settings', () => {

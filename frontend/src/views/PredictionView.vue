@@ -562,7 +562,7 @@ onBeforeUnmount(() => {
 
 .sheep-info {
   color: #909399;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 

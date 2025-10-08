@@ -32,8 +32,6 @@ describe('settings Store', () => {
     vi.clearAllMocks()
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.fontScale = FONT_SCALE.DEFAULT
-      document.documentElement.style.removeProperty('--app-font-scale')
-      document.documentElement.style.removeProperty('--el-font-size-base')
     }
     localStorageMock.getItem.mockImplementation((key) => {
       if (key === 'geminiApiKey') return ''
@@ -44,13 +42,8 @@ describe('settings Store', () => {
 
   describe('初始狀態', () => {
     it('應該有正確的初始狀態', () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'geminiApiKey') return ''
-        if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
-        return ''
-      })
       const store = useSettingsStore()
-      
+
       expect(store.apiKey).toBe('')
       expect(store.agentTip).toEqual({
         html: '',
@@ -246,7 +239,6 @@ describe('settings Store', () => {
 
       expect(store.fontScale).toBe(FONT_SCALE.LARGE)
       expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.LARGE)
-      expect(document.documentElement.style.getPropertyValue('--el-font-size-base')).toBe('1.125rem')
     })
 
     it('setFontScale 會更新狀態、儲存並套用到文件', () => {
@@ -257,7 +249,20 @@ describe('settings Store', () => {
       expect(store.fontScale).toBe(FONT_SCALE.LARGE)
       expect(localStorageMock.setItem).toHaveBeenCalledWith('uiFontScale', FONT_SCALE.LARGE)
       expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.LARGE)
-      expect(document.documentElement.style.getPropertyValue('--app-font-scale')).toBe('1.125')
+
+      store.setFontScale(FONT_SCALE.DEFAULT)
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('uiFontScale', FONT_SCALE.DEFAULT)
+      expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.DEFAULT)
+    })
+
+    it('setFontScale 支援超大字級', () => {
+      const store = useSettingsStore()
+
+      store.setFontScale(FONT_SCALE.EXTRA_LARGE)
+
+      expect(store.fontScale).toBe(FONT_SCALE.EXTRA_LARGE)
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('uiFontScale', FONT_SCALE.EXTRA_LARGE)
+      expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.EXTRA_LARGE)
     })
 
     it('setFontScale 遇到無效值會回退到預設字級', () => {
@@ -267,6 +272,7 @@ describe('settings Store', () => {
 
       expect(store.fontScale).toBe(FONT_SCALE.DEFAULT)
       expect(localStorageMock.setItem).toHaveBeenCalledWith('uiFontScale', FONT_SCALE.DEFAULT)
+      expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.DEFAULT)
     })
   })
 

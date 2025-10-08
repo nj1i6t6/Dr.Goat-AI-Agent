@@ -48,11 +48,18 @@ describe('SettingsView', () => {
       global: {
         plugins: [pinia],
         stubs: {
-          'el-card': true,
+          'el-card': {
+            template: '<div class="el-card"><slot name="header"></slot><slot></slot></div>'
+          },
           'el-input': true,
           'el-button': true,
-          'el-select': true,
-          'el-option': true,
+          'el-radio-group': {
+            props: ['modelValue'],
+            template: '<div class="el-radio-group"><slot></slot></div>'
+          },
+          'el-radio-button': {
+            template: '<button class="el-radio-button"><slot></slot></button>'
+          },
           'el-collapse': true,
           'el-collapse-item': true,
           'el-empty': true,
@@ -79,8 +86,6 @@ describe('SettingsView', () => {
     localStorage.setItem.mockReset()
     localStorage.removeItem.mockReset()
     document.documentElement.dataset.fontScale = FONT_SCALE.DEFAULT
-    document.documentElement.style.removeProperty('--app-font-scale')
-    document.documentElement.style.removeProperty('--el-font-size-base')
     localStorage.getItem.mockImplementation((key) => {
       if (key === 'geminiApiKey') return ''
       if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
@@ -193,13 +198,31 @@ describe('SettingsView', () => {
     expect(store.fontScale).toBe(FONT_SCALE.LARGE)
     expect(localStorage.setItem).toHaveBeenCalledWith('uiFontScale', FONT_SCALE.LARGE)
     expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.LARGE)
-    expect(document.documentElement.style.getPropertyValue('--app-font-scale')).toBe('1.125')
 
     mounted.vm.fontScaleValue = FONT_SCALE.DEFAULT
     await mounted.vm.$nextTick()
 
     expect(store.fontScale).toBe(FONT_SCALE.DEFAULT)
     expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.DEFAULT)
+
+    mounted.vm.fontScaleValue = FONT_SCALE.EXTRA_LARGE
+    await mounted.vm.$nextTick()
+
+    expect(store.fontScale).toBe(FONT_SCALE.EXTRA_LARGE)
+    expect(localStorage.setItem).toHaveBeenCalledWith('uiFontScale', FONT_SCALE.EXTRA_LARGE)
+    expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.EXTRA_LARGE)
+  })
+
+  it('顯示三種字級預覽', async () => {
+    apiMock.getEventOptions.mockResolvedValue([])
+
+    await mountView()
+
+    const previewCards = wrapper.findAll('.preview-card')
+    expect(previewCards).toHaveLength(3)
+    expect(previewCards[0].text()).toContain('預設字級')
+    expect(previewCards[1].text()).toContain('大字級')
+    expect(previewCards[2].text()).toContain('超大字級')
   })
 
   it('刪除自訂事件類型會呼叫 API', async () => {
