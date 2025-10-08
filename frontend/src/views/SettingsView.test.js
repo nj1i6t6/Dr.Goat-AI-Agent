@@ -7,7 +7,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import SettingsView from './SettingsView.vue'
-import { useSettingsStore } from '../stores/settings'
+import { useSettingsStore, FONT_SCALE } from '../stores/settings'
 
 const message = vi.hoisted(() => ({
   success: vi.fn(),
@@ -51,6 +51,8 @@ describe('SettingsView', () => {
           'el-card': true,
           'el-input': true,
           'el-button': true,
+          'el-select': true,
+          'el-option': true,
           'el-collapse': true,
           'el-collapse-item': true,
           'el-empty': true,
@@ -76,8 +78,12 @@ describe('SettingsView', () => {
     localStorage.getItem.mockReset()
     localStorage.setItem.mockReset()
     localStorage.removeItem.mockReset()
+    document.documentElement.dataset.fontScale = FONT_SCALE.DEFAULT
+    document.documentElement.style.removeProperty('--app-font-scale')
+    document.documentElement.style.removeProperty('--el-font-size-base')
     localStorage.getItem.mockImplementation((key) => {
       if (key === 'geminiApiKey') return ''
+      if (key === 'uiFontScale') return FONT_SCALE.DEFAULT
       return null
     })
   })
@@ -170,6 +176,30 @@ describe('SettingsView', () => {
     await mounted.vm.handleDeleteDescription('desc-1')
     expect(apiMock.deleteEventDescription).toHaveBeenCalledWith('desc-1')
     expect(message.success).toHaveBeenCalledTimes(2)
+  })
+
+  it('切換字體大小會更新 store 並套用到文件', async () => {
+    apiMock.getEventOptions.mockResolvedValue([])
+
+    const mounted = await mountView()
+    const store = useSettingsStore()
+
+    expect(store.fontScale).toBe(FONT_SCALE.DEFAULT)
+    expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.DEFAULT)
+
+    mounted.vm.fontScaleValue = FONT_SCALE.LARGE
+    await mounted.vm.$nextTick()
+
+    expect(store.fontScale).toBe(FONT_SCALE.LARGE)
+    expect(localStorage.setItem).toHaveBeenCalledWith('uiFontScale', FONT_SCALE.LARGE)
+    expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.LARGE)
+    expect(document.documentElement.style.getPropertyValue('--app-font-scale')).toBe('1.125')
+
+    mounted.vm.fontScaleValue = FONT_SCALE.DEFAULT
+    await mounted.vm.$nextTick()
+
+    expect(store.fontScale).toBe(FONT_SCALE.DEFAULT)
+    expect(document.documentElement.dataset.fontScale).toBe(FONT_SCALE.DEFAULT)
   })
 
   it('刪除自訂事件類型會呼叫 API', async () => {

@@ -516,22 +516,23 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+
 .prediction-page {
-  padding: 20px;
+  padding: 1.25rem;
 }
 
 .page-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 24px;
+  gap: 0.5rem;
+  font-size: 1.5rem;
   font-weight: 600;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem;
   color: #303133;
 }
 
 .card-header {
-  font-size: 16px;
+  font-size: 1.125rem;
   font-weight: 600;
   display: flex;
   justify-content: space-between;
@@ -539,13 +540,14 @@ onBeforeUnmount(() => {
 }
 
 .data-info {
-  font-size: 12px;
+  font-size: 0.875rem;
   color: #909399;
   font-weight: normal;
 }
 
+
 .sheep-selection-area {
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem;
 }
 
 .ear-tag-suggestion {
@@ -563,36 +565,39 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
+
 .results-card {
-  margin-top: 20px;
+  margin-top: 1.25rem;
 }
 
 .results-content {
-  min-height: 400px;
+  min-height: 25rem;
 }
+
 
 .chart-section {
   background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
+  padding: 1.25rem;
+  border-radius: 0.5rem;
 }
 
 .chart-container {
   width: 100%;
-  height: 400px;
-  margin: 20px 0;
+  height: 25rem;
+  margin: 1.25rem 0;
 }
 
 .key-metrics {
-  margin-top: 20px;
+  margin-top: 1.25rem;
 }
+
 
 .metric-card {
   background: white;
-  padding: 16px;
-  border-radius: 8px;
+  padding: 1rem;
+  border-radius: 0.5rem;
   text-align: center;
-  border: 2px solid #e4e7ed;
+  border: 0.125rem solid #e4e7ed;
 }
 
 .metric-card.status-good {
@@ -608,49 +613,50 @@ onBeforeUnmount(() => {
 }
 
 .metric-label {
-  font-size: 12px;
+  font-size: 0.875rem;
   color: #909399;
-  margin-bottom: 8px;
+  margin-bottom: 0.5rem;
 }
 
 .metric-value {
-  font-size: 18px;
+  font-size: 1.25rem;
   font-weight: 600;
   color: #303133;
 }
 
 .metric-subvalue {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
   color: #606266;
 }
 
+
 .ai-report-section {
   background: #f0f9ff;
-  padding: 20px;
-  border-radius: 8px;
+  padding: 1.25rem;
+  border-radius: 0.5rem;
   height: 100%;
 }
 
 .ai-analysis-content {
-  margin-top: 16px;
+  margin-top: 1rem;
   line-height: 1.6;
 }
 
 .ai-analysis-content :deep(h3) {
   color: #409eff;
-  font-size: 16px;
-  margin: 16px 0 8px 0;
+  font-size: 1.125rem;
+  margin: 1rem 0 0.5rem 0;
 }
 
 .ai-analysis-content :deep(h4) {
   color: #606266;
-  font-size: 14px;
-  margin: 12px 0 6px 0;
+  font-size: 1rem;
+  margin: 0.75rem 0 0.375rem 0;
 }
 
 .ai-analysis-content :deep(p) {
-  margin: 8px 0;
+  margin: 0.5rem 0;
 }
 
 .ai-analysis-content :deep(strong) {
@@ -658,19 +664,19 @@ onBeforeUnmount(() => {
 }
 
 .ai-analysis-content :deep(ul) {
-  margin: 8px 0;
-  padding-left: 20px;
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
 }
 
 .ai-analysis-content :deep(li) {
-  margin: 4px 0;
+  margin: 0.25rem 0;
 }
 
 .prediction-warning {
-  margin-top: 16px;
+  margin-top: 1rem;
 }
 
 .policy-alert {
-  margin-top: 12px;
+  margin-top: 0.75rem;
 }
 </style>

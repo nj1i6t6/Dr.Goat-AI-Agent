@@ -5,6 +5,19 @@
       系統設定
     </h1>
 
+    <!-- 介面字體大小 -->
+    <el-card shadow="never" class="font-card">
+      <template #header><div class="card-header">介面字體大小</div></template>
+      <p>
+        針對視覺需求調整整體字級。預設值符合目前設計建議，選擇「大字體」可於各頁面放大文字，方便熟齡使用者閱讀。
+      </p>
+      <el-select v-model="fontScaleValue" class="font-scale-select" size="large">
+        <el-option :value="FONT_SCALE.DEFAULT" label="預設字級（建議）" />
+        <el-option :value="FONT_SCALE.LARGE" label="大字體" />
+      </el-select>
+      <p class="font-scale-hint">此設定會記住在瀏覽器中，重新整理或再次登入都會維持目前字級。</p>
+    </el-card>
+
     <!-- API 金鑰設定 -->
     <el-card shadow="never">
       <template #header><div class="card-header">Gemini API 金鑰設定</div></template>
@@ -77,7 +90,7 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { Setting, Plus, Delete } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
-import { useSettingsStore } from '../stores/settings';
+import { useSettingsStore, FONT_SCALE } from '../stores/settings';
 import api from '../api';
 
 const settingsStore = useSettingsStore();
@@ -93,6 +106,11 @@ const eventOptions = ref([]);
 const newEventType = ref('');
 const newDescriptions = reactive({});
 const activeCollapseItems = ref([]);
+
+const fontScaleValue = computed({
+  get: () => settingsStore.fontScale,
+  set: (value) => settingsStore.setFontScale(value),
+});
 
 const updateApiKeyStatus = () => {
   if (settingsStore.hasApiKey) {
@@ -200,6 +218,7 @@ const handleDeleteDescription = async (descId) => {
 
 onMounted(() => {
   apiKeyInput.value = settingsStore.apiKey;
+  settingsStore.ensureFontScaleApplied();
   updateApiKeyStatus();
   fetchEventOptions();
 });
@@ -208,55 +227,69 @@ onMounted(() => {
 <style scoped>
 .settings-page { animation: fadeIn 0.5s ease-out; }
 .page-title {
-  font-size: 1.8em; color: #1e3a8a; margin-top: 0;
-  margin-bottom: 20px; display: flex; align-items: center;
+  font-size: 1.75rem; color: #1e3a8a; margin-top: 0;
+  margin-bottom: 1.25rem; display: flex; align-items: center;
 }
 .page-title .el-icon { margin-right: 10px; }
-.card-header { font-size: 1.2em; font-weight: bold; }
-.el-card { margin-bottom: 20px; }
+.card-header { font-size: 1.125rem; font-weight: bold; }
+.el-card { margin-bottom: 1.5rem; }
 
 .api-key-status {
-  margin: 10px 0;
-  padding: 8px 12px;
+  margin: 0.625rem 0;
+  padding: 0.5rem 0.75rem;
   border-radius: 4px;
-  font-size: 0.9em;
+  font-size: 0.9375rem;
 }
 .api-key-status.info { background-color: #f4f4f5; color: #909399; }
 .api-key-status.success { background-color: #f0f9eb; color: #67c23a; }
 .api-key-status.error { background-color: #fef0f0; color: #f56c6c; }
 
+.font-card p {
+  margin-bottom: 0.5rem;
+}
+
+.font-scale-select {
+  max-width: 16rem;
+}
+
+.font-scale-hint {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
 .add-type-form {
   display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 0.625rem;
+  margin-bottom: 1.25rem;
 }
 
 .collapse-title {
-  font-size: 1.1em;
+  font-size: 1.0625rem;
   font-weight: 500;
 }
 .title-tag {
-  margin-left: 10px;
+  margin-left: 0.625rem;
 }
 
 .description-list {
-  padding: 0 10px;
+  padding: 0 0.625rem;
 }
 .description-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 0.5rem 0;
   border-bottom: 1px solid #f0f2f5;
 }
 .add-description-form {
   display: flex;
-  gap: 8px;
-  margin-top: 15px;
+  gap: 0.5rem;
+  margin-top: 0.9375rem;
 }
 .type-actions {
-  margin-top: 15px;
-  padding-top: 15px;
+  margin-top: 0.9375rem;
+  padding-top: 0.9375rem;
   border-top: 1px dashed #dcdfe6;
   text-align: right;
 }

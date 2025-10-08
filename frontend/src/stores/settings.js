@@ -2,15 +2,46 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '../api'; // 導入 api 模組
 
+export const FONT_SCALE = Object.freeze({
+  DEFAULT: 'default',
+  LARGE: 'large',
+});
+
+const FONT_SCALE_STORAGE_KEY = 'uiFontScale';
+const FONT_SCALE_MULTIPLIER = {
+  [FONT_SCALE.DEFAULT]: '1',
+  [FONT_SCALE.LARGE]: '1.125',
+};
+const FONT_SCALE_BASE_SIZE = {
+  [FONT_SCALE.DEFAULT]: '1rem',
+  [FONT_SCALE.LARGE]: '1.125rem',
+};
+
+function normaliseFontScale(value) {
+  return Object.values(FONT_SCALE).includes(value) ? value : FONT_SCALE.DEFAULT;
+}
+
+function applyFontScale(scale) {
+  if (typeof document === 'undefined') return;
+  const htmlEl = document.documentElement;
+  const normalised = normaliseFontScale(scale);
+  htmlEl.setAttribute('data-font-scale', normalised);
+  htmlEl.style.setProperty('--app-font-scale', FONT_SCALE_MULTIPLIER[normalised]);
+  htmlEl.style.setProperty('--el-font-size-base', FONT_SCALE_BASE_SIZE[normalised]);
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   // --- State ---
   const apiKey = ref(localStorage.getItem('geminiApiKey') || '');
+  const fontScale = ref(normaliseFontScale(localStorage.getItem(FONT_SCALE_STORAGE_KEY)));
   // 新增：用於緩存 AI 每日提示的狀態
   const agentTip = ref({
     html: '',       // 提示的 HTML 內容
     loading: false, // 是否正在加載
     loaded: false,  // 是否已經成功加載過
   });
+
+  applyFontScale(fontScale.value);
 
   // --- Getters ---
   const hasApiKey = computed(() => !!apiKey.value);
@@ -24,6 +55,17 @@ export const useSettingsStore = defineStore('settings', () => {
   function clearApiKey() {
     apiKey.value = '';
     localStorage.removeItem('geminiApiKey');
+  }
+
+  function setFontScale(newScale) {
+    const normalised = normaliseFontScale(newScale);
+    fontScale.value = normalised;
+    localStorage.setItem(FONT_SCALE_STORAGE_KEY, normalised);
+    applyFontScale(normalised);
+  }
+
+  function ensureFontScaleApplied() {
+    applyFontScale(fontScale.value);
   }
 
   // 新增：獲取並緩存 AI 每日提示的 action
@@ -52,10 +94,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     apiKey,
+    fontScale,
     hasApiKey,
     agentTip, // 導出 agentTip 狀態
     setApiKey,
     clearApiKey,
+    setFontScale,
+    ensureFontScaleApplied,
     fetchAndSetAgentTip, // 導出新的 action
   };
 });
