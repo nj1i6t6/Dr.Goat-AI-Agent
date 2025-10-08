@@ -70,10 +70,9 @@ def _perform_embedding_requests(requests_batch: List[_EmbeddingRequest], api_key
     payload = {
         "requests": [
             {
-                "input": {
-                    "content": {"parts": [{"text": item.text}]},
-                    "taskType": item.task_type,
-                }
+                # 'content' 和 'taskType' 是頂層金鑰
+                "content": {"parts": [{"text": item.text}]},
+                "taskType": item.task_type,
             }
             for item in requests_batch
         ]
