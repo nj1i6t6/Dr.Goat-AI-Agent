@@ -201,6 +201,7 @@ def mock_gemini_api(monkeypatch):
     monkeypatch.setattr('app.api.agent.call_gemini_api', mock_call_gemini_api)
     monkeypatch.setattr('app.api.prediction.call_gemini_api', mock_call_gemini_api)
     monkeypatch.setattr('app.api.data_management.call_gemini_api', mock_call_gemini_api)
+    monkeypatch.setattr('app.api.agent.rag_query', lambda *args, **kwargs: [])
     return mock_call_gemini_api
 
 
@@ -213,6 +214,7 @@ def mock_gemini_api_error(monkeypatch):
     monkeypatch.setattr('app.utils.call_gemini_api', mock_call_gemini_api_error)
     monkeypatch.setattr('app.api.prediction.call_gemini_api', mock_call_gemini_api_error)
     monkeypatch.setattr('app.api.data_management.call_gemini_api', mock_call_gemini_api_error)
+    monkeypatch.setattr('app.api.agent.rag_query', lambda *args, **kwargs: [])
     return mock_call_gemini_api_error
 
 

@@ -3,12 +3,61 @@ from flask_login import login_required, current_user
 from app.utils import call_gemini_api, get_sheep_info_for_context, encode_image_to_base64
 from app.models import db, ChatHistory
 from app.schemas import AgentRecommendationModel, AgentChatModel, create_error_response
+from app.rag_loader import rag_query
 from pydantic import ValidationError
 from datetime import datetime
 import markdown
 import base64
 
 bp = Blueprint('agent', __name__)
+
+_RECOMMENDATION_FIELD_LABELS = {
+    'EarNum': '耳號',
+    'Breed': '品種',
+    'Body_Weight_kg': '體重 (kg)',
+    'Age_Months': '月齡 (月)',
+    'Sex': '性別',
+    'status': '生理狀態',
+    'target_average_daily_gain_g': '目標日增重 (g/天)',
+    'milk_yield_kg_day': '日產奶量 (kg/天)',
+    'milk_fat_percentage': '乳脂率 (%)',
+    'number_of_fetuses': '懷胎數',
+    'activity_level': '活動量',
+    'primary_forage_type': '主要草料',
+}
+
+
+def _format_rag_context(chunks: list[dict[str, object]]) -> str:
+    if not chunks:
+        return ""
+
+    lines = ["\n--- 參考知識庫片段 ---"]
+    for idx, chunk in enumerate(chunks, 1):
+        source = chunk.get('doc', 'unknown')
+        chunk_idx = chunk.get('idx', 'N/A')
+        score = chunk.get('score', 0.0)
+        lines.append(
+            f"[{idx}] 來源: {source} (段落 {chunk_idx}, 相似度 {score:.2f})\n{chunk.get('text', '').strip()}"
+        )
+    lines.append("--- 參考片段結束 ---\n")
+    return "\n".join(lines)
+
+
+def _build_recommendation_rag_query(data: dict, sheep_context: str) -> str:
+    query_lines = []
+    for key, label in _RECOMMENDATION_FIELD_LABELS.items():
+        value = data.get(key)
+        if value not in (None, ""):
+            query_lines.append(f"{label}: {value}")
+
+    other_notes = data.get('other_remarks')
+    if other_notes:
+        query_lines.append(f"其他備註: {other_notes}")
+
+    if sheep_context:
+        query_lines.append(sheep_context.strip())
+
+    return "\n".join(query_lines)
 
 @bp.route('/tip', methods=['GET'])
 @login_required
@@ -97,20 +146,20 @@ def get_recommendation():
     ]
     
     # 動態添加用戶輸入的數據
-    field_map = {
-        'EarNum': '耳號', 'Breed': '品種', 'Body_Weight_kg': '體重 (kg)',
-        'Age_Months': '月齡 (月)', 'Sex': '性別', 'status': '生理狀態',
-        'target_average_daily_gain_g': '目標日增重 (g/天)', 'milk_yield_kg_day': '日產奶量 (kg/天)',
-        'milk_fat_percentage': '乳脂率 (%)', 'number_of_fetuses': '懷胎數'
-    }
-    for key, label in field_map.items():
+    for key, label in _RECOMMENDATION_FIELD_LABELS.items():
         if data.get(key):
             prompt_parts.append(f"- {label}: {data[key]}")
 
     full_prompt = "\n".join(prompt_parts) + sheep_context_str
     if data.get('other_remarks'):
         full_prompt += f"\n\n--- 使用者提供的其他備註 ---\n{data.get('other_remarks')}"
-    
+
+    rag_query_text = _build_recommendation_rag_query(data, sheep_context_str)
+    rag_chunks = rag_query(rag_query_text, api_key=api_key)
+    rag_context_text = _format_rag_context(rag_chunks)
+    if rag_context_text:
+        full_prompt = rag_context_text + "\n" + full_prompt
+
     full_prompt += esg_prompt_instruction
     full_prompt += "\n\n請開始提供您的綜合建議。"
 
@@ -205,6 +254,11 @@ def chat_with_agent():
 
     # 準備用戶訊息
     current_user_message_with_context = user_message + sheep_context_text
+
+    rag_chunks = rag_query(user_message + sheep_context_text, api_key=api_key)
+    rag_context_text = _format_rag_context(rag_chunks)
+    if rag_context_text:
+        current_user_message_with_context = rag_context_text + "\n" + current_user_message_with_context
     
     # 如果有圖片，加入圖片部分
     user_message_parts = [{"text": current_user_message_with_context}]

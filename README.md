@@ -152,6 +152,13 @@ graph TB
   - `/api/agent/recommendation`：融合羊隻資料與歷史事件，提供營養與 ESG 建議。
   - `/api/agent/chat`：支援圖片 (JPEG/PNG/GIF/WebP，≤10 MB) 與對話歷史。
   - `/api/prediction/*`：使用相同 helper 產出預測解說與 ESG 建議。
+- **檢索增強生成（RAG）**：
+  - 知識來源位於 `docs/rag_sources/`（Markdown / 純文字）。執行 `make rag-update` 可完成切塊、嵌入（Gemini `gemini-embedding-001`、768 維 L2 正規化）並輸出 `docs/rag_vectors/corpus.parquet` 至 Git LFS。
+- `scripts/ingest_docs.py` 採 800 字、重疊 100 的固定切塊策略，並透過 `app/ai/embedding.py`（內建 `requests.Session` 連線池）批次呼叫嵌入 API。
+- 向量快照依賴 `pyarrow` 讀寫 Parquet、`faiss-cpu` 提供高效近似最近鄰檢索，兩者皆已寫入 `backend/requirements.txt`。
+- `make rag-update` 會自動產生向量並建立本地 commit，但保留 `git push` 由開發者手動確認。
+- `app/rag_loader.ensure_vectors()` 啟動時載入 Parquet 向量、序列化快照至 Redis 供多個 Worker 共用，並建構 FAISS Index；若檔案缺失會自動嘗試 `git lfs pull`，仍失敗則僅記錄警告並降級為無 context 模式。
+  - `/api/agent/recommendation` 與 `/api/agent/chat` 在原有 Prompt 前加入 Top-k 參考片段（餘弦相似度 ≥0.75），維持既有前端與 API 契約。
 - **生長預測**（`app/api/prediction.py`）：
   - LightGBM 分位數模型搭配線性迴歸備援，僅支援 60–365 天幼羊。
   - 進行資料品質檢查（筆數、時間跨度、異常值）。

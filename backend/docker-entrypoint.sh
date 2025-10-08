@@ -7,6 +7,16 @@ set -e
 
 echo "=== 領頭羊博士 Docker 啟動腳本 ==="
 
+echo "確認 RAG 向量檔..."
+python - <<'PY'
+from app.rag_loader import ensure_vectors
+
+try:
+    ensure_vectors()
+except Exception as exc:  # pragma: no cover - defensive startup handling
+    print(f"警告：RAG 預載失敗，將降級為無向量模式: {exc}")
+PY
+
 # 等待資料庫可用
 echo "等待資料庫連線..."
 while ! pg_isready -h ${POSTGRES_HOST:-db} -p ${POSTGRES_PORT:-5432} -U ${POSTGRES_USER:-postgres}; do
