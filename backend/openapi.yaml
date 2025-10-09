@@ -636,6 +636,13 @@ paths:
   /api/agent/analytics-report:
     post:
       summary: Generate analytics report via AI
+      parameters:
+        - in: header
+          name: X-Api-Key
+          required: true
+          schema:
+            type: string
+          description: Gemini API key used for report generation
       requestBody:
         required: true
         content:
@@ -758,9 +765,7 @@ components:
           items: { type: string }
     AnalyticsReportRequest:
       type: object
-      required: [api_key]
       properties:
-        api_key: { type: string }
         filters:
           type: object
           additionalProperties: true

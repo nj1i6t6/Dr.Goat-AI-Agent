@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Type
+from typing import Iterable, Type
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -54,6 +54,24 @@ def _ensure_sheep_ownership(sheep_id: int | None) -> None:
         raise ValueError('指定的羊隻不存在或非當前使用者所有')
 
 
+def _normalize_amount(value: Decimal | float | str) -> Decimal:
+    return Decimal(str(value))
+
+
+def _bulk_validate_sheep(entries: Iterable[dict]) -> None:
+    sheep_ids = {item.get('sheep_id') for item in entries if item.get('sheep_id')}
+    if not sheep_ids:
+        return
+    owned_ids = set(
+        db.session.scalars(
+            select(Sheep.id).where(Sheep.id.in_(sheep_ids), Sheep.user_id == current_user.id)
+        )
+    )
+    missing = sheep_ids - owned_ids
+    if missing:
+        raise ValueError('指定的羊隻中包含不存在或非當前使用者所有的羊隻')
+
+
 def _apply_filters(model: Type[CostEntry | RevenueEntry]):
     conditions = [model.user_id == current_user.id]
 
@@ -94,7 +112,7 @@ def _apply_filters(model: Type[CostEntry | RevenueEntry]):
 def _create_entry(model_cls: Type[CostEntry | RevenueEntry], payload: dict) -> dict:
     _ensure_sheep_ownership(payload.get('sheep_id'))
     payload['user_id'] = current_user.id
-    payload['amount'] = Decimal(str(payload['amount']))
+    payload['amount'] = _normalize_amount(payload['amount'])
     entry = model_cls(**payload)
     db.session.add(entry)
     db.session.commit()
@@ -109,11 +127,9 @@ def _update_entry(model_cls: Type[CostEntry | RevenueEntry], entry_id: int, payl
     if 'sheep_id' in payload:
         _ensure_sheep_ownership(payload['sheep_id'])
     if 'amount' in payload and payload['amount'] is not None:
-        payload['amount'] = Decimal(str(payload['amount']))
+        payload['amount'] = _normalize_amount(payload['amount'])
 
     for key, value in payload.items():
-        if value is None and key not in {'sheep_id', 'subcategory', 'label', 'notes', 'extra_metadata'}:
-            continue
         setattr(entry, key, value)
     db.session.commit()
     db.session.refresh(entry)
@@ -121,11 +137,12 @@ def _update_entry(model_cls: Type[CostEntry | RevenueEntry], entry_id: int, payl
 
 
 def _handle_bulk_import(model_cls: Type[CostEntry | RevenueEntry], entries: list[dict]) -> dict:
+    _bulk_validate_sheep(entries)
+
     created = []
     for item in entries:
-        _ensure_sheep_ownership(item.get('sheep_id'))
         item['user_id'] = current_user.id
-        item['amount'] = Decimal(str(item['amount']))
+        item['amount'] = _normalize_amount(item['amount'])
         entry = model_cls(**item)
         db.session.add(entry)
         created.append(entry)

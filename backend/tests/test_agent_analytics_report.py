@@ -3,7 +3,6 @@ from datetime import datetime
 
 def test_generate_analytics_report(authenticated_client, mock_gemini_api):
     payload = {
-        'api_key': 'fake-key',
         'filters': {'breed': ['波爾羊'], 'period': '2024-01'},
         'cohort': [
             {
@@ -37,7 +36,9 @@ def test_generate_analytics_report(authenticated_client, mock_gemini_api):
         'insights': ['泌乳期飼料成本較預期高 8%。']
     }
 
-    resp = authenticated_client.post('/api/agent/analytics-report', json=payload)
+    resp = authenticated_client.post(
+        '/api/agent/analytics-report', json=payload, headers={'X-Api-Key': 'fake-key'}
+    )
     assert resp.status_code == 200
     data = resp.get_json()
     assert 'report_html' in data

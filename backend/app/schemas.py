@@ -5,6 +5,7 @@ Pydantic 資料驗證模型
 
 import json
 from datetime import datetime, date
+from decimal import Decimal
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -123,7 +124,6 @@ class AgentChatModel(BaseModel):
 
 
 class AnalyticsReportRequestModel(BaseModel):
-    api_key: str = Field(..., min_length=1, description="API 金鑰")
     filters: Dict[str, Any] = Field(default_factory=dict, description="使用的篩選條件")
     cohort: List[Dict[str, Any]] = Field(default_factory=list, description="分群分析結果")
     cost_benefit: Dict[str, Any] = Field(default_factory=dict, description="成本收益摘要")
@@ -151,7 +151,7 @@ class FinanceEntryBaseModel(BaseModel):
     category: str = Field(..., min_length=1, max_length=100, description="分類")
     subcategory: Optional[str] = Field(None, max_length=100, description="子分類")
     label: Optional[str] = Field(None, max_length=150, description="標籤")
-    amount: float = Field(..., description="金額")
+    amount: Decimal = Field(..., description="金額")
     currency: Optional[str] = Field('TWD', max_length=8, description="幣別")
     sheep_id: Optional[int] = Field(None, ge=1, description="羊隻 ID")
     breed: Optional[str] = Field(None, max_length=100, description="品種")
@@ -163,10 +163,10 @@ class FinanceEntryBaseModel(BaseModel):
 
     @field_validator('amount')
     @classmethod
-    def validate_amount(cls, value: float) -> float:
+    def validate_amount(cls, value: Any) -> Decimal:
         if value is None:
             raise ValueError('amount 不能為空')
-        return float(value)
+        return Decimal(str(value))
 
     @field_validator('extra_metadata', mode='before')
     @classmethod
@@ -188,7 +188,7 @@ class CostEntryUpdateModel(BaseModel):
     category: Optional[str] = Field(None, min_length=1, max_length=100)
     subcategory: Optional[str] = Field(None, max_length=100)
     label: Optional[str] = Field(None, max_length=150)
-    amount: Optional[float] = Field(None)
+    amount: Optional[Decimal] = Field(None)
     currency: Optional[str] = Field(None, max_length=8)
     sheep_id: Optional[int] = Field(None, ge=1)
     breed: Optional[str] = Field(None, max_length=100)
@@ -281,7 +281,6 @@ class CostBenefitRequest(BaseModel):
     time_range: Optional[TimeRangeModel] = Field(None, description="時間範圍")
     metrics: List[Literal['total_cost', 'total_revenue', 'net_profit', 'avg_cost_per_head', 'avg_revenue_per_head']] = Field(default_factory=lambda: ['total_cost', 'total_revenue', 'net_profit'], description="指標列表")
     group_by: Literal['month', 'category', 'breed', 'lactation_number', 'production_stage', 'none'] = Field('month', description="分組方式")
-    include_timeseries: bool = Field(True, description="是否包含時間序列")
 
 
 # === 數據管理相關模型 ===

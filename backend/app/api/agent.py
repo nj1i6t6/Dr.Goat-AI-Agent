@@ -149,13 +149,16 @@ def _format_cost_benefit(summary: dict[str, object]) -> str:
 @bp.route('/analytics-report', methods=['POST'])
 @login_required
 def generate_analytics_report():
+    api_key = request.headers.get('X-Api-Key')
+    if not api_key:
+        return jsonify(create_error_response('未提供 API 金鑰', [{'loc': ['header', 'X-Api-Key'], 'msg': '必須包含 X-Api-Key'}])), 401
+
     try:
         payload = AnalyticsReportRequestModel(**request.get_json())
     except ValidationError as exc:
         return jsonify(create_error_response('請求資料驗證失敗', exc.errors())), 400
 
     data = payload.model_dump()
-    api_key = data.pop('api_key')
     filters = _format_filters(data.get('filters', {}))
     cohort_summary = _format_cohort_rows(data.get('cohort', []))
     cost_benefit_summary = _format_cost_benefit(data.get('cost_benefit', {}))

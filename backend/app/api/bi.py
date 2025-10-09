@@ -107,12 +107,10 @@ def _cohort_analysis(payload: dict) -> dict:
 
     dimension_exprs = []
     dimension_labels = []
-    group_by_columns = []
     for dimension in request_model.cohort_by:
-        expr = _dimension_expression(Sheep, dimension)
-        dimension_exprs.append(expr.label(dimension))
+        expr = _dimension_expression(Sheep, dimension).label(dimension)
+        dimension_exprs.append(expr)
         dimension_labels.append(dimension)
-        group_by_columns.append(expr)
 
     sheep_query = select(
         *dimension_exprs,
@@ -121,14 +119,9 @@ def _cohort_analysis(payload: dict) -> dict:
         func.avg(Sheep.milk_yield_kg_day).label('avg_milk'),
     ).where(Sheep.user_id == current_user.id)
     sheep_query = _apply_sheep_filters(sheep_query, request_model.filters)
-    if group_by_columns:
-        sheep_query = sheep_query.group_by(*group_by_columns)
-
-    sheep_rows = db.session.execute(sheep_query).all()
-    if not sheep_rows:
-        result = {'items': [], 'metrics': request_model.metrics}
-        set_bi_cache(current_user.id, wrapped_payload, result)
-        return {'data': result, 'status': 200}
+    if dimension_exprs:
+        sheep_query = sheep_query.group_by(*dimension_exprs)
+    sheep_subquery = sheep_query.subquery('sheep_cohort')
 
     cost_group_exprs = [
         _dimension_expression(CostEntry, dimension).label(dimension) for dimension in request_model.cohort_by
@@ -138,9 +131,9 @@ def _cohort_analysis(payload: dict) -> dict:
         func.sum(CostEntry.amount).label('total_cost'),
     )
     cost_query = _apply_finance_filters(cost_query, CostEntry, request_model.filters, request_model.time_range)
-    if request_model.cohort_by:
-        cost_query = cost_query.group_by(*[_dimension_expression(CostEntry, d) for d in request_model.cohort_by])
-    cost_rows = {tuple(row[:len(request_model.cohort_by)]): row[-1] for row in db.session.execute(cost_query).all()}
+    if cost_group_exprs:
+        cost_query = cost_query.group_by(*cost_group_exprs)
+    cost_subquery = cost_query.subquery('cost_cohort')
 
     revenue_group_exprs = [
         _dimension_expression(RevenueEntry, dimension).label(dimension) for dimension in request_model.cohort_by
@@ -150,12 +143,49 @@ def _cohort_analysis(payload: dict) -> dict:
         func.sum(RevenueEntry.amount).label('total_revenue'),
     )
     revenue_query = _apply_finance_filters(revenue_query, RevenueEntry, request_model.filters, request_model.time_range)
-    if request_model.cohort_by:
-        revenue_query = revenue_query.group_by(*[_dimension_expression(RevenueEntry, d) for d in request_model.cohort_by])
-    revenue_rows = {tuple(row[:len(request_model.cohort_by)]): row[-1] for row in db.session.execute(revenue_query).all()}
+    if revenue_group_exprs:
+        revenue_query = revenue_query.group_by(*revenue_group_exprs)
+    revenue_subquery = revenue_query.subquery('revenue_cohort')
+
+    join_condition_cost = (
+        and_(*[sheep_subquery.c[label] == cost_subquery.c[label] for label in dimension_labels])
+        if dimension_labels
+        else literal(True)
+    )
+    join_condition_revenue = (
+        and_(*[sheep_subquery.c[label] == revenue_subquery.c[label] for label in dimension_labels])
+        if dimension_labels
+        else literal(True)
+    )
+
+    select_columns = [sheep_subquery.c[label] for label in dimension_labels]
+    select_columns.extend(
+        [
+            sheep_subquery.c.sheep_count,
+            sheep_subquery.c.avg_weight,
+            sheep_subquery.c.avg_milk,
+            cost_subquery.c.total_cost,
+            revenue_subquery.c.total_revenue,
+        ]
+    )
+
+    final_query = (
+        select(*select_columns)
+        .select_from(
+            sheep_subquery.outerjoin(cost_subquery, join_condition_cost).outerjoin(
+                revenue_subquery, join_condition_revenue
+            )
+        )
+    )
+
+    rows = db.session.execute(final_query).all()
+    if not rows:
+        result = {'items': [], 'metrics': request_model.metrics}
+        set_bi_cache(current_user.id, wrapped_payload, result)
+        return {'data': result, 'status': 200}
 
     response_items = []
-    for row in sheep_rows:
+    for row in rows:
         mapping = getattr(row, '_mapping', row)
         group_key_raw = [mapping[label] for label in dimension_labels]
         normalized_key = []
@@ -166,12 +196,11 @@ def _cohort_analysis(payload: dict) -> dict:
                 normalized_key.append(None)
             else:
                 normalized_key.append(value)
-        group_key = tuple(group_key_raw)
         sheep_count = mapping['sheep_count'] or 0
         avg_weight = mapping['avg_weight']
         avg_milk = mapping['avg_milk']
-        total_cost = cost_rows.get(group_key, Decimal('0'))
-        total_revenue = revenue_rows.get(group_key, Decimal('0'))
+        total_cost = mapping['total_cost'] or Decimal('0')
+        total_revenue = mapping['total_revenue'] or Decimal('0')
         net_profit = total_revenue - total_cost
         cost_per_head = (total_cost / sheep_count) if sheep_count else None
         revenue_per_head = (total_revenue / sheep_count) if sheep_count else None
@@ -238,7 +267,7 @@ def _cost_benefit(payload: dict) -> dict:
     cost_query = _apply_finance_filters(cost_query, CostEntry, request_model.filters, request_model.time_range)
     if group_expr_cost:
         cost_query = cost_query.group_by(*group_expr_cost)
-    cost_rows = db.session.execute(cost_query).all()
+    cost_subquery = cost_query.subquery('cost_benefit')
 
     group_expr_revenue = _time_group_expression(RevenueEntry, request_model.group_by)
     revenue_query = select(
@@ -249,47 +278,101 @@ def _cost_benefit(payload: dict) -> dict:
     revenue_query = _apply_finance_filters(revenue_query, RevenueEntry, request_model.filters, request_model.time_range)
     if group_expr_revenue:
         revenue_query = revenue_query.group_by(*group_expr_revenue)
-    revenue_rows = db.session.execute(revenue_query).all()
+    revenue_subquery = revenue_query.subquery('revenue_benefit')
 
-    # 統整資料
-    grouped = {}
-    for row in cost_rows:
-        mapping = getattr(row, '_mapping', row)
-        key = tuple(row[:-2]) if request_model.group_by != 'none' else ('總計',)
-        grouped.setdefault(key, {'total_cost': Decimal('0'), 'total_revenue': Decimal('0'), 'sheep': 0})
-        grouped[key]['total_cost'] = mapping['total_cost'] or Decimal('0')
-        grouped[key]['sheep'] = max(grouped[key]['sheep'], mapping['sheep_incurred'] or 0)
-    for row in revenue_rows:
-        mapping = getattr(row, '_mapping', row)
-        key = tuple(row[:-2]) if request_model.group_by != 'none' else ('總計',)
-        grouped.setdefault(key, {'total_cost': Decimal('0'), 'total_revenue': Decimal('0'), 'sheep': 0})
-        grouped[key]['total_revenue'] = mapping['total_revenue'] or Decimal('0')
-        grouped[key]['sheep'] = max(grouped[key]['sheep'], mapping['sheep_served'] or 0)
-
-    summary = {'total_cost': 0.0, 'total_revenue': 0.0, 'net_profit': 0.0}
-    items = []
-    for key, aggregate in grouped.items():
-        total_cost = aggregate['total_cost']
-        total_revenue = aggregate['total_revenue']
-        sheep_count = aggregate['sheep']
+    if request_model.group_by == 'none':
+        cost_row = db.session.execute(cost_query).first()
+        revenue_row = db.session.execute(revenue_query).first()
+        total_cost = (cost_row._mapping['total_cost'] if cost_row else None) or Decimal('0')
+        total_revenue = (revenue_row._mapping['total_revenue'] if revenue_row else None) or Decimal('0')
+        sheep_count = max(
+            (cost_row._mapping['sheep_incurred'] if cost_row else 0) or 0,
+            (revenue_row._mapping['sheep_served'] if revenue_row else 0) or 0,
+        )
         net_profit = total_revenue - total_cost
-        summary['total_cost'] += float(total_cost)
-        summary['total_revenue'] += float(total_revenue)
-        summary['net_profit'] += float(net_profit)
+        summary_decimal = {
+            'total_cost': total_cost,
+            'total_revenue': total_revenue,
+            'net_profit': net_profit,
+        }
+        summary = {key: float(value) for key, value in summary_decimal.items()}
+        item_metrics = {
+            'total_cost': _serialize_decimal(total_cost),
+            'total_revenue': _serialize_decimal(total_revenue),
+            'net_profit': _serialize_decimal(net_profit),
+        }
+        if 'avg_cost_per_head' in request_model.metrics:
+            item_metrics['avg_cost_per_head'] = _serialize_decimal((total_cost / sheep_count) if sheep_count else None)
+        if 'avg_revenue_per_head' in request_model.metrics:
+            item_metrics['avg_revenue_per_head'] = _serialize_decimal((total_revenue / sheep_count) if sheep_count else None)
+        items = [
+            {
+                'group': '總計',
+                'metrics': item_metrics,
+            }
+        ] if (total_cost or total_revenue or sheep_count) else []
+    else:
+        group_labels = [expr.name for expr in group_expr_cost] or [expr.name for expr in group_expr_revenue]
+        groups_query = select(*[cost_subquery.c[label] for label in group_labels]).select_from(cost_subquery)
+        groups_query = groups_query.union(
+            select(*[revenue_subquery.c[label] for label in group_labels]).select_from(revenue_subquery)
+        )
+        groups_subquery = groups_query.subquery('benefit_groups')
 
-        item = {
-            'group': key[0] if request_model.group_by != 'none' else '總計',
-            'metrics': {
+        join_condition_cost = and_(
+            *[groups_subquery.c[label] == cost_subquery.c[label] for label in group_labels]
+        )
+        join_condition_revenue = and_(
+            *[groups_subquery.c[label] == revenue_subquery.c[label] for label in group_labels]
+        )
+
+        final_query = (
+            select(
+                *[groups_subquery.c[label] for label in group_labels],
+                cost_subquery.c.total_cost,
+                revenue_subquery.c.total_revenue,
+                cost_subquery.c.sheep_incurred,
+                revenue_subquery.c.sheep_served,
+            )
+            .select_from(
+                groups_subquery.outerjoin(cost_subquery, join_condition_cost).outerjoin(
+                    revenue_subquery, join_condition_revenue
+                )
+            )
+            .order_by(*[groups_subquery.c[label] for label in group_labels])
+        )
+        rows = db.session.execute(final_query).all()
+
+        summary_decimal = {
+            'total_cost': Decimal('0'),
+            'total_revenue': Decimal('0'),
+            'net_profit': Decimal('0'),
+        }
+        items = []
+        for row in rows:
+            mapping = getattr(row, '_mapping', row)
+            total_cost = mapping['total_cost'] or Decimal('0')
+            total_revenue = mapping['total_revenue'] or Decimal('0')
+            sheep_count = max(mapping['sheep_incurred'] or 0, mapping['sheep_served'] or 0)
+            net_profit = total_revenue - total_cost
+            summary_decimal['total_cost'] += total_cost
+            summary_decimal['total_revenue'] += total_revenue
+            summary_decimal['net_profit'] += net_profit
+
+            group_values = [mapping[label] for label in group_labels]
+            group_display = ' / '.join('未指定' if value in (None, '未填寫') else str(value) for value in group_values)
+            metrics = {
                 'total_cost': _serialize_decimal(total_cost),
                 'total_revenue': _serialize_decimal(total_revenue),
                 'net_profit': _serialize_decimal(net_profit),
             }
-        }
-        if 'avg_cost_per_head' in request_model.metrics:
-            item['metrics']['avg_cost_per_head'] = _serialize_decimal((total_cost / sheep_count) if sheep_count else None)
-        if 'avg_revenue_per_head' in request_model.metrics:
-            item['metrics']['avg_revenue_per_head'] = _serialize_decimal((total_revenue / sheep_count) if sheep_count else None)
-        items.append(item)
+            if 'avg_cost_per_head' in request_model.metrics:
+                metrics['avg_cost_per_head'] = _serialize_decimal((total_cost / sheep_count) if sheep_count else None)
+            if 'avg_revenue_per_head' in request_model.metrics:
+                metrics['avg_revenue_per_head'] = _serialize_decimal((total_revenue / sheep_count) if sheep_count else None)
+            items.append({'group': group_display, 'metrics': metrics})
+
+        summary = {key: float(value) for key, value in summary_decimal.items()}
 
     result = {
         'summary': summary,

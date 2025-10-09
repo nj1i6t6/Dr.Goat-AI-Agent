@@ -26,17 +26,27 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   const _inflight = reactive(new Map())
   const _lastRequested = reactive(new Map())
 
+  const costBenefitSummary = computed(() => costBenefitResult.value?.summary || {})
+
   const kpiCards = computed(() => {
-    if (!costBenefitResult.value) return []
-    const summary = costBenefitResult.value.summary || {}
+    const summary = costBenefitSummary.value
+    const totalCost = Number(summary.total_cost ?? 0)
+    const totalRevenue = Number(summary.total_revenue ?? 0)
+    const netProfit = Number(summary.net_profit ?? 0)
+    const ratio = totalCost ? totalRevenue / totalCost : null
+
     return [
-      { label: '總成本', value: summary.total_cost ?? 0, unit: 'TWD' },
-      { label: '總收益', value: summary.total_revenue ?? 0, unit: 'TWD' },
-      { label: '淨收益', value: summary.net_profit ?? 0, unit: 'TWD' },
+      { label: '總成本', value: totalCost, unit: 'TWD' },
+      { label: '總收益', value: totalRevenue, unit: 'TWD' },
+      { label: '淨收益', value: netProfit, unit: 'TWD' },
+      { label: '成本收益比', value: ratio, unit: 'x' },
     ]
   })
 
   const cohortHasData = computed(() => Array.isArray(cohortResult.value?.items) && cohortResult.value.items.length > 0)
+  const costBenefitHasData = computed(
+    () => Array.isArray(costBenefitResult.value?.items) && costBenefitResult.value.items.length > 0
+  )
 
   const _throttledRequest = async (endpoint, payload, requestFn, force = false) => {
     const key = serializeKey(endpoint, payload)
@@ -147,11 +157,11 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     revenueEntries.value = revenueEntries.value.filter((item) => item.id !== id)
   }
 
-  const generateReport = async (payload) => {
+  const generateReport = async ({ apiKey, ...payload }) => {
     loading.report = true
     error.value = null
     try {
-      const data = await api.generateAnalyticsReport(payload, (err) => (error.value = err.message))
+      const data = await api.generateAnalyticsReport(payload, apiKey, (err) => (error.value = err.message))
       reportState.html = data.report_html
       reportState.markdown = data.report_markdown
       return data
@@ -175,6 +185,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     error,
     kpiCards,
     cohortHasData,
+    costBenefitHasData,
     loadCostEntries,
     loadRevenueEntries,
     fetchCohortAnalysis,

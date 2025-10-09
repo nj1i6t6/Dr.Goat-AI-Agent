@@ -212,8 +212,9 @@ export default {
   runCostBenefit(payload, errorHandler) {
     return withErrorHandling(() => apiClient.post('/api/bi/cost-benefit', payload), errorHandler);
   },
-  generateAnalyticsReport(payload, errorHandler) {
-    return withErrorHandling(() => apiClient.post('/api/agent/analytics-report', payload), errorHandler);
+  generateAnalyticsReport(payload, apiKey, errorHandler) {
+    const config = apiKey ? { headers: { 'X-Api-Key': apiKey } } : {};
+    return withErrorHandling(() => apiClient.post('/api/agent/analytics-report', payload, config), errorHandler);
   },
 
   // 資料管理 API

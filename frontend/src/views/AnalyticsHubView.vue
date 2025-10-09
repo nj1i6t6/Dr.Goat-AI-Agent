@@ -8,9 +8,6 @@
           <template #header>
             <div class="card-header">
               <span>分析篩選條件</span>
-              <el-button type="primary" :loading="store.loading.cohort || store.loading.costBenefit" @click="runAnalysis">
-                更新分析
-              </el-button>
             </div>
           </template>
           <el-form label-width="90px" :model="filters" class="filters-form">
@@ -60,6 +57,16 @@
           </el-form>
         </el-card>
 
+        <el-alert
+          v-if="store.error"
+          class="error-alert"
+          type="error"
+          show-icon
+          :closable="false"
+        >
+          {{ store.error }}
+        </el-alert>
+
         <el-row :gutter="16" class="kpi-row">
           <el-col v-for="card in store.kpiCards" :key="card.label" :lg="8" :md="12" :sm="12" :xs="24">
             <el-card shadow="hover" class="kpi-card">
@@ -73,10 +80,16 @@
           <template #header>
             <div class="card-header">
               <span>分群淨收益</span>
-              <el-tag v-if="!store.cohortHasData" type="info" effect="plain">尚無資料</el-tag>
             </div>
           </template>
-          <div ref="cohortChartRef" class="chart-container"></div>
+          <div v-if="store.cohortHasData" ref="cohortChartRef" class="chart-container"></div>
+          <div v-else class="empty-wrapper">
+            <el-empty description="尚無資料">
+              <template #extra>
+                <el-button type="primary" @click="scrollToFinanceForms('cost')">前往新增成本紀錄</el-button>
+              </template>
+            </el-empty>
+          </div>
         </el-card>
 
         <el-card class="chart-card" shadow="never">
@@ -85,70 +98,79 @@
               <span>成本 / 收益趨勢</span>
             </div>
           </template>
-          <div ref="costBenefitChartRef" class="chart-container"></div>
+          <div v-if="store.costBenefitHasData" ref="costBenefitChartRef" class="chart-container"></div>
+          <div v-else class="empty-wrapper">
+            <el-empty description="尚無資料">
+              <template #extra>
+                <el-button type="primary" @click="scrollToFinanceForms('revenue')">前往新增收益紀錄</el-button>
+              </template>
+            </el-empty>
+          </div>
         </el-card>
       </el-col>
 
       <el-col :lg="6" :md="24">
-        <el-card class="form-card" shadow="never">
-          <template #header>
-            <span>新增成本紀錄</span>
-          </template>
-          <el-form ref="costFormRef" :model="costForm" :rules="financeRules" label-width="90px">
-            <el-form-item label="日期" prop="recorded_at">
-              <el-date-picker v-model="costForm.recorded_at" type="date" value-format="YYYY-MM-DD" placeholder="選擇日期" />
-            </el-form-item>
-            <el-form-item label="分類" prop="category">
-              <el-input v-model="costForm.category" placeholder="例如：feed" />
-            </el-form-item>
-            <el-form-item label="金額" prop="amount">
-              <el-input-number v-model="costForm.amount" :min="0" :precision="2" />
-            </el-form-item>
-            <el-form-item label="備註">
-              <el-input v-model="costForm.notes" type="textarea" :rows="2" />
-            </el-form-item>
-            <el-button type="primary" :loading="store.loading.costEntries" @click="submitCostForm">新增成本</el-button>
-          </el-form>
-        </el-card>
+        <div ref="financeSectionRef" class="finance-section">
+          <el-card class="form-card" shadow="never">
+            <template #header>
+              <span>新增成本紀錄</span>
+            </template>
+            <el-form ref="costFormRef" :model="costForm" :rules="financeRules" label-width="90px">
+              <el-form-item label="日期" prop="recorded_at">
+                <el-date-picker v-model="costForm.recorded_at" type="date" value-format="YYYY-MM-DD" placeholder="選擇日期" />
+              </el-form-item>
+              <el-form-item label="分類" prop="category">
+                <el-input v-model="costForm.category" placeholder="例如：feed" />
+              </el-form-item>
+              <el-form-item label="金額" prop="amount">
+                <el-input-number v-model="costForm.amount" :min="0" :precision="2" />
+              </el-form-item>
+              <el-form-item label="備註">
+                <el-input v-model="costForm.notes" type="textarea" :rows="2" />
+              </el-form-item>
+              <el-button type="primary" :loading="store.loading.costEntries" @click="submitCostForm">新增成本</el-button>
+            </el-form>
+          </el-card>
 
-        <el-card class="form-card" shadow="never">
-          <template #header>
-            <span>新增收益紀錄</span>
-          </template>
-          <el-form ref="revenueFormRef" :model="revenueForm" :rules="financeRules" label-width="90px">
-            <el-form-item label="日期" prop="recorded_at">
-              <el-date-picker v-model="revenueForm.recorded_at" type="date" value-format="YYYY-MM-DD" placeholder="選擇日期" />
-            </el-form-item>
-            <el-form-item label="分類" prop="category">
-              <el-input v-model="revenueForm.category" placeholder="例如：milk" />
-            </el-form-item>
-            <el-form-item label="金額" prop="amount">
-              <el-input-number v-model="revenueForm.amount" :min="0" :precision="2" />
-            </el-form-item>
-            <el-form-item label="備註">
-              <el-input v-model="revenueForm.notes" type="textarea" :rows="2" />
-            </el-form-item>
-            <el-button type="success" :loading="store.loading.revenueEntries" @click="submitRevenueForm">新增收益</el-button>
-          </el-form>
-        </el-card>
+          <el-card class="form-card" shadow="never">
+            <template #header>
+              <span>新增收益紀錄</span>
+            </template>
+            <el-form ref="revenueFormRef" :model="revenueForm" :rules="financeRules" label-width="90px">
+              <el-form-item label="日期" prop="recorded_at">
+                <el-date-picker v-model="revenueForm.recorded_at" type="date" value-format="YYYY-MM-DD" placeholder="選擇日期" />
+              </el-form-item>
+              <el-form-item label="分類" prop="category">
+                <el-input v-model="revenueForm.category" placeholder="例如：milk" />
+              </el-form-item>
+              <el-form-item label="金額" prop="amount">
+                <el-input-number v-model="revenueForm.amount" :min="0" :precision="2" />
+              </el-form-item>
+              <el-form-item label="備註">
+                <el-input v-model="revenueForm.notes" type="textarea" :rows="2" />
+              </el-form-item>
+              <el-button type="success" :loading="store.loading.revenueEntries" @click="submitRevenueForm">新增收益</el-button>
+            </el-form>
+          </el-card>
 
-        <el-card class="form-card" shadow="never">
-          <template #header>
-            <span>AI 報告</span>
-          </template>
-          <el-form label-width="80px">
-            <el-form-item label="API Key">
-              <el-input v-model="reportApiKey" placeholder="輸入 X-Api-Key" />
-            </el-form-item>
-            <el-form-item label="備註">
-              <el-input v-model="reportNotes" type="textarea" :rows="2" placeholder="可選的補充說明" />
-            </el-form-item>
-            <el-button type="primary" :loading="store.loading.report" @click="generateReport">產生報告</el-button>
-            <el-button class="mt-2" text type="primary" :disabled="!store.reportState.markdown" @click="copyReport">複製 Markdown</el-button>
-            <el-button class="mt-2" text type="primary" :disabled="!store.reportState.markdown" @click="downloadReport">下載報告</el-button>
-          </el-form>
-          <div v-if="store.reportState.html" class="report-preview" v-html="store.reportState.html"></div>
-        </el-card>
+          <el-card class="form-card" shadow="never">
+            <template #header>
+              <span>AI 報告</span>
+            </template>
+            <el-form label-width="80px">
+              <el-form-item label="API Key">
+                <el-input v-model="reportApiKey" placeholder="輸入 X-Api-Key" />
+              </el-form-item>
+              <el-form-item label="備註">
+                <el-input v-model="reportNotes" type="textarea" :rows="2" placeholder="可選的補充說明" />
+              </el-form-item>
+              <el-text class="helper-text" size="small">使用下方浮動按鈕即可即時產生報告</el-text>
+              <el-button class="mt-2" text type="primary" :disabled="!store.reportState.markdown" @click="copyReport">複製 Markdown</el-button>
+              <el-button class="mt-2" text type="primary" :disabled="!store.reportState.markdown" @click="downloadReport">下載報告</el-button>
+            </el-form>
+            <div v-if="store.reportState.html" class="report-preview" v-html="store.reportState.html"></div>
+          </el-card>
+        </div>
       </el-col>
     </el-row>
 
@@ -168,6 +190,13 @@
                 <el-button type="danger" size="small" link @click="store.removeCostEntry(scope.row.id)">刪除</el-button>
               </template>
             </el-table-column>
+            <template #empty>
+              <el-empty description="尚無資料">
+                <template #extra>
+                  <el-button type="primary" @click="scrollToFinanceForms('cost')">前往新增成本紀錄</el-button>
+                </template>
+              </el-empty>
+            </template>
           </el-table>
         </el-card>
       </el-col>
@@ -186,10 +215,47 @@
                 <el-button type="danger" size="small" link @click="store.removeRevenueEntry(scope.row.id)">刪除</el-button>
               </template>
             </el-table-column>
+            <template #empty>
+              <el-empty description="尚無資料">
+                <template #extra>
+                  <el-button type="success" @click="scrollToFinanceForms('revenue')">前往新增收益紀錄</el-button>
+                </template>
+              </el-empty>
+            </template>
           </el-table>
         </el-card>
       </el-col>
     </el-row>
+
+    <div class="floating-actions">
+      <el-button-group>
+        <el-button
+          class="fab-button"
+          type="primary"
+          :loading="store.loading.cohort || store.loading.costBenefit"
+          @click="runAnalysis"
+        >
+          重新分析
+        </el-button>
+        <el-button
+          class="fab-button"
+          type="info"
+          :disabled="!store.costBenefitHasData && !(store.costBenefitResult?.summary)"
+          @click="exportCostBenefitCsv"
+        >
+          匯出 CSV
+        </el-button>
+        <el-button
+          class="fab-button"
+          type="success"
+          :loading="store.loading.report"
+          :disabled="!reportApiKey"
+          @click="generateReport"
+        >
+          產生報告
+        </el-button>
+      </el-button-group>
+    </div>
   </div>
 </template>
 
@@ -254,9 +320,24 @@ const revenueForm = reactive({
 let cohortChartInstance = null
 let costBenefitChartInstance = null
 
+const financeSectionRef = ref(null)
+
 const formatNumber = (value) => {
   if (value == null) return '—'
   return new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(value)
+}
+
+const formatGroupLabel = (item) => {
+  const dims = Object.entries(item || {}).filter(([key]) => key !== 'metrics')
+  if (!dims.length) return '全部'
+  return dims
+    .map(([key, value]) => {
+      if (value == null || value === '未填寫') {
+        return `${key}:未指定`
+      }
+      return `${key}:${value}`
+    })
+    .join(' / ')
 }
 
 const runAnalysis = async () => {
@@ -312,14 +393,20 @@ const submitRevenueForm = () => {
 }
 
 const renderCohortChart = () => {
-  if (!cohortChartRef.value) return
+  if (!cohortChartRef.value || !store.cohortHasData) {
+    if (cohortChartInstance) {
+      cohortChartInstance.dispose()
+      cohortChartInstance = null
+    }
+    return
+  }
   if (cohortChartInstance) {
     cohortChartInstance.dispose()
   }
   cohortChartInstance = echarts.init(cohortChartRef.value)
   const items = store.cohortResult?.items || []
-  const categories = items.map((item) => item.breed || item.production_stage || '未指定')
-  const profits = items.map((item) => item.metrics?.net_profit ?? 0)
+  const categories = items.map((item) => formatGroupLabel(item))
+  const profits = items.map((item) => Number(item.metrics?.net_profit ?? 0))
   cohortChartInstance.setOption({
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: categories },
@@ -336,7 +423,13 @@ const renderCohortChart = () => {
 }
 
 const renderCostBenefitChart = () => {
-  if (!costBenefitChartRef.value) return
+  if (!costBenefitChartRef.value || !store.costBenefitHasData) {
+    if (costBenefitChartInstance) {
+      costBenefitChartInstance.dispose()
+      costBenefitChartInstance = null
+    }
+    return
+  }
   if (costBenefitChartInstance) {
     costBenefitChartInstance.dispose()
   }
@@ -367,18 +460,88 @@ const generateReport = async () => {
     ElMessage.warning('請先填寫 API Key')
     return
   }
+  const reportFilters = {}
+  if (filters.categories.length) {
+    reportFilters.category = [...filters.categories]
+  }
+  if (filters.timeRange?.length === 2) {
+    reportFilters.time_range = `${filters.timeRange[0]} 至 ${filters.timeRange[1]}`
+  }
   await store.generateReport({
-    api_key: reportApiKey.value,
-    filters: {
-      cohort_by: filters.cohortBy,
-      metrics: filters.metrics,
-      categories: filters.categories,
-    },
+    apiKey: reportApiKey.value,
+    filters: reportFilters,
     cohort: store.cohortResult?.items || [],
     cost_benefit: store.costBenefitResult || {},
     insights: reportNotes.value ? [reportNotes.value] : [],
   })
   ElMessage.success('AI 報告已產生')
+}
+
+const scrollToFinanceForms = (target = 'cost') => {
+  if (financeSectionRef.value) {
+    financeSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  nextTick(() => {
+    const formEl = target === 'cost' ? costFormRef.value?.$el : revenueFormRef.value?.$el
+    const input = formEl?.querySelector('input')
+    input?.focus()
+  })
+}
+
+const exportCostBenefitCsv = () => {
+  const analysis = store.costBenefitResult
+  const summary = analysis?.summary
+  const items = analysis?.items || []
+  if ((!items.length) && !summary) {
+    ElMessage.warning('目前沒有可匯出的分析資料')
+    return
+  }
+
+  const formatCsvNumber = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return ''
+    }
+    return Number(value).toFixed(2)
+  }
+
+  const rows = [['群組', '總成本', '總收益', '淨收益', '成本收益比']]
+  items.forEach((item) => {
+    const metrics = item.metrics || {}
+    const totalCost = Number(metrics.total_cost ?? 0)
+    const totalRevenue = Number(metrics.total_revenue ?? 0)
+    const netProfit = Number(metrics.net_profit ?? 0)
+    const ratio = totalCost ? totalRevenue / totalCost : null
+    rows.push([
+      `"${item.group}"`,
+      formatCsvNumber(totalCost),
+      formatCsvNumber(totalRevenue),
+      formatCsvNumber(netProfit),
+      ratio === null ? '' : formatCsvNumber(ratio),
+    ])
+  })
+  if (summary) {
+    const totalCost = Number(summary.total_cost ?? 0)
+    const totalRevenue = Number(summary.total_revenue ?? 0)
+    const netProfit = Number(summary.net_profit ?? 0)
+    const ratio = totalCost ? totalRevenue / totalCost : null
+    rows.push([
+      '"總計"',
+      formatCsvNumber(totalCost),
+      formatCsvNumber(totalRevenue),
+      formatCsvNumber(netProfit),
+      ratio === null ? '' : formatCsvNumber(ratio),
+    ])
+  }
+
+  const csvContent = rows.map((row) => row.join(',')).join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `cost-benefit-${Date.now()}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('已匯出成本收益 CSV')
 }
 
 const copyReport = async () => {
@@ -453,6 +616,10 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+.error-alert {
+  margin-bottom: 12px;
+}
+
 .kpi-row {
   margin-bottom: 16px;
 }
@@ -492,6 +659,17 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
 }
 
+.finance-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.helper-text {
+  display: block;
+  color: #64748b;
+}
+
 .report-preview {
   margin-top: 12px;
   padding: 12px;
@@ -499,6 +677,10 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   max-height: 280px;
   overflow: auto;
+}
+
+.empty-wrapper {
+  padding: 32px 0;
 }
 
 .tables-row {
@@ -511,9 +693,26 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.floating-actions {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+}
+
+.fab-button {
+  min-width: 120px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+}
+
 @media (max-width: 768px) {
   .chart-container {
     height: 260px;
+  }
+
+  .floating-actions {
+    right: 16px;
+    bottom: 16px;
   }
 }
 </style>

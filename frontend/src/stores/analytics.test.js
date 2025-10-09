@@ -51,8 +51,12 @@ describe('analytics store', () => {
 
   it('stores report output', async () => {
     const store = useAnalyticsStore()
-    await store.generateReport({ api_key: 'key' })
+    await store.generateReport({ apiKey: 'key', filters: { category: ['feed'] } })
     expect(store.reportState.html).toContain('<p>ok</p>')
-    expect(apiMock.generateAnalyticsReport).toHaveBeenCalledWith({ api_key: 'key' }, expect.any(Function))
+    expect(apiMock.generateAnalyticsReport).toHaveBeenCalledWith(
+      { filters: { category: ['feed'] } },
+      'key',
+      expect.any(Function)
+    )
   })
 })

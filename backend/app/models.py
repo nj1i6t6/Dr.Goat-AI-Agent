@@ -5,6 +5,7 @@ from flask import current_app
 from datetime import datetime
 import hashlib
 import hmac
+from sqlalchemy.ext.declarative import declared_attr
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -189,7 +190,9 @@ class SheepHistoricalData(db.Model):
         return f'<HistoricalData {self.record_type}:{self.value} for SheepID:{self.sheep_id}>'
 
 
-class CostEntry(db.Model):
+class FinanceEntryMixin:
+    __abstract__ = True
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     sheep_id = db.Column(db.Integer, db.ForeignKey('sheep.id', ondelete='SET NULL'))
@@ -212,47 +215,25 @@ class CostEntry(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    __table_args__ = (
-        db.Index('ix_cost_entry_user_recorded', 'user_id', 'recorded_at'),
-        db.Index('ix_cost_entry_user_category', 'user_id', 'category'),
-        db.Index('ix_cost_entry_user_breed', 'user_id', 'breed'),
-    )
+    @declared_attr
+    def __table_args__(cls):  # type: ignore[override]
+        base_name = cls.__tablename__
+        return (
+            db.Index(f'ix_{base_name}_user_recorded', 'user_id', 'recorded_at'),
+            db.Index(f'ix_{base_name}_user_category', 'user_id', 'category'),
+            db.Index(f'ix_{base_name}_user_breed', 'user_id', 'breed'),
+        )
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
-class RevenueEntry(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    sheep_id = db.Column(db.Integer, db.ForeignKey('sheep.id', ondelete='SET NULL'))
+class CostEntry(FinanceEntryMixin, db.Model):
+    pass
 
-    recorded_at = db.Column(db.DateTime, nullable=False, index=True)
-    category = db.Column(db.String(100), nullable=False)
-    subcategory = db.Column(db.String(100))
-    label = db.Column(db.String(150))
-    amount = db.Column(db.Numeric(14, 2), nullable=False)
-    currency = db.Column(db.String(8), default='TWD')
 
-    breed = db.Column(db.String(100))
-    age_months = db.Column(db.Integer)
-    lactation_number = db.Column(db.Integer)
-    production_stage = db.Column(db.String(100))
-
-    notes = db.Column(db.Text)
-    extra_metadata = db.Column(db.JSON, default=dict)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    __table_args__ = (
-        db.Index('ix_revenue_entry_user_recorded', 'user_id', 'recorded_at'),
-        db.Index('ix_revenue_entry_user_category', 'user_id', 'category'),
-        db.Index('ix_revenue_entry_user_breed', 'user_id', 'breed'),
-    )
-
-    def to_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+class RevenueEntry(FinanceEntryMixin, db.Model):
+    pass
 
 
 class ChatHistory(db.Model):
