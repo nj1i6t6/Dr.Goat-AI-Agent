@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set
+
+from sqlalchemy import or_, select
+from sqlalchemy.exc import InvalidRequestError
 
 from app import db
 from app.models import ProductBatch, ProcessingStep, SheepEvent, VerifiableLog
@@ -13,7 +16,6 @@ from .hash_service import HashService
 
 
 LEDGER_VERIFICATION_BATCH_SIZE = 200
-RECENT_LOOKUP_PAGE_SIZE = 200
 
 
 def append_event(
@@ -29,27 +31,42 @@ def append_event(
     payload["metadata"] = normalise_json_payload(payload.get("metadata") or {})
     timestamp = datetime.utcnow()
 
-    previous_entry = _lock_current_tail()
-    previous_hash = previous_entry.current_hash if previous_entry else None
+    session = db.session()
 
-    hash_payload = {
-        "entity_type": entity_type,
-        "entity_id": entity_id,
-        "event_data": payload,
-        "timestamp": timestamp.isoformat(timespec="microseconds"),
-    }
-    current_hash = HashService.generate_hash(previous_hash, hash_payload)
+    def _append() -> VerifiableLog:
+        previous_entry = _lock_current_tail()
+        previous_hash = previous_entry.current_hash if previous_entry else None
 
-    entry = VerifiableLog(
-        entity_type=entity_type,
-        entity_id=entity_id,
-        event_data=payload,
-        timestamp=timestamp,
-        previous_hash=previous_hash,
-        current_hash=current_hash,
-    )
-    db.session.add(entry)
-    db.session.flush()
+        hash_payload = {
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "event_data": payload,
+            "timestamp": timestamp.isoformat(timespec="microseconds"),
+        }
+        current_hash = HashService.generate_hash(previous_hash, hash_payload)
+
+        entry = VerifiableLog(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            event_data=payload,
+            timestamp=timestamp,
+            previous_hash=previous_hash,
+            current_hash=current_hash,
+        )
+        session.add(entry)
+        session.flush()
+        return entry
+
+    if session.in_transaction():
+        entry = _append()
+    else:
+        try:
+            with session.begin():
+                entry = _append()
+        except InvalidRequestError:
+            with session.begin_nested():
+                entry = _append()
+
     return entry
 
 
@@ -139,41 +156,42 @@ def recent_entries(limit: int = 100, *, user_id: int) -> List[Dict[str, Any]]:
     """Return the most recent log entries visible to the user in chronological order."""
 
     limit = max(limit, 1)
-    collected: List[VerifiableLog] = []
-    last_seen_id: Optional[int] = None
 
-    while len(collected) < limit:
-        query = VerifiableLog.query.order_by(VerifiableLog.id.desc())
-        if last_seen_id is not None:
-            query = query.filter(VerifiableLog.id < last_seen_id)
-        chunk = query.limit(RECENT_LOOKUP_PAGE_SIZE).all()
-        if not chunk:
-            break
+    conditions = []
 
-        accessible = _filter_entries_for_user(chunk, user_id)
-        collected.extend(accessible)
-        last_seen_id = chunk[-1].id
+    product_batch_ids = select(ProductBatch.id).where(ProductBatch.user_id == user_id)
+    conditions.append(
+        (VerifiableLog.entity_type == "product_batch")
+        & VerifiableLog.entity_id.in_(product_batch_ids)
+    )
 
-    trimmed = collected[:limit]
-    return [serialize_entry(entry) for entry in reversed(trimmed)]
+    processing_step_ids = (
+        select(ProcessingStep.id)
+        .join(ProductBatch, ProcessingStep.batch_id == ProductBatch.id)
+        .where(ProductBatch.user_id == user_id)
+    )
+    conditions.append(
+        (VerifiableLog.entity_type == "processing_step")
+        & VerifiableLog.entity_id.in_(processing_step_ids)
+    )
 
+    sheep_event_ids = select(SheepEvent.id).where(SheepEvent.user_id == user_id)
+    conditions.append(
+        (VerifiableLog.entity_type == "sheep_event")
+        & VerifiableLog.entity_id.in_(sheep_event_ids)
+    )
 
-def _filter_entries_for_user(entries: Iterable[VerifiableLog], user_id: int) -> List[VerifiableLog]:
-    ids_by_type: Dict[str, Set[int]] = {}
-    for entry in entries:
-        ids_by_type.setdefault(entry.entity_type, set()).add(entry.entity_id)
+    if not conditions:
+        return []
 
-    allowed: Dict[str, Set[int]] = {}
-    for entity_type, ids in ids_by_type.items():
-        owned_ids = _owned_ids_for_type(entity_type, ids, user_id)
-        if owned_ids:
-            allowed[entity_type] = owned_ids
+    entries = (
+        VerifiableLog.query.filter(or_(*conditions))
+        .order_by(VerifiableLog.id.desc())
+        .limit(limit)
+        .all()
+    )
 
-    return [
-        entry
-        for entry in entries
-        if entry.entity_type in allowed and entry.entity_id in allowed[entry.entity_type]
-    ]
+    return [serialize_entry(entry) for entry in reversed(entries)]
 
 
 def _owned_ids_for_type(entity_type: str, entity_ids: Iterable[int], user_id: int) -> Set[int]:
@@ -181,50 +199,46 @@ def _owned_ids_for_type(entity_type: str, entity_ids: Iterable[int], user_id: in
     if not ids:
         return set()
 
-    if entity_type in _OWNABLE_MODELS:
-        model = _OWNABLE_MODELS[entity_type]
-        rows = (
-            model.query.with_entities(model.id)
-            .filter(model.id.in_(ids), model.user_id == user_id)
-            .all()
-        )
-        return {row[0] for row in rows}
+    query_factory = OWNERSHIP_QUERY_FACTORIES.get(entity_type)
+    if query_factory is None:
+        return set()
 
-    if entity_type == "processing_step":
-        rows = (
-            ProcessingStep.query.with_entities(ProcessingStep.id)
-            .join(ProductBatch, ProcessingStep.batch_id == ProductBatch.id)
-            .filter(ProcessingStep.id.in_(ids), ProductBatch.user_id == user_id)
-            .all()
-        )
-        return {row[0] for row in rows}
-
-    return set()
+    rows = query_factory(ids, user_id).all()
+    return {row[0] for row in rows}
 
 
 def _lock_current_tail() -> Optional[VerifiableLog]:
-    """Lock and return the current tail entry, accounting for concurrent writers."""
+    """以行級鎖鎖定並取得當前尾端條目。需在交易中呼叫以序列化 append 操作。"""
 
-    candidate = (
+    return (
         VerifiableLog.query.order_by(VerifiableLog.id.desc()).with_for_update().first()
     )
 
-    if candidate is None:
-        return None
 
-    while True:
-        latest = VerifiableLog.query.order_by(VerifiableLog.id.desc()).first()
-        if latest is None or latest.id == candidate.id:
-            return candidate
-
-        candidate = (
-            VerifiableLog.query.filter_by(id=latest.id)
-            .with_for_update()
-            .one()
-        )
+def _product_batch_ownership_query(entity_ids: Set[int], user_id: int):
+    return (
+        ProductBatch.query.with_entities(ProductBatch.id)
+        .filter(ProductBatch.id.in_(entity_ids), ProductBatch.user_id == user_id)
+    )
 
 
-_OWNABLE_MODELS = {
-    "product_batch": ProductBatch,
-    "sheep_event": SheepEvent,
+def _processing_step_ownership_query(entity_ids: Set[int], user_id: int):
+    return (
+        ProcessingStep.query.with_entities(ProcessingStep.id)
+        .join(ProductBatch, ProcessingStep.batch_id == ProductBatch.id)
+        .filter(ProcessingStep.id.in_(entity_ids), ProductBatch.user_id == user_id)
+    )
+
+
+def _sheep_event_ownership_query(entity_ids: Set[int], user_id: int):
+    return (
+        SheepEvent.query.with_entities(SheepEvent.id)
+        .filter(SheepEvent.id.in_(entity_ids), SheepEvent.user_id == user_id)
+    )
+
+
+OWNERSHIP_QUERY_FACTORIES: Dict[str, Callable[[Set[int], int], Any]] = {
+    "product_batch": _product_batch_ownership_query,
+    "processing_step": _processing_step_ownership_query,
+    "sheep_event": _sheep_event_ownership_query,
 }
