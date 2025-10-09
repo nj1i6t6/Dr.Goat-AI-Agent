@@ -19,6 +19,8 @@ class User(UserMixin, db.Model):
     product_batches = db.relationship('ProductBatch', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
     iot_devices = db.relationship('IotDevice', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
     automation_rules = db.relationship('AutomationRule', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
+    cost_entries = db.relationship('CostEntry', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
+    revenue_entries = db.relationship('RevenueEntry', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
 
 
     def set_password(self, password):
@@ -127,6 +129,8 @@ class Sheep(db.Model):
     historical_data = db.relationship('SheepHistoricalData', backref='sheep', lazy='dynamic', cascade="all, delete-orphan")
     batch_links = db.relationship('BatchSheepAssociation', back_populates='sheep', cascade="all, delete-orphan", overlaps='product_batches,sheep_links')
     product_batches = db.relationship('ProductBatch', secondary='batch_sheep_association', back_populates='sheep', lazy='dynamic', overlaps='batch_links,sheep_links')
+    cost_entries = db.relationship('CostEntry', backref='sheep', lazy='dynamic', cascade="all, delete-orphan")
+    revenue_entries = db.relationship('RevenueEntry', backref='sheep', lazy='dynamic', cascade="all, delete-orphan")
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -183,6 +187,52 @@ class SheepHistoricalData(db.Model):
 
     def __repr__(self):
         return f'<HistoricalData {self.record_type}:{self.value} for SheepID:{self.sheep_id}>'
+
+
+class FinanceEntryMixin:
+    __abstract__ = True
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    sheep_id = db.Column(db.Integer, db.ForeignKey('sheep.id', ondelete='SET NULL'))
+
+    recorded_at = db.Column(db.DateTime, nullable=False, index=True)
+    category = db.Column(db.String(100), nullable=False)
+    subcategory = db.Column(db.String(100))
+    label = db.Column(db.String(150))
+    amount = db.Column(db.Numeric(14, 2), nullable=False)
+    currency = db.Column(db.String(8), default='TWD')
+
+    breed = db.Column(db.String(100))
+    age_months = db.Column(db.Integer)
+    lactation_number = db.Column(db.Integer)
+    production_stage = db.Column(db.String(100))
+
+    notes = db.Column(db.Text)
+    extra_metadata = db.Column(db.JSON, default=dict)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+class CostEntry(FinanceEntryMixin, db.Model):
+    __table_args__ = (
+        db.Index('ix_cost_entry_user_recorded', 'user_id', 'recorded_at'),
+        db.Index('ix_cost_entry_user_category', 'user_id', 'category'),
+        db.Index('ix_cost_entry_user_breed', 'user_id', 'breed'),
+    )
+
+
+class RevenueEntry(FinanceEntryMixin, db.Model):
+    __table_args__ = (
+        db.Index('ix_revenue_entry_user_recorded', 'user_id', 'recorded_at'),
+        db.Index('ix_revenue_entry_user_category', 'user_id', 'category'),
+        db.Index('ix_revenue_entry_user_breed', 'user_id', 'breed'),
+    )
+
 
 class ChatHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
