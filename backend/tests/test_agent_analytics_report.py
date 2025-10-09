@@ -43,4 +43,4 @@ def test_generate_analytics_report(authenticated_client, mock_gemini_api):
     data = resp.get_json()
     assert 'report_html' in data
     assert 'report_markdown' in data
-    assert 'AI 回應內容' in data['report_markdown'] or data['report_markdown']
+    assert 'AI 回應內容' in data['report_markdown']

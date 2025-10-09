@@ -312,7 +312,11 @@ def _cost_benefit(payload: dict) -> dict:
             }
         ] if (total_cost or total_revenue or sheep_count) else []
     else:
-        group_labels = [expr.name for expr in group_expr_cost] or [expr.name for expr in group_expr_revenue]
+        group_by = request_model.group_by
+        if group_by == 'month':
+            group_labels = ['period']
+        else:
+            group_labels = [group_by]
         groups_query = select(*[cost_subquery.c[label] for label in group_labels]).select_from(cost_subquery)
         groups_query = groups_query.union(
             select(*[revenue_subquery.c[label] for label in group_labels]).select_from(revenue_subquery)
