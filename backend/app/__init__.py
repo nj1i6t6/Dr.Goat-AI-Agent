@@ -172,6 +172,7 @@ def create_app():
             traceability as traceability_bp,
             tasks as tasks_bp,
             iot as iot_bp,
+            verify as verify_bp,
         )
         app.register_blueprint(auth_bp.bp, url_prefix='/api/auth')
         app.register_blueprint(sheep_bp.bp, url_prefix='/api/sheep')
@@ -182,6 +183,7 @@ def create_app():
         app.register_blueprint(traceability_bp.bp, url_prefix='/api/traceability')
         app.register_blueprint(tasks_bp.bp, url_prefix='/api/tasks')
         app.register_blueprint(iot_bp.bp, url_prefix='/api/iot')
+        app.register_blueprint(verify_bp.bp, url_prefix='/api/verify')
 
         # --- OpenAPI 規格與 Swagger UI ---
         @app.route('/openapi.yaml')

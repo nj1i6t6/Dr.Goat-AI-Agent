@@ -197,6 +197,34 @@ class ChatHistory(db.Model):
         return f'<Chat {self.session_id} - {self.role}>'
 
 
+class VerifiableLog(db.Model):
+    __tablename__ = 'verifiable_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    entity_type = db.Column(db.String(80), nullable=False)
+    entity_id = db.Column(db.Integer, nullable=False)
+    event_data = db.Column(db.JSON, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    previous_hash = db.Column(db.String(64))
+    current_hash = db.Column(db.String(64), nullable=False)
+
+    __table_args__ = (
+        db.Index('ix_verifiable_log_entity', 'entity_type', 'entity_id', 'id'),
+        db.Index('ix_verifiable_log_current_hash', 'current_hash', unique=True),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'event_data': self.event_data,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'previous_hash': self.previous_hash,
+            'current_hash': self.current_hash,
+        }
+
+
 class ProductBatch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

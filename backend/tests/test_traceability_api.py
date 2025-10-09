@@ -11,6 +11,7 @@ from app.models import (
     ProcessingStep,
     SheepEvent,
     SheepHistoricalData,
+    VerifiableLog,
 )
 
 
@@ -41,6 +42,24 @@ class TestTraceabilityAPI:
         assert data['sheep_links']
         assert data['sheep_links'][0]['sheep_id'] == test_sheep.id
 
+    def test_create_batch_writes_verifiable_log(self, authenticated_client, test_sheep, app):
+        data = self._create_batch(authenticated_client, sheep=test_sheep, batch_number='BATCH-LOG')
+        with app.app_context():
+            entries = VerifiableLog.query.filter_by(entity_type='product_batch', entity_id=data['id']).all()
+            assert entries
+
+    def test_add_step_writes_verifiable_log(self, authenticated_client, test_sheep, app):
+        batch = self._create_batch(authenticated_client, sheep=test_sheep, batch_number='BATCH-STEP-LOG')
+        response = authenticated_client.post(
+            f"/api/traceability/batches/{batch['id']}/steps",
+            json={'title': '巴氏殺菌', 'sequence_order': 1},
+        )
+        assert response.status_code == 201
+        step = response.get_json()
+        with app.app_context():
+            entries = VerifiableLog.query.filter_by(entity_type='processing_step', entity_id=step['id']).all()
+            assert entries
+
     def test_list_batches_with_details(self, authenticated_client, test_sheep):
         batch = self._create_batch(authenticated_client, sheep=test_sheep, batch_number='BATCH-LIST')
         response = authenticated_client.get('/api/traceability/batches?include_details=true')
@@ -49,6 +68,8 @@ class TestTraceabilityAPI:
         assert any(item['id'] == batch['id'] for item in payload)
         target = next(item for item in payload if item['id'] == batch['id'])
         assert 'sheep_links' in target
+        if target.get('steps'):
+            assert all('fingerprints' in step for step in target['steps'])
 
     def test_list_batches_requires_authentication(self, client):
         response = client.get('/api/traceability/batches')

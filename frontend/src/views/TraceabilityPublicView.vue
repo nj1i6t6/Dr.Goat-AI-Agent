@@ -69,12 +69,31 @@
                 placement="top"
               >
                 <div class="timeline-item">
-                  <h4>{{ step.sequence_order ? `Step ${step.sequence_order}` : '步驟' }}</h4>
+                  <div class="timeline-header">
+                    <h4>{{ step.sequence_order ? `Step ${step.sequence_order}` : '步驟' }}</h4>
+                    <el-button
+                      class="fingerprint-button"
+                      link
+                      :type="step.fingerprints?.length ? 'primary' : 'info'"
+                      :disabled="!step.fingerprints?.length"
+                      @click="openFingerprint(step)"
+                    >
+                      <svg class="fingerprint-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M12 2l7 3v6c0 5.2-3.7 9.8-7 11-3.3-1.2-7-5.8-7-11V5l7-3zm0 2.18L7 5.9v5.1c0 3.6 2.5 7.3 5 8.6 2.5-1.3 5-5 5-8.6V5.9l-5-1.72zm-1 8.39l-2-2 1.41-1.41L11 9.76l2.59-2.59L15 8.59l-4 3.98z"
+                        />
+                      </svg>
+                      <span>數據指紋</span>
+                    </el-button>
+                  </div>
                   <p class="timeline-title">{{ step.title }}</p>
                   <p class="timeline-desc" v-if="step.description">{{ step.description }}</p>
-                  <el-link v-if="step.evidence_url" :href="step.evidence_url" target="_blank" type="primary">
-                    查看佐證資料
-                  </el-link>
+                  <div class="timeline-actions">
+                    <el-link v-if="step.evidence_url" :href="step.evidence_url" target="_blank" type="primary">
+                      查看佐證資料
+                    </el-link>
+                  </div>
                 </div>
               </el-timeline-item>
             </el-timeline>
@@ -134,10 +153,53 @@
       </el-row>
     </template>
   </div>
+
+  <el-dialog
+    v-model="fingerprintModal.visible"
+    :title="`數據指紋 - ${fingerprintModal.stepTitle || '未命名步驟'}`"
+    width="720px"
+    class="fingerprint-dialog"
+  >
+    <template v-if="fingerprintModal.entries.length">
+      <div class="fingerprint-actions">
+        <el-button @click="copyFingerprint">複製 JSON</el-button>
+        <el-button type="primary" @click="downloadFingerprint">下載 JSON</el-button>
+      </div>
+      <el-timeline>
+        <el-timeline-item
+          v-for="entry in fingerprintModal.entries"
+          :key="entry.id"
+          :timestamp="formatFingerprintTimestamp(entry.timestamp)"
+          placement="top"
+        >
+          <div class="fingerprint-entry">
+            <div class="fingerprint-entry-header">
+              <el-tag size="small">{{ entry.event_data?.action || 'event' }}</el-tag>
+              <strong>{{ entry.event_data?.summary || '未提供摘要' }}</strong>
+            </div>
+            <p class="fingerprint-actor" v-if="entry.event_data?.actor?.username">
+              操作人員：{{ entry.event_data.actor.username }}
+            </p>
+            <p class="fingerprint-hash">
+              <span>前一筆 Hash：</span><code>{{ entry.previous_hash || '—' }}</code>
+            </p>
+            <p class="fingerprint-hash">
+              <span>目前 Hash：</span><code>{{ entry.current_hash }}</code>
+            </p>
+            <div class="fingerprint-metadata">
+              <h5>Metadata</h5>
+              <pre>{{ formatMetadata(entry.event_data?.metadata) }}</pre>
+            </div>
+          </div>
+        </el-timeline-item>
+      </el-timeline>
+    </template>
+    <el-empty v-else description="尚無可驗證紀錄" />
+  </el-dialog>
 </template>
 
 <script setup>
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref, computed, reactive } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '../api';
@@ -147,6 +209,11 @@ const batchNumber = computed(() => route.params.batchNumber);
 const loading = ref(false);
 const story = ref(null);
 const errorMessage = ref('');
+const fingerprintModal = reactive({
+  visible: false,
+  stepTitle: '',
+  entries: [],
+});
 
 const fetchStory = async () => {
   loading.value = true;
@@ -185,6 +252,68 @@ const formatSheepTitle = (detail) => {
   const sheep = detail.sheep || {};
   const roleText = detail.link.role || detail.link.contribution_type || '參與';
   return `${sheep.EarNum || '未知耳號'}｜${roleText}`;
+};
+
+const openFingerprint = (step) => {
+  fingerprintModal.visible = true;
+  fingerprintModal.stepTitle = step.title || `Step ${step.sequence_order || ''}`;
+  fingerprintModal.entries = Array.isArray(step.fingerprints) ? [...step.fingerprints] : [];
+};
+
+const formatFingerprintTimestamp = (value) => {
+  if (!value) return '—';
+  try {
+    return new Date(value).toLocaleString();
+  } catch (error) {
+    return value;
+  }
+};
+
+const formatMetadata = (metadata) => {
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return '—';
+  }
+  try {
+    return JSON.stringify(metadata, null, 2);
+  } catch (error) {
+    return String(metadata);
+  }
+};
+
+const buildFingerprintPayload = () => ({
+  stepTitle: fingerprintModal.stepTitle,
+  entries: fingerprintModal.entries,
+});
+
+const copyFingerprint = async () => {
+  const payloadText = JSON.stringify(buildFingerprintPayload(), null, 2);
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(payloadText);
+      ElMessage.success('已複製數據指紋');
+    } else {
+      throw new Error('Clipboard not available');
+    }
+  } catch (error) {
+    ElMessage.error('無法自動複製，請手動複製 JSON 內容');
+  }
+};
+
+const downloadFingerprint = () => {
+  try {
+    const blob = new Blob([JSON.stringify(buildFingerprintPayload(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    const safeTitle = fingerprintModal.stepTitle.replace(/[^\w\-]+/g, '_');
+    anchor.href = url;
+    anchor.download = `fingerprint_${safeTitle || 'step'}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    ElMessage.error('下載檔案時發生錯誤');
+  }
 };
 
 onMounted(fetchStory);
@@ -278,6 +407,36 @@ onMounted(fetchStory);
   padding-bottom: 12px;
 }
 
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fingerprint-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.fingerprint-button[disabled] {
+  color: var(--el-color-info-light-5, #cbd5f5);
+}
+
+.fingerprint-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.timeline-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .timeline-title {
   font-size: 1.1rem;
   color: #0f172a;
@@ -315,6 +474,66 @@ onMounted(fetchStory);
 
 .grid-item strong {
   color: #0f172a;
+}
+
+.fingerprint-dialog .fingerprint-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.fingerprint-entry {
+  border: 1px solid var(--el-border-color-light, #dfe5f2);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.fingerprint-entry + .fingerprint-entry {
+  margin-top: 12px;
+}
+
+.fingerprint-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fingerprint-actor {
+  font-size: 0.85rem;
+  color: var(--el-text-color-secondary, #6b7280);
+  margin: 0 0 6px;
+}
+
+.fingerprint-hash {
+  font-family: var(--el-font-family-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace);
+  font-size: 0.85rem;
+  margin: 4px 0;
+  word-break: break-all;
+}
+
+.fingerprint-hash span {
+  color: var(--el-text-color-secondary, #64748b);
+  margin-right: 4px;
+}
+
+.fingerprint-metadata h5 {
+  margin: 10px 0 4px;
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+
+.fingerprint-metadata pre {
+  background: rgba(15, 23, 42, 0.05);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: var(--el-font-family-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  max-height: 200px;
+  overflow: auto;
 }
 
 .section-block {

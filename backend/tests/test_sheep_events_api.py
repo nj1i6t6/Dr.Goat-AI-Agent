@@ -6,7 +6,7 @@
 import pytest
 import json
 from datetime import datetime, date
-from app.models import Sheep, SheepEvent
+from app.models import Sheep, SheepEvent, VerifiableLog
 
 
 class TestSheepEventsAPI:
@@ -45,14 +45,31 @@ class TestSheepEventsAPI:
             'description': '定期體重檢查',
             'notes': '健康狀況良好'
         }
-        
+
         response = authenticated_client.post('/api/sheep/TEST001/events', json=event_data)
-        
+
         assert response.status_code == 201  # 修正：實際API返回201
         data = json.loads(response.data)
         assert data['success'] is True
         assert 'event' in data
         assert data['event']['event_type'] == '體重測量'
+
+    def test_major_medical_event_generates_log(self, authenticated_client, test_sheep, app):
+        event_data = {
+            'event_date': '2024-02-01',
+            'event_type': '疾病治療',
+            'description': '抗生素療程',
+            'medication': '盤尼西林',
+            'withdrawal_days': 7,
+        }
+        response = authenticated_client.post('/api/sheep/TEST001/events', json=event_data)
+        assert response.status_code == 201
+        payload = json.loads(response.data)
+        event_id = payload['event']['id']
+
+        with app.app_context():
+            entries = VerifiableLog.query.filter_by(entity_type='sheep_event', entity_id=event_id).all()
+            assert entries
 
     def test_add_sheep_event_sheep_not_found(self, authenticated_client):
         """測試為不存在的山羊添加事件"""

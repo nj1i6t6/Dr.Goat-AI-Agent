@@ -416,11 +416,97 @@ paths:
         '200': { description: Deleted }
         '401': { description: Unauthorized }
         '404': { description: Not Found }
+  /api/verify/chain:
+    get:
+      summary: Verify verifiable ledger chain integrity
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: start_id
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - in: query
+          name: entity_type
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: entity_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: include_entries
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Chain verified without issues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyChainResponse'
+        '409':
+          description: Chain integrity failure detected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyChainResponse'
 components:
   securitySchemes:
     cookieAuth:
       type: apiKey
       in: cookie
       name: session
+  schemas:
+    VerifiableLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        entity_type:
+          type: string
+        entity_id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        previous_hash:
+          type: string
+          nullable: true
+        current_hash:
+          type: string
+        event_data:
+          type: object
+          additionalProperties: true
+    VerifyChainResponse:
+      type: object
+      properties:
+        integrity:
+          type: string
+          enum: [OK, FAILED]
+        broken_at_id:
+          type: integer
+          nullable: true
+        checked:
+          type: integer
+        last_hash:
+          type: string
+          nullable: true
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerifiableLogEntry'
 security:
   - cookieAuth: []

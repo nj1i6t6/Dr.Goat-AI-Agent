@@ -34,6 +34,7 @@
 - Surface growth forecasts with confidence intervals from LightGBM/linear regression plus LLM interpretation.
 - Streamline Excel-based batch import/export with automatic column mapping, default templates, and validation feedback.
 - Publish shareable traceability stories, timeline views, and QR-friendly endpoints for consumer transparency.
+- Guarantee tamper-evident auditability with an append-only hash chain covering traceability milestones and critical health events.
 - Close the loop between virtual data and barn hardware through IoT ingest, rule evaluation, and control dispatch.
 
 ### 1.2 Feature Map
@@ -46,7 +47,7 @@
 | Data Management | Excel export/import, AI-assisted mapping, chat history export | `app/api/data_management.py`, `app/utils.py` | `DataManagementView.vue`, `stores/data` | `tests/test_data_management_api.py`, `tests/test_data_management_enhanced.py`, `tests/test_data_management_error_handling.py` |
 | AI Assistant | Daily tips, nutrition/ESG recommendations, multimodal chat with history | `app/api/agent.py`, `app/utils.py`, `app/models.ChatHistory` | `ConsultationView.vue`, `ChatView.vue`, `stores/consultation.js`, `stores/chat.js` | `tests/test_agent_api.py` |
 | Growth Prediction | Weight projections, confidence bands, ESG-aware guidance | `app/api/prediction.py`, `backend/models/*.joblib` | `PredictionView.vue`, `stores/prediction.js` | `tests/test_prediction_api.py` |
-| Traceability | Batch lifecycle, steps, sheep contributions, public storytelling | `app/api/traceability.py` | `TraceabilityManagementView.vue`, `TraceabilityPublicView.vue`, `stores/traceability.js` | `tests/test_traceability_api.py` |
+| Traceability | Batch lifecycle, steps, sheep contributions, public storytelling, verifiable hash chain | `app/api/traceability.py` | `TraceabilityManagementView.vue`, `TraceabilityPublicView.vue`, `stores/traceability.js` | `tests/test_traceability_api.py`, `tests/test_verifiable_log.py` |
 | IoT Automation | Device registry, API-key HMAC, sensor ingest, rule execution, control logs | `app/api/iot.py`, `app/iot/automation.py` | `IotManagementView.vue`, `stores/iot.js` | `tests/test_iot_api.py`, `tests/test_iot_worker.py` |
 | Background Tasks | Lightweight queue wrapper and demo job endpoint | `app/tasks.py`, `app/simple_queue.py`, `app/api/tasks.py` | Triggered from settings/tasks UI | `tests/test_tasks_api.py` |
 
@@ -130,10 +131,11 @@ graph TB
   - `dashboard`: Reminder aggregation, medication withdrawal checks, growth/milk trend analysis, event option administration, Redis caching.
   - `agent`: Gemini-backed daily tips, nutrition + ESG recommendations, multimodal chat with conversation persistence.
   - `prediction`: LightGBM + linear regression blending, data-quality gating, ESG-aware LLM synthesis, chart data endpoints.
-  - `traceability`: Product batch CRUD, processing steps, sheep contribution links, public storytelling payloads.
+  - `traceability`: Product batch CRUD, processing steps, sheep contribution links, public storytelling payloads, append-only log writes.
   - `iot`: Device registry with HMAC API keys, sensor ingest queueing, automation rule evaluation, control dispatch and logging.
   - `tasks`: Demo endpoint for enqueueing background jobs through `SimpleQueue`.
-- **Models**: `app/models.py` captures everything from sheep data to chat history, IoT devices, automation rules, and control logs. Unique constraints enforce per-user isolation.
+  - `verify`: Verifiable ledger integrity checks, hash-chain streaming, and operator audit APIs.
+- **Models**: `app/models.py` captures everything from sheep data to chat history, IoT devices, automation rules, verifiable ledger entries, and control logs. Unique constraints enforce per-user isolation.
 - **Utilities**: `app/utils.py` centralises Gemini API calls, sheep context assembly, and image encoding; `app/cache.py` wraps Redis for dashboard TTL caching.
 
 ## 4. Frontend Application (Vue 3)
@@ -145,6 +147,7 @@ graph TB
 - **Views**: Each route has a dedicated view under `src/views/` accompanied by unit/behaviour tests (e.g., `DashboardView.test.js`, `ConsultationView.behavior.test.js`). Components encapsulate tables, forms, and charts with Element Plus primitives.
 - **UX Considerations**:
   - Responsive layout via Element Plus grid, consistent loading states, toast notifications for async flows, Markdown rendering for AI output, and modals for API key reveal.
+  - Public traceability stories expose a “data fingerprint” modal per processing step showing hash-chain metadata with copy/download helpers for auditors.
   - System Settings includes a persistent font size toggle (default vs. large) that updates the Element Plus base size and CSS variables so older farmers can switch to larger typography across the entire SPA.
 
 ## 5. AI & Machine Learning Capabilities
@@ -189,6 +192,7 @@ graph TB
 - **Session & Cache**: Redis stores Flask sessions (`RedisSessionInterface`) and dashboard cache (`set_dashboard_cache`) with per-user locks to prevent thundering herds.
 - **SimpleQueue**: Minimal RQ-like abstraction using Redis lists for background jobs. `enqueue_example_task` demonstrates queue usage and is exercised in tests.
 - **Workers**: `backend/run_worker.py` and `start_*` scripts run blocking loops that pop from queues, dispatch tasks, and process IoT automation events.
+- **Ledger Verification**: `app/tasks.verify_verifiable_log_chain` audits the append-only hash chain and emits warnings if corruption is detected. Use `enqueue_verifiable_log_verification` for scheduled jobs or manual triggers.
 
 ## 9. Local Development Environment
 
