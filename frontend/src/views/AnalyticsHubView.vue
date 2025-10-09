@@ -73,54 +73,26 @@
 
     <el-row :gutter="16" class="tables-row">
       <el-col :md="12" :sm="24">
-        <el-card shadow="never">
-          <template #header>
-            <span>最新成本紀錄</span>
-          </template>
-          <el-table :data="store.costEntries" size="small" height="260">
-            <el-table-column prop="recorded_at" label="日期" width="120" />
-            <el-table-column prop="category" label="分類" />
-            <el-table-column prop="amount" label="金額" width="100" />
-            <el-table-column prop="notes" label="備註" />
-            <el-table-column label="操作" width="80">
-              <template #default="scope">
-                <el-button type="danger" size="small" link @click="store.removeCostEntry(scope.row.id)">刪除</el-button>
-              </template>
-            </el-table-column>
-            <template #empty>
-              <el-empty description="尚無資料">
-                <template #extra>
-                  <el-button type="primary" @click="scrollToFinanceForms('cost')">前往新增成本紀錄</el-button>
-                </template>
-              </el-empty>
-            </template>
-          </el-table>
-        </el-card>
+        <AnalyticsRecordTable
+          title="最新成本紀錄"
+          :entries="store.costEntries"
+          cta-label="前往新增成本紀錄"
+          cta-type="primary"
+          empty-description="尚無成本資料"
+          @cta-click="() => scrollToFinanceForms('cost')"
+          @delete="store.removeCostEntry"
+        />
       </el-col>
       <el-col :md="12" :sm="24">
-        <el-card shadow="never">
-          <template #header>
-            <span>最新收益紀錄</span>
-          </template>
-          <el-table :data="store.revenueEntries" size="small" height="260">
-            <el-table-column prop="recorded_at" label="日期" width="120" />
-            <el-table-column prop="category" label="分類" />
-            <el-table-column prop="amount" label="金額" width="100" />
-            <el-table-column prop="notes" label="備註" />
-            <el-table-column label="操作" width="80">
-              <template #default="scope">
-                <el-button type="danger" size="small" link @click="store.removeRevenueEntry(scope.row.id)">刪除</el-button>
-              </template>
-            </el-table-column>
-            <template #empty>
-              <el-empty description="尚無資料">
-                <template #extra>
-                  <el-button type="success" @click="scrollToFinanceForms('revenue')">前往新增收益紀錄</el-button>
-                </template>
-              </el-empty>
-            </template>
-          </el-table>
-        </el-card>
+        <AnalyticsRecordTable
+          title="最新收益紀錄"
+          :entries="store.revenueEntries"
+          cta-label="前往新增收益紀錄"
+          cta-type="success"
+          empty-description="尚無收益資料"
+          @cta-click="() => scrollToFinanceForms('revenue')"
+          @delete="store.removeRevenueEntry"
+        />
       </el-col>
     </el-row>
 
@@ -162,6 +134,7 @@ import { ElMessage } from 'element-plus'
 
 import AnalyticsFiltersCard from '../components/analytics/AnalyticsFiltersCard.vue'
 import AnalyticsKpiGrid from '../components/analytics/AnalyticsKpiGrid.vue'
+import AnalyticsRecordTable from '../components/analytics/AnalyticsRecordTable.vue'
 import CohortChartCard from '../components/analytics/CohortChartCard.vue'
 import CostBenefitChartCard from '../components/analytics/CostBenefitChartCard.vue'
 import FinanceEntryForm from '../components/analytics/FinanceEntryForm.vue'

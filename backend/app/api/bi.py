@@ -8,7 +8,7 @@ from typing import Iterable
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from pydantic import ValidationError
-from sqlalchemy import and_, func, literal, select
+from sqlalchemy import and_, func, literal, select, union
 
 from app import db
 from app.cache import check_bi_rate_limit, get_bi_cache, set_bi_cache
@@ -147,35 +147,81 @@ def _cohort_analysis(payload: dict) -> dict:
         revenue_query = revenue_query.group_by(*revenue_group_exprs)
     revenue_subquery = revenue_query.subquery('revenue_cohort')
 
-    join_condition_cost = (
-        and_(*[sheep_subquery.c[label] == cost_subquery.c[label] for label in dimension_labels])
-        if dimension_labels
-        else literal(True)
+    if not dimension_labels:
+        sheep_row = db.session.execute(
+            select(
+                sheep_subquery.c.sheep_count,
+                sheep_subquery.c.avg_weight,
+                sheep_subquery.c.avg_milk,
+            )
+        ).first()
+        cost_row = db.session.execute(select(cost_subquery.c.total_cost)).first()
+        revenue_row = db.session.execute(select(revenue_subquery.c.total_revenue)).first()
+
+        sheep_count = (sheep_row._mapping['sheep_count'] if sheep_row else 0) or 0
+        avg_weight = sheep_row._mapping['avg_weight'] if sheep_row else None
+        avg_milk = sheep_row._mapping['avg_milk'] if sheep_row else None
+        total_cost = (cost_row._mapping['total_cost'] if cost_row else None) or Decimal('0')
+        total_revenue = (revenue_row._mapping['total_revenue'] if revenue_row else None) or Decimal('0')
+
+        if not (sheep_count or total_cost or total_revenue):
+            result = {'items': [], 'metrics': request_model.metrics}
+            set_bi_cache(current_user.id, wrapped_payload, result)
+            return {'data': result, 'status': 200}
+
+        metrics_payload = {
+            'sheep_count': sheep_count,
+            'avg_weight': float(avg_weight) if avg_weight is not None else None,
+            'avg_milk_yield': float(avg_milk) if avg_milk is not None else None,
+            'total_cost': _serialize_decimal(total_cost),
+            'total_revenue': _serialize_decimal(total_revenue),
+            'net_profit': _serialize_decimal(total_revenue - total_cost),
+            'cost_per_head': _serialize_decimal((total_cost / sheep_count) if sheep_count else None),
+            'revenue_per_head': _serialize_decimal((total_revenue / sheep_count) if sheep_count else None),
+        }
+
+        result = {
+            'items': [
+                {
+                    'metrics': {metric: metrics_payload.get(metric) for metric in request_model.metrics},
+                }
+            ],
+            'metrics': request_model.metrics,
+        }
+        set_bi_cache(current_user.id, wrapped_payload, result)
+        return {'data': result, 'status': 200}
+
+    group_selects = [
+        select(*[subquery.c[label] for label in dimension_labels]).select_from(subquery)
+        for subquery in (sheep_subquery, cost_subquery, revenue_subquery)
+    ]
+
+    # 移除可能的重複群組並確保包含沒有對應羊隻資料的財務紀錄
+    groups_query = union(*group_selects) if len(group_selects) > 1 else group_selects[0]
+    groups_subquery = groups_query.subquery('cohort_groups')
+
+    join_condition_sheep = and_(
+        *[groups_subquery.c[label] == sheep_subquery.c[label] for label in dimension_labels]
     )
-    join_condition_revenue = (
-        and_(*[sheep_subquery.c[label] == revenue_subquery.c[label] for label in dimension_labels])
-        if dimension_labels
-        else literal(True)
+    join_condition_cost = and_(*[groups_subquery.c[label] == cost_subquery.c[label] for label in dimension_labels])
+    join_condition_revenue = and_(
+        *[groups_subquery.c[label] == revenue_subquery.c[label] for label in dimension_labels]
     )
 
-    select_columns = [sheep_subquery.c[label] for label in dimension_labels]
-    select_columns.extend(
-        [
+    final_query = (
+        select(
+            *[groups_subquery.c[label] for label in dimension_labels],
             sheep_subquery.c.sheep_count,
             sheep_subquery.c.avg_weight,
             sheep_subquery.c.avg_milk,
             cost_subquery.c.total_cost,
             revenue_subquery.c.total_revenue,
-        ]
-    )
-
-    final_query = (
-        select(*select_columns)
-        .select_from(
-            sheep_subquery.outerjoin(cost_subquery, join_condition_cost).outerjoin(
-                revenue_subquery, join_condition_revenue
-            )
         )
+        .select_from(groups_subquery)
+        .outerjoin(sheep_subquery, join_condition_sheep)
+        .outerjoin(cost_subquery, join_condition_cost)
+        .outerjoin(revenue_subquery, join_condition_revenue)
+        .order_by(*[groups_subquery.c[label] for label in dimension_labels])
     )
 
     rows = db.session.execute(final_query).all()

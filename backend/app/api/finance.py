@@ -158,8 +158,13 @@ def list_costs():
     except ValueError as exc:
         return jsonify(create_error_response(str(exc))), 400
 
-    page = int(request.args.get('page', 1))
-    page_size = int(request.args.get('page_size', 50))
+    try:
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 50))
+        if page < 1 or page_size < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify(create_error_response('分頁參數必須為正整數')), 400
 
     stmt = select(CostEntry).where(conditions).order_by(CostEntry.recorded_at.desc())
     total = db.session.scalar(select(db.func.count()).select_from(stmt.subquery()))
@@ -246,8 +251,13 @@ def list_revenues():
     except ValueError as exc:
         return jsonify(create_error_response(str(exc))), 400
 
-    page = int(request.args.get('page', 1))
-    page_size = int(request.args.get('page_size', 50))
+    try:
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 50))
+        if page < 1 or page_size < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify(create_error_response('分頁參數必須為正整數')), 400
 
     stmt = select(RevenueEntry).where(conditions).order_by(RevenueEntry.recorded_at.desc())
     total = db.session.scalar(select(db.func.count()).select_from(stmt.subquery()))

@@ -24,7 +24,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
 
   const _cache = reactive(new Map())
   const _inflight = reactive(new Map())
-  const _lastRequested = reactive(new Map())
+  const _lastCompleted = reactive(new Map())
 
   const costBenefitSummary = computed(() => costBenefitResult.value?.summary || {})
 
@@ -52,24 +52,30 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     const key = serializeKey(endpoint, payload)
     const now = Date.now()
 
+    const cached = _cache.get(key)
+
     if (!force) {
-      const cached = _cache.get(key)
       if (cached && now - cached.timestamp < CACHE_TTL) {
         return cached.data
       }
-      const last = _lastRequested.get(key) || 0
-      if (now - last < THROTTLE_WINDOW && _inflight.get(key)) {
-        return _inflight.get(key)
+      const last = _lastCompleted.get(key) || 0
+      if (now - last < THROTTLE_WINDOW) {
+        if (_inflight.get(key)) {
+          return _inflight.get(key)
+        }
+        if (cached) {
+          return cached.data
+        }
       }
     }
 
-    _lastRequested.set(key, now)
     const promise = requestFn()
       .then((data) => {
         _cache.set(key, { data, timestamp: Date.now() })
         return data
       })
       .finally(() => {
+        _lastCompleted.set(key, Date.now())
         _inflight.delete(key)
       })
 
