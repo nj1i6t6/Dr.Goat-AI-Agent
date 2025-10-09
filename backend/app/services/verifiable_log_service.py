@@ -29,12 +29,12 @@ def append_event(
     event_model = event if isinstance(event, VerifiableLogEventModel) else VerifiableLogEventModel(**event)
     payload = event_model.model_dump()
     payload["metadata"] = normalise_json_payload(payload.get("metadata") or {})
-    timestamp = datetime.utcnow()
 
     session = db.session()
 
     def _append() -> VerifiableLog:
         previous_entry = _lock_current_tail()
+        timestamp = datetime.utcnow()
         previous_hash = previous_entry.current_hash if previous_entry else None
 
         hash_payload = {
@@ -180,9 +180,6 @@ def recent_entries(limit: int = 100, *, user_id: int) -> List[Dict[str, Any]]:
         (VerifiableLog.entity_type == "sheep_event")
         & VerifiableLog.entity_id.in_(sheep_event_ids)
     )
-
-    if not conditions:
-        return []
 
     entries = (
         VerifiableLog.query.filter(or_(*conditions))
