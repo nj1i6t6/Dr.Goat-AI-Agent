@@ -167,11 +167,54 @@ export default {
   },
 
   // 儀表板 API
-  getDashboardData(errorHandler) { 
-    return withErrorHandling(() => apiClient.get('/api/dashboard/data'), errorHandler); 
+  getDashboardData(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/dashboard/data'), errorHandler);
   },
-  getFarmReport(errorHandler) { 
-    return withErrorHandling(() => apiClient.get('/api/dashboard/farm_report'), errorHandler); 
+  getFarmReport(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/dashboard/farm_report'), errorHandler);
+  },
+
+  // 成本 / 收益管理 API
+  listCostEntries(params = {}, errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/finance/costs', { params }), errorHandler);
+  },
+  createCostEntry(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/finance/costs', data), errorHandler);
+  },
+  updateCostEntry(id, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/finance/costs/${id}`, data), errorHandler);
+  },
+  deleteCostEntry(id, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/finance/costs/${id}`), errorHandler);
+  },
+  bulkImportCostEntries(entries, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/finance/costs/bulk-import', { entries }), errorHandler);
+  },
+  listRevenueEntries(params = {}, errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/finance/revenues', { params }), errorHandler);
+  },
+  createRevenueEntry(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/finance/revenues', data), errorHandler);
+  },
+  updateRevenueEntry(id, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/finance/revenues/${id}`, data), errorHandler);
+  },
+  deleteRevenueEntry(id, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/finance/revenues/${id}`), errorHandler);
+  },
+  bulkImportRevenueEntries(entries, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/finance/revenues/bulk-import', { entries }), errorHandler);
+  },
+
+  runCohortAnalysis(payload, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/bi/cohort-analysis', payload), errorHandler);
+  },
+  runCostBenefit(payload, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/bi/cost-benefit', payload), errorHandler);
+  },
+  generateAnalyticsReport(payload, apiKey, errorHandler) {
+    const config = apiKey ? { headers: { 'X-Api-Key': apiKey } } : {}
+    return withErrorHandling(() => apiClient.post('/api/agent/analytics-report', payload, config), errorHandler);
   },
 
   // 資料管理 API

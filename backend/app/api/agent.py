@@ -2,7 +2,12 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from app.utils import call_gemini_api, get_sheep_info_for_context, encode_image_to_base64
 from app.models import db, ChatHistory
-from app.schemas import AgentRecommendationModel, AgentChatModel, create_error_response
+from app.schemas import (
+    AgentRecommendationModel,
+    AgentChatModel,
+    AnalyticsReportRequestModel,
+    create_error_response,
+)
 from app.rag_loader import rag_query
 from pydantic import ValidationError
 from datetime import datetime
@@ -82,6 +87,105 @@ def get_agent_tip():
     tip_text = result.get("text", "保持羊舍通風乾燥，提供清潔飲水。")
     tip_html = markdown.markdown(tip_text, extensions=['nl2br', 'fenced_code', 'tables'])
     return jsonify(tip_html=tip_html)
+
+
+def _format_filters(filters: dict[str, object]) -> str:
+    if not filters:
+        return '（無額外篩選）'
+    lines = []
+    for key, value in filters.items():
+        if value in (None, '', []):
+            continue
+        if isinstance(value, list):
+            formatted = ', '.join(str(v) for v in value)
+        else:
+            formatted = str(value)
+        lines.append(f"- {key}: {formatted}")
+    return '\n'.join(lines) if lines else '（無額外篩選）'
+
+
+def _format_cohort_rows(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return '尚未執行分群分析或沒有符合條件的羊群。'
+    formatted_rows = []
+    for row in rows:
+        metrics = row.get('metrics', {})
+        dims = {k: v for k, v in row.items() if k != 'metrics'}
+        dim_text = ', '.join(f"{k}: {v}" for k, v in dims.items() if v not in (None, '')) or '未指定維度'
+        metric_text = ', '.join(f"{k}={v}" for k, v in metrics.items() if v is not None) or '無指標資料'
+        formatted_rows.append(f"• {dim_text} → {metric_text}")
+    return '\n'.join(formatted_rows)
+
+
+def _format_cost_benefit(summary: dict[str, object]) -> str:
+    if not summary:
+        return '尚未計算成本收益。'
+    parts = []
+    total_cost = summary.get('summary', {}).get('total_cost')
+    total_revenue = summary.get('summary', {}).get('total_revenue')
+    net_profit = summary.get('summary', {}).get('net_profit')
+    if total_cost is not None:
+        parts.append(f"總成本: {total_cost:,.2f}")
+    if total_revenue is not None:
+        parts.append(f"總收益: {total_revenue:,.2f}")
+    if net_profit is not None:
+        parts.append(f"淨收益: {net_profit:,.2f}")
+    if not parts:
+        parts.append('目前缺少成本收益資料。')
+
+    breakdowns = []
+    for item in summary.get('items', [])[:6]:
+        label = item.get('group', '未分組')
+        metrics = item.get('metrics', {})
+        metric_text = ', '.join(f"{k}={v}" for k, v in metrics.items() if v is not None)
+        breakdowns.append(f"- {label}: {metric_text}")
+
+    if breakdowns:
+        parts.append('\n主要分組表現:\n' + '\n'.join(breakdowns))
+
+    return '\n'.join(parts)
+
+
+@bp.route('/analytics-report', methods=['POST'])
+@login_required
+def generate_analytics_report():
+    api_key = request.headers.get('X-Api-Key')
+    if not api_key:
+        return jsonify(create_error_response('請在標頭提供 X-Api-Key')), 401
+    try:
+        payload = AnalyticsReportRequestModel(**request.get_json())
+    except ValidationError as exc:
+        return jsonify(create_error_response('請求資料驗證失敗', exc.errors())), 400
+
+    data = payload.model_dump()
+    filters = _format_filters(data.get('filters', {}))
+    cohort_summary = _format_cohort_rows(data.get('cohort', []))
+    cost_benefit_summary = _format_cost_benefit(data.get('cost_benefit', {}))
+    extra_insights = '\n'.join(f"- {note}" for note in data.get('insights', []) if note)
+    if not extra_insights:
+        extra_insights = '（目前尚未填寫其他觀察）'
+
+    prompt = (
+        "你是台灣畜牧產業的財務顧問，熟悉山羊飼養成本與收益。"
+        "請根據以下數據輸出一份 300-400 字的繁體中文報告，包含 KPI 摘要、異常提醒、建議行動與後續追蹤指標。\n"
+        "--- 篩選條件 ---\n"
+        f"{filters}\n\n"
+        "--- 分群分析 ---\n"
+        f"{cohort_summary}\n\n"
+        "--- 成本收益摘要 ---\n"
+        f"{cost_benefit_summary}\n\n"
+        "--- 使用者備註 ---\n"
+        f"{extra_insights}\n\n"
+        "請重點標示 ROI 最高與最低的分群，並提供可立即採取的改善建議。最後給出下週需追蹤的 2 項量化指標。"
+    )
+
+    result = call_gemini_api(prompt, api_key, generation_config_override={'temperature': 0.35})
+    if 'error' in result:
+        return jsonify(error=result['error']), 500
+
+    report_text = result.get('text', '').strip()
+    report_html = markdown.markdown(report_text, extensions=['fenced_code', 'tables', 'nl2br'])
+    return jsonify(report_html=report_html, report_markdown=report_text)
 
 @bp.route('/recommendation', methods=['POST'])
 @login_required
