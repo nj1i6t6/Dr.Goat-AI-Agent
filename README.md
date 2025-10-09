@@ -44,6 +44,7 @@
 | 認證 | 註冊、登入、健康檢查、預設事件字典 | `app/api/auth.py` | `LoginView.vue`、`stores/auth.js` | `tests/test_auth_api.py`、`tests/test_auth_agent_enhanced.py` |
 | 羊群管理 | CRUD、歷史自動紀錄、提醒欄位、自訂事件詞庫 | `app/api/sheep.py`、`app/models.py` | `SheepListView.vue`、`stores/sheep.js` | `tests/test_sheep_api.py`、`tests/test_sheep_events_api.py`、`tests/test_sheep_enhanced.py` |
 | 儀表板與報表 | 提醒、停藥檢查、健康警示、牧場摘要、Redis 快取 | `app/api/dashboard.py`、`app/cache.py` | `DashboardView.vue` | `tests/test_dashboard_api.py`、`tests/test_dashboard_enhanced.py` |
+| 分析與財務 BI | 成本/收益帳冊、Cohort 分析、AI 報告、ECharts 儀表板 | `app/api/finance.py`、`app/api/bi.py` | `AnalyticsHubView.vue`、`stores/analytics.js` | `tests/test_finance_bi_api.py`、`frontend/src/stores/analytics.test.js` |
 | 資料治理 | Excel 匯出/匯入、AI 導入建議、聊天紀錄匯出 | `app/api/data_management.py`、`app/utils.py` | `DataManagementView.vue`、`stores/data` | `tests/test_data_management_api.py`、`tests/test_data_management_enhanced.py`、`tests/test_data_management_error_handling.py` |
 | AI 協作 | 每日提示、營養/ESG 建議、多模態聊天 | `app/api/agent.py`、`app/utils.py`、`app/models.ChatHistory` | `ConsultationView.vue`、`ChatView.vue`、`stores/consultation.js`、`stores/chat.js` | `tests/test_agent_api.py` |
 | 生長預測 | 體重預估、信賴區間、ESG 說明 | `app/api/prediction.py`、`backend/models/*.joblib` | `PredictionView.vue`、`stores/prediction.js` | `tests/test_prediction_api.py` |
@@ -129,6 +130,8 @@ graph TB
   - `sheep`：羊隻 CRUD、事件生命週期、關鍵欄位歷史自動紀錄、提醒欄位。
   - `data_management`：Excel 匯出/匯入、AI 映射建議、匯出聊天紀錄。
   - `dashboard`：提醒、停藥期、體重/奶量趨勢分析、事件選項管理、Redis 快取。
+  - `finance`：使用者專屬的成本/收益帳冊，支援 CRUD、複合篩選與批次匯入。
+  - `bi`：SQLAlchemy Core 聚合查詢、成本收益趨勢、查詢速率限制、Redis 快取與 Gemini 報告提示語。
   - `agent`：Gemini 每日提示、營養+ESG 建議、多模態聊天紀錄。
   - `prediction`：LightGBM+線性回歸、數據品質檢查、ESG LLM 解讀、圖表資料。
   - `traceability`：批次/加工步驟/羊隻關聯、公眾故事 payload、可驗證賬本寫入。
@@ -141,8 +144,8 @@ graph TB
 ## 4. 前端應用 (Vue 3)
 
 - **技術**：Vue 3 `<script setup>`、Vite、Pinia、Element Plus、Axios、Chart.js、ECharts。
-- **路由**：`src/router/index.js` 包含 Dashboard、Consultation、Chat、Flock、Data Management、Prediction、IoT、Traceability、Settings 等需登入路由，以及 `/login`、`/trace/:batchNumber` 公開頁面。
-- **狀態管理**：`src/stores/` 依功能拆分（auth、sheep、consultation、chat、prediction、iot、traceability、settings），皆附 Vitest 覆蓋。
+- **路由**：`src/router/index.js` 包含 Dashboard、Analytics Hub、Consultation、Chat、Flock、Data Management、Prediction、IoT、Traceability、Settings 等需登入路由，以及 `/login`、`/trace/:batchNumber` 公開頁面。
+- **狀態管理**：`src/stores/` 依功能拆分（auth、sheep、consultation、chat、prediction、iot、traceability、analytics、settings），皆附 Vitest 覆蓋。
 - **API 層**：`src/api/index.js` 統一錯誤處理、Gemini Header 注入、Multipart 上傳。
 - **視圖與測試**：每個頁面皆有對應測試 (`*.test.js` / `*.behavior.test.js`) 驗證路由守衛、表單驗證、Store 行為與 UI 呈現。
 - **UX**：
@@ -156,6 +159,7 @@ graph TB
   - `/api/agent/tip`：依季節產出每日提示。
   - `/api/agent/recommendation`：融合羊隻資料與歷史事件，提供營養與 ESG 建議。
   - `/api/agent/chat`：支援圖片 (JPEG/PNG/GIF/WebP，≤10 MB) 與對話歷史。
+  - `/api/bi/ai-report`：整合 Cohort 篩選與 KPI 摘要，產出可直接複製/下載的營運洞察報告。
   - `/api/prediction/*`：使用相同 helper 產出預測解說與 ESG 建議。
 - **檢索增強生成（RAG）**：
   - 知識來源位於 `docs/rag_sources/`（Markdown / 純文字）。執行 `make rag-update` 可完成切塊、嵌入（Gemini `gemini-embedding-001`、768 維 L2 正規化）並輸出 `docs/rag_vectors/corpus.parquet` 至 Git LFS。

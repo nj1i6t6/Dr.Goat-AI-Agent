@@ -30,6 +30,11 @@ const routes = [
         component: () => import('../views/DashboardView.vue')
       },
       {
+        path: 'analytics',
+        name: 'AnalyticsHub',
+        component: () => import('../views/AnalyticsHubView.vue')
+      },
+      {
         path: 'consultation',
         name: 'Consultation',
         component: () => import('../views/ConsultationView.vue')

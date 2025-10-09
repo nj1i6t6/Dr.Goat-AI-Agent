@@ -250,6 +250,295 @@ paths:
       responses:
         '200': { description: OK }
         '400': { description: Validation error }
+  /api/finance/costs:
+    get:
+      summary: List cost entries
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500 }
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: breed
+          schema: { type: string }
+        - in: query
+          name: age_group
+          schema: { type: string }
+        - in: query
+          name: parity
+          schema: { type: integer }
+        - in: query
+          name: herd_tag
+          schema: { type: string }
+        - in: query
+          name: start_at
+          schema: { type: string, format: date-time }
+        - in: query
+          name: end_at
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CostEntry'
+        '401': { description: Unauthorized }
+    post:
+      summary: Create cost entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostEntryInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostEntry'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+  /api/finance/costs/bulk:
+    post:
+      summary: Bulk create cost entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CostEntryInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CostEntry'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+  /api/finance/costs/{entry_id}:
+    put:
+      summary: Update cost entry
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostEntryPartial'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostEntry'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+    delete:
+      summary: Delete cost entry
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Deleted }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+  /api/finance/revenues:
+    get:
+      summary: List revenue entries
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500 }
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: breed
+          schema: { type: string }
+        - in: query
+          name: age_group
+          schema: { type: string }
+        - in: query
+          name: parity
+          schema: { type: integer }
+        - in: query
+          name: herd_tag
+          schema: { type: string }
+        - in: query
+          name: start_at
+          schema: { type: string, format: date-time }
+        - in: query
+          name: end_at
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RevenueEntry'
+        '401': { description: Unauthorized }
+    post:
+      summary: Create revenue entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevenueEntryInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevenueEntry'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+  /api/finance/revenues/bulk:
+    post:
+      summary: Bulk create revenue entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/RevenueEntryInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RevenueEntry'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+  /api/finance/revenues/{entry_id}:
+    put:
+      summary: Update revenue entry
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevenueEntryPartial'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevenueEntry'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+    delete:
+      summary: Delete revenue entry
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Deleted }
+        '401': { description: Unauthorized }
+        '404': { description: Not Found }
+  /api/bi/cohort-analysis:
+    post:
+      summary: Cohort analysis query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortAnalysisRequest'
+      responses:
+        '200':
+          description: Aggregated metrics by cohort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortAnalysisResponse'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+        '429': { description: Rate limited }
+  /api/bi/cost-benefit:
+    post:
+      summary: Cost-benefit trend query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostBenefitRequest'
+      responses:
+        '200':
+          description: Cost-benefit metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostBenefitResponse'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+        '429': { description: Rate limited }
+  /api/bi/ai-report:
+    post:
+      summary: Generate AI operations report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiReportRequest'
+      responses:
+        '200':
+          description: AI generated report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiReportResponse'
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+        '502': { description: Upstream AI error }
   /api/prediction/goats/{ear_tag}/prediction:
     parameters:
       - in: path
@@ -470,6 +759,207 @@ components:
       in: cookie
       name: session
   schemas:
+    CostEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        category: { type: string }
+        subcategory: { type: string, nullable: true }
+        amount: { type: number, format: float }
+        currency: { type: string }
+        recorded_at: { type: string, format: date-time }
+        breed: { type: string, nullable: true }
+        age_group: { type: string, nullable: true }
+        parity: { type: integer, nullable: true }
+        herd_tag: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    CostEntryInput:
+      type: object
+      required: [category, amount, recorded_at]
+      properties:
+        category: { type: string }
+        subcategory: { type: string }
+        amount: { type: number }
+        currency: { type: string, default: TWD }
+        recorded_at: { type: string, format: date-time }
+        breed: { type: string }
+        age_group: { type: string }
+        parity: { type: integer }
+        herd_tag: { type: string }
+        description: { type: string }
+        notes: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+    CostEntryPartial:
+      allOf:
+        - $ref: '#/components/schemas/CostEntryInput'
+      required: []
+    RevenueEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        category: { type: string }
+        subcategory: { type: string, nullable: true }
+        amount: { type: number, format: float }
+        currency: { type: string }
+        recorded_at: { type: string, format: date-time }
+        breed: { type: string, nullable: true }
+        age_group: { type: string, nullable: true }
+        parity: { type: integer, nullable: true }
+        herd_tag: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    RevenueEntryInput:
+      type: object
+      required: [category, amount, recorded_at]
+      properties:
+        category: { type: string }
+        subcategory: { type: string }
+        amount: { type: number }
+        currency: { type: string, default: TWD }
+        recorded_at: { type: string, format: date-time }
+        breed: { type: string }
+        age_group: { type: string }
+        parity: { type: integer }
+        herd_tag: { type: string }
+        description: { type: string }
+        notes: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+    RevenueEntryPartial:
+      allOf:
+        - $ref: '#/components/schemas/RevenueEntryInput'
+      required: []
+    CohortAnalysisRequest:
+      type: object
+      required: [dimensions, metrics]
+      properties:
+        dimensions:
+          type: array
+          items: { type: string }
+          minItems: 1
+        metrics:
+          type: array
+          items: { type: string }
+          minItems: 1
+        filters:
+          type: object
+          additionalProperties:
+            type: array
+            items: { oneOf: [{ type: string }, { type: integer }] }
+        time_range:
+          type: object
+          properties:
+            start: { type: string, format: date-time }
+            end: { type: string, format: date-time }
+        limit: { type: integer, default: 50 }
+    CohortAnalysisResponse:
+      type: object
+      properties:
+        dimensions:
+          type: array
+          items: { type: string }
+        metrics:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              dimensions:
+                type: object
+                additionalProperties: { type: string }
+              metrics:
+                type: object
+                additionalProperties: { type: number }
+        generated_at: { type: string, format: date-time }
+    CostBenefitRequest:
+      type: object
+      required: [metrics]
+      properties:
+        metrics:
+          type: array
+          items: { type: string }
+          minItems: 1
+        granularity:
+          type: string
+          enum: [day, month]
+          default: month
+        filters:
+          type: object
+          additionalProperties:
+            type: array
+            items: { oneOf: [{ type: string }, { type: integer }] }
+        time_range:
+          type: object
+          properties:
+            start: { type: string, format: date-time }
+            end: { type: string, format: date-time }
+    CostBenefitResponse:
+      type: object
+      properties:
+        metrics:
+          type: array
+          items: { type: string }
+        granularity:
+          type: string
+        kpis:
+          type: object
+          additionalProperties: { type: number }
+        trend:
+          type: array
+          items:
+            type: object
+            properties:
+              period: { type: string }
+              metrics:
+                type: object
+                additionalProperties: { type: number }
+        generated_at: { type: string, format: date-time }
+    AiReportRequest:
+      type: object
+      required: [api_key, metrics, aggregates]
+      properties:
+        api_key: { type: string }
+        metrics:
+          type: array
+          items: { type: string }
+          minItems: 1
+        filters:
+          type: object
+          additionalProperties:
+            type: array
+            items: { oneOf: [{ type: string }, { type: integer }] }
+        time_range:
+          type: object
+          properties:
+            start: { type: string, format: date-time }
+            end: { type: string, format: date-time }
+        highlights:
+          type: array
+          items: { type: string }
+        aggregates:
+          type: object
+          additionalProperties: true
+    AiReportResponse:
+      type: object
+      properties:
+        report_markdown: { type: string }
+        report_html: { type: string }
     VerifiableLogEntry:
       type: object
       properties:

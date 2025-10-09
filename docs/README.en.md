@@ -44,6 +44,7 @@
 | Authentication | Registration, login, health checks, seeded event options | `app/api/auth.py` | `LoginView.vue`, `stores/auth.js` | `tests/test_auth_api.py`, `tests/test_auth_agent_enhanced.py` |
 | Sheep Management | CRUD, auto history logging, reminders, custom event vocabularies | `app/api/sheep.py`, `app/models.py` | `SheepListView.vue`, `stores/sheep.js` | `tests/test_sheep_api.py`, `tests/test_sheep_events_api.py`, `tests/test_sheep_enhanced.py` |
 | Dashboard & Reports | Cached reminders, medication withdrawal checks, health alerts, farm summary | `app/api/dashboard.py`, `app/cache.py` | `DashboardView.vue`, `stores/dashboard` (computed from API) | `tests/test_dashboard_api.py`, `tests/test_dashboard_enhanced.py` |
+| Analytics & Financial BI | Cost/revenue registry, cohort analysis, AI-assisted reporting, ECharts dashboards | `app/api/finance.py`, `app/api/bi.py` | `AnalyticsHubView.vue`, `stores/analytics.js` | `tests/test_finance_bi_api.py`, `frontend/src/stores/analytics.test.js` |
 | Data Management | Excel export/import, AI-assisted mapping, chat history export | `app/api/data_management.py`, `app/utils.py` | `DataManagementView.vue`, `stores/data` | `tests/test_data_management_api.py`, `tests/test_data_management_enhanced.py`, `tests/test_data_management_error_handling.py` |
 | AI Assistant | Daily tips, nutrition/ESG recommendations, multimodal chat with history | `app/api/agent.py`, `app/utils.py`, `app/models.ChatHistory` | `ConsultationView.vue`, `ChatView.vue`, `stores/consultation.js`, `stores/chat.js` | `tests/test_agent_api.py` |
 | Growth Prediction | Weight projections, confidence bands, ESG-aware guidance | `app/api/prediction.py`, `backend/models/*.joblib` | `PredictionView.vue`, `stores/prediction.js` | `tests/test_prediction_api.py` |
@@ -129,6 +130,8 @@ graph TB
   - `sheep`: Sheep CRUD, event lifecycle, automatic historical logging for key metrics, reminder fields.
   - `data_management`: Excel export/import, AI sheet mapping, template-driven transformations, history/chat export.
   - `dashboard`: Reminder aggregation, medication withdrawal checks, growth/milk trend analysis, event option administration, Redis caching.
+  - `finance`: Per-user cost and revenue ledgers with CRUD, filtering, and bulk import.
+  - `bi`: SQLAlchemy-core cohort queries, cost-benefit trends, rate limiting, Redis caching, Gemini report prompts.
   - `agent`: Gemini-backed daily tips, nutrition + ESG recommendations, multimodal chat with conversation persistence.
   - `prediction`: LightGBM + linear regression blending, data-quality gating, ESG-aware LLM synthesis, chart data endpoints.
   - `traceability`: Product batch CRUD, processing steps, sheep contribution links, public storytelling payloads, append-only log writes.
@@ -141,8 +144,8 @@ graph TB
 ## 4. Frontend Application (Vue 3)
 
 - **Stack**: Vue 3 (Composition API + `<script setup>`), Vite 5, Pinia stores, Element Plus UI library, Axios, Chart.js, and ECharts.
-- **Routing**: `src/router/index.js` defines guarded routes: dashboard, consultation (nutrition), chat, flock management, data management, prediction, IoT, traceability, and settings. Public routes include `/login` and `/trace/:batchNumber`.
-- **State Management**: Pinia stores under `src/stores/` wrap API clients with optimistic updates and error helpers (`auth`, `sheep`, `consultation`, `chat`, `prediction`, `iot`, `traceability`, `settings`). Each store ships with Vitest coverage.
+- **Routing**: `src/router/index.js` defines guarded routes: dashboard, analytics hub, consultation (nutrition), chat, flock management, data management, prediction, IoT, traceability, and settings. Public routes include `/login` and `/trace/:batchNumber`.
+- **State Management**: Pinia stores under `src/stores/` wrap API clients with optimistic updates and error helpers (`auth`, `sheep`, `consultation`, `chat`, `prediction`, `iot`, `traceability`, `analytics`, `settings`). Each store ships with Vitest coverage.
 - **API Layer**: `src/api/index.js` exposes strongly-typed helpers, consistent error handling, and header propagation for Gemini API keys and multipart requests.
 - **Views**: Each route has a dedicated view under `src/views/` accompanied by unit/behaviour tests (e.g., `DashboardView.test.js`, `ConsultationView.behavior.test.js`). Components encapsulate tables, forms, and charts with Element Plus primitives.
 - **UX Considerations**:
@@ -156,6 +159,7 @@ graph TB
   - `/api/agent/tip`: Season-aware daily husbandry tips rendered as Markdown.
   - `/api/agent/recommendation`: Fuses user input with stored sheep context to output nutrition + ESG instructions, leveraging history/events.
   - `/api/agent/chat`: Multimodal chat with optional images (JPEG/PNG/GIF/WebP ≤10 MB) and persisted conversation history.
+  - `/api/bi/ai-report`: Consolidates cohort filters and KPI summaries into structured bilingual operations reports.
   - `/api/prediction/*`: Summaries for weight forecasts and ESG narratives use the same helper with stricter safety settings.
 - **Retrieval-Augmented Generation**:
   - Knowledge sources live under `docs/rag_sources/` (Markdown/Text/PDF). Run `make rag-update` to chunk, embed (Gemini `gemini-embedding-001`, L2-normalised 768-d vectors), and publish `docs/rag_vectors/corpus.parquet` to Git LFS. Scanned PDFs fall back to Tesseract OCR; ensure Poppler + `tesseract-ocr` are installed (Docker image already bundles them).

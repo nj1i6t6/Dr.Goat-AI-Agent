@@ -77,10 +77,39 @@ class InMemoryRedis:
             self._data[key] = value
             self._expirations[key] = time.time() + ttl
 
+    def incr(self, key: str, amount: int = 1) -> int:
+        with self._mutex:
+            self._purge(key)
+            value = self._data.get(key)
+            if value is None:
+                new_value = amount
+            else:
+                try:
+                    new_value = int(value) + amount
+                except (TypeError, ValueError) as exc:
+                    raise TypeError(f'Key {key} does not hold an integer value') from exc
+            self._data[key] = str(new_value)
+            self._expirations.pop(key, None)
+            return new_value
+
+    def expire(self, key: str, ttl: int) -> bool:
+        with self._mutex:
+            if key not in self._data:
+                return False
+            self._expirations[key] = time.time() + ttl
+            return True
+
     def delete(self, key: str) -> None:
         with self._mutex:
             self._data.pop(key, None)
             self._expirations.pop(key, None)
+
+    def keys(self, pattern: str):
+        with self._mutex:
+            if pattern.endswith('*'):
+                prefix = pattern[:-1]
+                return [key for key in list(self._data.keys()) if key.startswith(prefix)]
+            return [pattern] if pattern in self._data else []
 
     def lock(self, name: str, timeout: Optional[int] = None, blocking_timeout: Optional[int] = None):
         return _InMemoryLock(self, name, timeout, blocking_timeout)
