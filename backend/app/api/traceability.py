@@ -1,10 +1,11 @@
+from datetime import datetime, date
+from typing import Any, Dict, List
+
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from pydantic import ValidationError
-from datetime import datetime
-
 from app.models import (
     db,
     ProductBatch,
@@ -13,6 +14,7 @@ from app.models import (
     Sheep,
     SheepEvent,
     SheepHistoricalData,
+    VerifiableLog,
 )
 from app.schemas import (
     ProductBatchCreateModel,
@@ -22,6 +24,7 @@ from app.schemas import (
     BatchSheepLinkModel,
     create_error_response,
 )
+from app.services.verifiable_log_service import append_event, serialize_entry
 
 bp = Blueprint('traceability', __name__)
 
@@ -32,11 +35,71 @@ def _ensure_authenticated_response():
     return None
 
 
+def _format_value(value: Any):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, list):
+        return [_format_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _format_value(val) for key, val in value.items()}
+    return value
+
+
+def _log_traceability_event(
+    entity_type: str,
+    entity_id: int,
+    action: str,
+    summary: str,
+    metadata: Dict[str, Any] | None = None,
+):
+    actor = None
+    if current_user.is_authenticated:
+        actor = {
+            'id': getattr(current_user, 'id', None),
+            'username': getattr(current_user, 'username', None),
+        }
+    append_event(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        event={
+            'action': action,
+            'summary': summary,
+            'actor': actor,
+            'metadata': _format_value(metadata or {}),
+        },
+    )
+
+
+def _load_step_fingerprints(step_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
+    if not step_ids:
+        return {}
+    entries = (
+        VerifiableLog.query.filter(
+            VerifiableLog.entity_type == 'processing_step',
+            VerifiableLog.entity_id.in_(step_ids),
+        )
+        .order_by(VerifiableLog.entity_id.asc(), VerifiableLog.id.asc())
+        .all()
+    )
+    mapping: Dict[int, List[Dict[str, Any]]] = {step_id: [] for step_id in step_ids}
+    for entry in entries:
+        mapping.setdefault(entry.entity_id, []).append(serialize_entry(entry))
+    return mapping
+
+
 def _serialize_batch(batch: ProductBatch, include_relationships: bool = False):
     data = batch.to_dict(include_relationships=include_relationships)
     if include_relationships:
         steps = sorted(batch.steps, key=lambda s: (s.sequence_order or 0, s.id))
-        data['steps'] = [step.to_dict() for step in steps]
+        step_fingerprints = _load_step_fingerprints([step.id for step in steps])
+        enriched_steps = []
+        for step in steps:
+            payload = step.to_dict()
+            payload['fingerprints'] = step_fingerprints.get(step.id, [])
+            enriched_steps.append(payload)
+        data['steps'] = enriched_steps
         links_payload = []
         for link in batch.sheep_links:
             payload = link.to_dict(include_sheep=True)
@@ -97,6 +160,7 @@ def _upsert_sheep_links(batch: ProductBatch, link_models, sheep_lookup):
 
 def _build_public_story(batch: ProductBatch):
     steps = sorted(batch.steps, key=lambda s: (s.sequence_order or 0, s.started_at or datetime.min))
+    step_fingerprints = _load_step_fingerprints([step.id for step in steps])
     timeline = []
     for step in steps:
         timeline.append({
@@ -106,6 +170,7 @@ def _build_public_story(batch: ProductBatch):
             'started_at': step.started_at.isoformat() if step.started_at else None,
             'completed_at': step.completed_at.isoformat() if step.completed_at else None,
             'evidence_url': step.evidence_url,
+            'fingerprints': step_fingerprints.get(step.id, []),
         })
 
     sheep_details = []
@@ -228,9 +293,44 @@ def create_batch():
         db.session.add(batch)
         db.session.flush()
 
+        _log_traceability_event(
+            'product_batch',
+            batch.id,
+            'create',
+            f'建立批次 {batch.batch_number}',
+            {
+                'batch_number': batch.batch_number,
+                'product_name': batch.product_name,
+                'is_public': batch.is_public,
+            },
+        )
+
+        if batch.steps:
+            for step in batch.steps:
+                _log_traceability_event(
+                    'processing_step',
+                    step.id,
+                    'create',
+                    f'建立加工步驟 {step.title}',
+                    {
+                        'batch_id': batch.id,
+                        'sequence_order': step.sequence_order,
+                        'evidence_url': step.evidence_url,
+                    },
+                )
+
         if payload.sheep_links:
             sheep_lookup = _validate_sheep_links(current_user.id, payload.sheep_links)
             _upsert_sheep_links(batch, payload.sheep_links, sheep_lookup)
+            _log_traceability_event(
+                'product_batch',
+                batch.id,
+                'link',
+                f'批次 {batch.batch_number} 設定羊隻關聯',
+                {
+                    'linked_sheep_ids': [link.sheep_id for link in batch.sheep_links],
+                },
+            )
 
         db.session.commit()
         return jsonify(_serialize_batch(batch, include_relationships=True)), 201
@@ -273,15 +373,42 @@ def update_batch(batch_id):
     except ValidationError as e:
         return jsonify(create_error_response('資料驗證失敗', e.errors())), 400
 
-    for field in ['product_name', 'product_type', 'description', 'esg_highlights', 'production_date', 'expiration_date', 'origin_story', 'is_public']:
+    tracked_fields = ['product_name', 'product_type', 'description', 'esg_highlights', 'production_date', 'expiration_date', 'origin_story', 'is_public']
+    original_state = {field: getattr(batch, field) for field in tracked_fields}
+
+    for field in tracked_fields:
         value = getattr(payload, field)
         if value is not None:
             setattr(batch, field, value)
 
     try:
+        metadata: Dict[str, Any] = {}
+        changed_fields = {}
+        for field in tracked_fields:
+            previous = original_state[field]
+            current = getattr(batch, field)
+            if previous != current:
+                changed_fields[field] = {
+                    'old': _format_value(previous),
+                    'new': _format_value(current),
+                }
+
         if payload.sheep_links is not None:
             sheep_lookup = _validate_sheep_links(current_user.id, payload.sheep_links)
             _upsert_sheep_links(batch, payload.sheep_links, sheep_lookup)
+            metadata['linked_sheep_ids'] = [link.sheep_id for link in batch.sheep_links]
+
+        if changed_fields:
+            metadata['changed_fields'] = changed_fields
+
+        if metadata:
+            _log_traceability_event(
+                'product_batch',
+                batch.id,
+                'update',
+                f'更新批次 {batch.batch_number}',
+                metadata,
+            )
 
         db.session.commit()
         return jsonify(_serialize_batch(batch, include_relationships=True))
@@ -302,6 +429,17 @@ def delete_batch(batch_id):
     if not batch:
         return jsonify(error='找不到批次或您沒有權限'), 404
     try:
+        _log_traceability_event(
+            'product_batch',
+            batch.id,
+            'delete',
+            f'刪除批次 {batch.batch_number}',
+            {
+                'batch_number': batch.batch_number,
+                'total_steps': len(batch.steps),
+                'linked_sheep_ids': [link.sheep_id for link in batch.sheep_links],
+            },
+        )
         db.session.delete(batch)
         db.session.commit()
         return jsonify(success=True, message='批次已刪除')
@@ -339,6 +477,18 @@ def add_step(batch_id):
     )
     try:
         db.session.add(step)
+        db.session.flush()
+        _log_traceability_event(
+            'processing_step',
+            step.id,
+            'create',
+            f'批次 {batch.batch_number} 新增步驟 {step.title}',
+            {
+                'batch_id': batch.id,
+                'sequence_order': step.sequence_order,
+                'evidence_url': step.evidence_url,
+            },
+        )
         db.session.commit()
         return jsonify(step.to_dict()), 201
     except Exception as e:
@@ -363,12 +513,37 @@ def update_step(step_id):
     except ValidationError as e:
         return jsonify(create_error_response('資料驗證失敗', e.errors())), 400
 
-    for field in ['title', 'description', 'sequence_order', 'started_at', 'completed_at', 'evidence_url']:
+    tracked_fields = ['title', 'description', 'sequence_order', 'started_at', 'completed_at', 'evidence_url']
+    original_state = {field: getattr(step, field) for field in tracked_fields}
+
+    for field in tracked_fields:
         value = getattr(payload, field)
         if value is not None:
             setattr(step, field, value)
 
     try:
+        changed_fields = {}
+        for field in tracked_fields:
+            previous = original_state[field]
+            current = getattr(step, field)
+            if previous != current:
+                changed_fields[field] = {
+                    'old': _format_value(previous),
+                    'new': _format_value(current),
+                }
+
+        if changed_fields:
+            _log_traceability_event(
+                'processing_step',
+                step.id,
+                'update',
+                f'更新步驟 {step.title}',
+                {
+                    'batch_id': step.batch_id,
+                    'changed_fields': changed_fields,
+                },
+            )
+
         db.session.commit()
         return jsonify(step.to_dict())
     except Exception as e:
@@ -385,6 +560,16 @@ def delete_step(step_id):
     if not step or step.batch.user_id != current_user.id:
         return jsonify(error='找不到步驟或您沒有權限'), 404
     try:
+        _log_traceability_event(
+            'processing_step',
+            step.id,
+            'delete',
+            f'刪除步驟 {step.title}',
+            {
+                'batch_id': step.batch_id,
+                'sequence_order': step.sequence_order,
+            },
+        )
         db.session.delete(step)
         db.session.commit()
         return jsonify(success=True, message='步驟已刪除')
@@ -414,6 +599,16 @@ def replace_sheep_links(batch_id):
         link_models = [BatchSheepLinkModel(**item) for item in sheep_links_data]
         sheep_lookup = _validate_sheep_links(current_user.id, link_models)
         _upsert_sheep_links(batch, link_models, sheep_lookup)
+        _log_traceability_event(
+            'product_batch',
+            batch.id,
+            'link',
+            f'批次 {batch.batch_number} 更新羊隻關聯',
+            {
+                'linked_sheep_ids': [link.sheep_id for link in batch.sheep_links],
+                'total_links': len(batch.sheep_links),
+            },
+        )
         db.session.commit()
         return jsonify(_serialize_batch(batch, include_relationships=True))
     except ValidationError as e:
@@ -439,6 +634,16 @@ def remove_sheep_link(batch_id, sheep_id):
     if not link:
         return jsonify(error='找不到指定羊隻關聯'), 404
     try:
+        _log_traceability_event(
+            'product_batch',
+            batch.id,
+            'link',
+            f'批次 {batch.batch_number} 移除羊隻 {sheep_id}',
+            {
+                'removed_sheep_id': sheep_id,
+                'remaining_sheep_ids': [association.sheep_id for association in batch.sheep_links if association.sheep_id != sheep_id],
+            },
+        )
         db.session.delete(link)
         db.session.commit()
         return jsonify(success=True, message='羊隻已移除')

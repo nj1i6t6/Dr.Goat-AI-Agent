@@ -3,9 +3,11 @@ Pydantic 資料驗證模型
 用於 API 請求和響應的資料驗證與序列化
 """
 
-from pydantic import BaseModel, field_validator, Field
-from typing import Optional, List, Dict, Any, Literal
+import json
 from datetime import datetime, date
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, Field, field_validator
 
 
 # === 認證相關模型 ===
@@ -308,6 +310,30 @@ class EventDescriptionOptionModel(BaseModel):
     event_type_option_id: int = Field(..., description="事件類型選項ID")
     description: str = Field(..., min_length=1, max_length=200, description="事件描述")
     is_default: bool = Field(False, description="是否為預設選項")
+
+
+def _metadata_json_encoder(value: Any):
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    raise TypeError(f'Unsupported metadata type: {type(value)!r}')
+
+
+class VerifiableLogActorModel(BaseModel):
+    id: Optional[int] = None
+    username: Optional[str] = None
+
+
+class VerifiableLogEventModel(BaseModel):
+    action: Literal['create', 'update', 'delete', 'link', 'verify', 'sync'] = Field(..., description='事件動作')
+    summary: str = Field(..., min_length=1, max_length=255, description='事件摘要')
+    actor: Optional[VerifiableLogActorModel] = Field(None, description='操作人員資訊')
+    metadata: Dict[str, Any] = Field(default_factory=dict, description='補充資訊')
+
+    @field_validator('metadata')
+    @classmethod
+    def validate_metadata(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        json.dumps(value, default=_metadata_json_encoder)
+        return value
 
 
 # === 工具函數 ===

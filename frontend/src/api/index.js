@@ -275,6 +275,9 @@ export default {
   getPublicTraceBatch(batchNumber, errorHandler) {
     return withErrorHandling(() => apiClient.get(`/api/traceability/public/${batchNumber}`), errorHandler);
   },
+  verifyHashChain(params = {}, errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/verify/chain', { params }), errorHandler);
+  },
 
   // IoT 裝置與自動化規則 API
   getIotDevices(errorHandler) {

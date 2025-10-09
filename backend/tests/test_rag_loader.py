@@ -8,6 +8,8 @@ import pytest
 from app import rag_loader
 from app.ai import EmbeddingError
 
+pytest.importorskip("pyarrow", reason="pyarrow is required for parquet-related tests")
+
 
 class StubRedis:
     def __init__(self):

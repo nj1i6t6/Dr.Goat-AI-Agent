@@ -37,3 +37,32 @@ def enqueue_example_task(user_id: int):
         user_id,
         description=f'Generate dashboard snapshot for user {user_id}',
     )
+
+
+def verify_verifiable_log_chain() -> Dict[str, Any]:
+    """執行完整的可驗證賬本鏈檢查。"""
+
+    from app.services.verifiable_log_service import verify_chain  # 避免循環匯入
+
+    result = verify_chain()
+    if result['integrity'] == 'OK':
+        current_app.logger.info(
+            'Verifiable log integrity OK — %s entries checked',
+            result.get('checked', 0),
+        )
+    else:
+        current_app.logger.error(
+            'Verifiable log integrity FAILED at id %s',
+            result.get('broken_at_id'),
+        )
+    return result
+
+
+def enqueue_verifiable_log_verification():
+    """將可驗證賬本檢查排入背景任務。"""
+
+    queue = get_task_queue()
+    return queue.enqueue(
+        verify_verifiable_log_chain,
+        description='Verify verifiable ledger chain integrity',
+    )

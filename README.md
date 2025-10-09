@@ -34,6 +34,7 @@
 - 使用 LightGBM/線性回歸結合 LLM，輸出帶信賴區間的生長預測與 ESG 解讀。
 - 自動化 Excel 匯入匯出，包含欄位對映、預設範本與錯誤提示。
 - 產出可分享的產銷履歷故事、時間軸與 QR code 友善資料。
+- 提供不可竄改的可驗證賬本，串連產銷履歷與重大醫療事件，協助稽核與外部買家自主驗證。
 - 結合 IoT 裝置資料、規則判斷與控制指令，閉環連結虛實場域。
 
 ### 1.2 功能地圖
@@ -46,7 +47,7 @@
 | 資料治理 | Excel 匯出/匯入、AI 導入建議、聊天紀錄匯出 | `app/api/data_management.py`、`app/utils.py` | `DataManagementView.vue`、`stores/data` | `tests/test_data_management_api.py`、`tests/test_data_management_enhanced.py`、`tests/test_data_management_error_handling.py` |
 | AI 協作 | 每日提示、營養/ESG 建議、多模態聊天 | `app/api/agent.py`、`app/utils.py`、`app/models.ChatHistory` | `ConsultationView.vue`、`ChatView.vue`、`stores/consultation.js`、`stores/chat.js` | `tests/test_agent_api.py` |
 | 生長預測 | 體重預估、信賴區間、ESG 說明 | `app/api/prediction.py`、`backend/models/*.joblib` | `PredictionView.vue`、`stores/prediction.js` | `tests/test_prediction_api.py` |
-| 產銷履歷 | 批次流程、加工步驟、羊隻貢獻、公眾故事 | `app/api/traceability.py` | `TraceabilityManagementView.vue`、`TraceabilityPublicView.vue`、`stores/traceability.js` | `tests/test_traceability_api.py` |
+| 產銷履歷 | 批次流程、加工步驟、羊隻貢獻、公眾故事、可驗證 Hash 鏈 | `app/api/traceability.py` | `TraceabilityManagementView.vue`、`TraceabilityPublicView.vue`、`stores/traceability.js` | `tests/test_traceability_api.py`、`tests/test_verifiable_log.py` |
 | IoT 自動化 | 裝置註冊、HMAC API Key、資料攝取、規則判斷、控制紀錄 | `app/api/iot.py`、`app/iot/automation.py` | `IotManagementView.vue`、`stores/iot.js` | `tests/test_iot_api.py`、`tests/test_iot_worker.py` |
 | 背景任務 | 輕量佇列與示範任務端點 | `app/tasks.py`、`app/simple_queue.py`、`app/api/tasks.py` | 設定/維運頁面觸發 | `tests/test_tasks_api.py` |
 
@@ -130,10 +131,11 @@ graph TB
   - `dashboard`：提醒、停藥期、體重/奶量趨勢分析、事件選項管理、Redis 快取。
   - `agent`：Gemini 每日提示、營養+ESG 建議、多模態聊天紀錄。
   - `prediction`：LightGBM+線性回歸、數據品質檢查、ESG LLM 解讀、圖表資料。
-  - `traceability`：批次/加工步驟/羊隻關聯、公眾故事 payload。
+  - `traceability`：批次/加工步驟/羊隻關聯、公眾故事 payload、可驗證賬本寫入。
   - `iot`：裝置註冊與 HMAC API key、感測資料攝取、規則判斷、控制指令紀錄。
   - `tasks`：透過 `SimpleQueue` 排程示範任務。
-- **資料模型**：`app/models.py` 涵蓋羊隻、事件、歷史、聊天、IoT 裝置、規則與控制紀錄，並以 Unique Constraint 確保用戶隔離。
+  - `verify`：提供 Hash 鏈完整性檢查、串流查詢與稽核用 API。
+- **資料模型**：`app/models.py` 涵蓋羊隻、事件、歷史、聊天、IoT 裝置、規則、可驗證賬本與控制紀錄，並以 Unique Constraint 確保用戶隔離。
 - **工具**：`app/utils.py` 統一 Gemini 呼叫、羊隻上下文、圖片編碼；`app/cache.py` 封裝 Redis 快取與鎖。
 
 ## 4. 前端應用 (Vue 3)
@@ -145,6 +147,7 @@ graph TB
 - **視圖與測試**：每個頁面皆有對應測試 (`*.test.js` / `*.behavior.test.js`) 驗證路由守衛、表單驗證、Store 行為與 UI 呈現。
 - **UX**：
   - Element Plus 排版、統一 loading/toast、AI Markdown 呈現、API Key 彈窗一次顯示。
+  - 公開產銷履歷每個加工步驟提供「數據指紋」彈窗，可檢視 Hash 鏈資訊並支援複製/下載，方便稽核。
   - 系統設定新增「字體大小」切換（預設／大字），同步調整 Element Plus 基準字級與全域 CSS 變數，方便熟齡牧場管理者以較大的字體操作系統。
 
 ## 5. AI 與機器學習能力
@@ -189,6 +192,7 @@ graph TB
 - **Session 與快取**：Redis 作為 Flask Session；`app/cache.py` 針對 Dashboard 以 TTL + 鎖避免併發重算。
 - **SimpleQueue**：使用 Redis list，提供 `enqueue_example_task` 示範，並由 `app/tasks.py` 暴露 API。
 - **Worker**：`backend/run_worker.py`、`start_*` 腳本負責啟動背景任務與 IoT 控制流程。
+- **可驗證賬本檢查**：`app/tasks.verify_verifiable_log_chain` 會記錄 Hash 鏈完整性並在異常時寫入錯誤 log；`enqueue_verifiable_log_verification` 可做排程或手動觸發。
 
 ## 9. 本機開發環境
 

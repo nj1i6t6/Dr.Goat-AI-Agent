@@ -6,6 +6,8 @@
 | Flock | 羊群 | Grouping used in dashboards and reports. |
 | Batch | 批次 | Production batch for traceability workflows. |
 | Traceability | 產銷履歷 | Public-facing supply-chain storytelling. |
+| Verifiable Ledger | 可驗證賬本 | Append-only hash chain stored in `verifiable_log`. |
+| Data Fingerprint | 數據指紋 | Modal showing hash/metadata for traceability steps. |
 | ESG | 永續 / ESG 指標 | Environmental, social, and governance metrics. |
 | Sensor Reading | 感測數據 | IoT ingestion payload stored per device. |
 | IoT Device | IoT 裝置 | Managed hardware endpoint for telemetry. |

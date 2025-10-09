@@ -1,15 +1,72 @@
+from datetime import datetime, date
+from typing import Any, Dict
+
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
-from app.models import db, Sheep, SheepEvent, SheepHistoricalData
+from pydantic import ValidationError
+
 from app.cache import clear_dashboard_cache
+from app.models import db, Sheep, SheepEvent, SheepHistoricalData
 from app.schemas import (
-    SheepCreateModel, SheepUpdateModel, SheepEventCreateModel, 
+    SheepCreateModel, SheepUpdateModel, SheepEventCreateModel,
     HistoricalDataCreateModel, create_error_response
 )
-from pydantic import ValidationError
-from datetime import datetime, date
+from app.services.verifiable_log_service import append_event
 
 bp = Blueprint('sheep', __name__)
+
+SIGNIFICANT_EVENT_KEYWORDS = ('醫療', '治療', '手術', '疫', '藥')
+
+
+def _normalise_metadata(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, list):
+        return [_normalise_metadata(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _normalise_metadata(val) for key, val in value.items()}
+    return value
+
+
+def _is_significant_event(event_type: str | None, medication: str | None, withdrawal_days: int | None) -> bool:
+    if medication:
+        return True
+    if withdrawal_days and withdrawal_days > 0:
+        return True
+    if not event_type:
+        return False
+    return any(keyword in event_type for keyword in SIGNIFICANT_EVENT_KEYWORDS)
+
+
+def _log_significant_event(action: str, event: SheepEvent, ear_num: str | None = None, metadata: Dict[str, Any] | None = None):
+    if not _is_significant_event(event.event_type, event.medication, event.withdrawal_days):
+        return
+    actor = None
+    if current_user.is_authenticated:
+        actor = {
+            'id': getattr(current_user, 'id', None),
+            'username': getattr(current_user, 'username', None),
+        }
+    payload = {
+        'sheep_id': event.sheep_id,
+        'event_date': event.event_date,
+        'event_type': event.event_type,
+        'description': event.description,
+        'medication': event.medication,
+        'withdrawal_days': event.withdrawal_days,
+    }
+    if metadata:
+        payload.update(metadata)
+    append_event(
+        entity_type='sheep_event',
+        entity_id=event.id,
+        event={
+            'action': action,
+            'summary': f'羊隻 {ear_num or event.sheep_id} 事件 {event.event_type}',
+            'actor': actor,
+            'metadata': _normalise_metadata(payload),
+        },
+    )
 
 # --- Sheep (羊隻) API Endpoints ---
 
@@ -171,11 +228,13 @@ def add_sheep_event(ear_num):
     try:
         event_dict = event_data.model_dump(exclude_unset=True)
         new_event = SheepEvent(
-            user_id=current_user.id, 
-            sheep_id=sheep.id, 
+            user_id=current_user.id,
+            sheep_id=sheep.id,
             **event_dict
         )
         db.session.add(new_event)
+        db.session.flush()
+        _log_significant_event('create', new_event, ear_num=sheep.EarNum)
         db.session.commit()
         clear_dashboard_cache(current_user.id)
         return jsonify(success=True, message="羊隻事件新增成功", event=new_event.to_dict()), 201
@@ -190,16 +249,45 @@ def update_event(event_id):
     event = SheepEvent.query.get_or_404(event_id)
     if event.user_id != current_user.id:
         return jsonify(error="權限不足"), 403
-    
+
     data = request.get_json()
     if not data.get('event_date') or not data.get('event_type'):
         return jsonify(error="事件日期和類型為必填"), 400
-        
+
+    original_snapshot = {
+        'event_date': event.event_date,
+        'event_type': event.event_type,
+        'description': event.description,
+        'notes': event.notes,
+        'medication': event.medication,
+        'withdrawal_days': event.withdrawal_days,
+    }
+    was_significant = _is_significant_event(
+        original_snapshot['event_type'],
+        original_snapshot['medication'],
+        original_snapshot['withdrawal_days'],
+    )
+
     try:
         allowed_keys = SheepEvent.__table__.columns.keys()
         for key, value in data.items():
             if key in allowed_keys:
                 setattr(event, key, value)
+        changed_fields = {}
+        for key, previous in original_snapshot.items():
+            current_value = getattr(event, key)
+            if previous != current_value:
+                changed_fields[key] = {
+                    'old': _normalise_metadata(previous),
+                    'new': _normalise_metadata(current_value),
+                }
+        is_significant = _is_significant_event(event.event_type, event.medication, event.withdrawal_days)
+        if changed_fields and (was_significant or is_significant):
+            _log_significant_event(
+                'update',
+                event,
+                metadata={'changed_fields': changed_fields},
+            )
         db.session.commit()
         clear_dashboard_cache(current_user.id)
         return jsonify(success=True, message="事件更新成功", event=event.to_dict())
@@ -214,8 +302,9 @@ def delete_event(event_id):
     event = SheepEvent.query.get_or_404(event_id)
     if event.user_id != current_user.id:
         return jsonify(error="權限不足"), 403
-    
+
     try:
+        _log_significant_event('delete', event)
         db.session.delete(event)
         db.session.commit()
         clear_dashboard_cache(current_user.id)
