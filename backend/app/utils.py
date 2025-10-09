@@ -1,8 +1,8 @@
+import base64
+import json
 from datetime import date, datetime
 from typing import Any
 
-import base64
-import json
 import requests
 from flask import current_app
 

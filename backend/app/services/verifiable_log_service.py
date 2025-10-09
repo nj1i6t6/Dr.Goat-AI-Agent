@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 from app import db
 from app.models import ProductBatch, ProcessingStep, SheepEvent, VerifiableLog
@@ -29,9 +29,7 @@ def append_event(
     payload["metadata"] = normalise_json_payload(payload.get("metadata") or {})
     timestamp = datetime.utcnow()
 
-    previous_entry = (
-        VerifiableLog.query.order_by(VerifiableLog.id.desc()).with_for_update().first()
-    )
+    previous_entry = _lock_current_tail()
     previous_hash = previous_entry.current_hash if previous_entry else None
 
     hash_payload = {
@@ -183,10 +181,11 @@ def _owned_ids_for_type(entity_type: str, entity_ids: Iterable[int], user_id: in
     if not ids:
         return set()
 
-    if entity_type == "product_batch":
+    if entity_type in _OWNABLE_MODELS:
+        model = _OWNABLE_MODELS[entity_type]
         rows = (
-            ProductBatch.query.with_entities(ProductBatch.id)
-            .filter(ProductBatch.id.in_(ids), ProductBatch.user_id == user_id)
+            model.query.with_entities(model.id)
+            .filter(model.id.in_(ids), model.user_id == user_id)
             .all()
         )
         return {row[0] for row in rows}
@@ -200,12 +199,32 @@ def _owned_ids_for_type(entity_type: str, entity_ids: Iterable[int], user_id: in
         )
         return {row[0] for row in rows}
 
-    if entity_type == "sheep_event":
-        rows = (
-            SheepEvent.query.with_entities(SheepEvent.id)
-            .filter(SheepEvent.id.in_(ids), SheepEvent.user_id == user_id)
-            .all()
-        )
-        return {row[0] for row in rows}
-
     return set()
+
+
+def _lock_current_tail() -> Optional[VerifiableLog]:
+    """Lock and return the current tail entry, accounting for concurrent writers."""
+
+    candidate = (
+        VerifiableLog.query.order_by(VerifiableLog.id.desc()).with_for_update().first()
+    )
+
+    if candidate is None:
+        return None
+
+    while True:
+        latest = VerifiableLog.query.order_by(VerifiableLog.id.desc()).first()
+        if latest is None or latest.id == candidate.id:
+            return candidate
+
+        candidate = (
+            VerifiableLog.query.filter_by(id=latest.id)
+            .with_for_update()
+            .one()
+        )
+
+
+_OWNABLE_MODELS = {
+    "product_batch": ProductBatch,
+    "sheep_event": SheepEvent,
+}
