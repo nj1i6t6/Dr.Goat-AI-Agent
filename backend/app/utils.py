@@ -1,8 +1,26 @@
-import requests
-import json
 import base64
-from .models import Sheep, SheepEvent, SheepHistoricalData
+import json
+from datetime import date, datetime
+from typing import Any
+
+import requests
 from flask import current_app
+
+from .models import Sheep, SheepEvent, SheepHistoricalData
+
+
+def normalise_json_payload(value: Any) -> Any:
+    """Normalise nested structures for deterministic JSON serialisation."""
+
+    if isinstance(value, datetime):
+        return value.isoformat(timespec="microseconds")
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, (list, tuple)):
+        return [normalise_json_payload(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): normalise_json_payload(val) for key, val in value.items()}
+    return value
 
 def call_gemini_api(prompt_text, api_key, generation_config_override=None, safety_settings_override=None):
     """

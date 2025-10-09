@@ -25,6 +25,7 @@ from app.schemas import (
     create_error_response,
 )
 from app.services.verifiable_log_service import append_event, serialize_entry
+from app.utils import normalise_json_payload
 
 bp = Blueprint('traceability', __name__)
 
@@ -33,20 +34,6 @@ def _ensure_authenticated_response():
     if not current_user.is_authenticated:
         return jsonify(error='Login required'), 401
     return None
-
-
-def _format_value(value: Any):
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, date):
-        return value.isoformat()
-    if isinstance(value, list):
-        return [_format_value(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _format_value(val) for key, val in value.items()}
-    return value
-
-
 def _log_traceability_event(
     entity_type: str,
     entity_id: int,
@@ -67,7 +54,7 @@ def _log_traceability_event(
             'action': action,
             'summary': summary,
             'actor': actor,
-            'metadata': _format_value(metadata or {}),
+            'metadata': normalise_json_payload(metadata or {}),
         },
     )
 
@@ -389,8 +376,8 @@ def update_batch(batch_id):
             current = getattr(batch, field)
             if previous != current:
                 changed_fields[field] = {
-                    'old': _format_value(previous),
-                    'new': _format_value(current),
+                    'old': normalise_json_payload(previous),
+                    'new': normalise_json_payload(current),
                 }
 
         if payload.sheep_links is not None:
@@ -528,8 +515,8 @@ def update_step(step_id):
             current = getattr(step, field)
             if previous != current:
                 changed_fields[field] = {
-                    'old': _format_value(previous),
-                    'new': _format_value(current),
+                    'old': normalise_json_payload(previous),
+                    'new': normalise_json_payload(current),
                 }
 
         if changed_fields:

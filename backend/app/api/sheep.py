@@ -12,22 +12,11 @@ from app.schemas import (
     HistoricalDataCreateModel, create_error_response
 )
 from app.services.verifiable_log_service import append_event
+from app.utils import normalise_json_payload
 
 bp = Blueprint('sheep', __name__)
 
 SIGNIFICANT_EVENT_KEYWORDS = ('醫療', '治療', '手術', '疫', '藥')
-
-
-def _normalise_metadata(value: Any) -> Any:
-    if isinstance(value, (datetime, date)):
-        return value.isoformat()
-    if isinstance(value, list):
-        return [_normalise_metadata(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _normalise_metadata(val) for key, val in value.items()}
-    return value
-
-
 def _is_significant_event(event_type: str | None, medication: str | None, withdrawal_days: int | None) -> bool:
     if medication:
         return True
@@ -64,7 +53,7 @@ def _log_significant_event(action: str, event: SheepEvent, ear_num: str | None =
             'action': action,
             'summary': f'羊隻 {ear_num or event.sheep_id} 事件 {event.event_type}',
             'actor': actor,
-            'metadata': _normalise_metadata(payload),
+            'metadata': normalise_json_payload(payload),
         },
     )
 
@@ -278,8 +267,8 @@ def update_event(event_id):
             current_value = getattr(event, key)
             if previous != current_value:
                 changed_fields[key] = {
-                    'old': _normalise_metadata(previous),
-                    'new': _normalise_metadata(current_value),
+                    'old': normalise_json_payload(previous),
+                    'new': normalise_json_payload(current_value),
                 }
         is_significant = _is_significant_event(event.event_type, event.medication, event.withdrawal_days)
         if changed_fields and (was_significant or is_significant):

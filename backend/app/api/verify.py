@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.services.verifiable_log_service import (
     append_event,  # noqa: F401 - re-export for future extensions
@@ -23,10 +23,13 @@ def get_chain_status():
     result = verify_chain(start_id=start_id, limit=limit)
 
     if entity_type and entity_id is not None:
-        result['entries'] = list_entity_entries(entity_type, entity_id)
+        entries = list_entity_entries(entity_type, entity_id, user_id=current_user.id)
+        if entries is None:
+            return jsonify(error='找不到資料或您沒有權限'), 404
+        result['entries'] = entries
     elif include_entries:
         recent_limit = limit or 100
-        result['entries'] = recent_entries(recent_limit)
+        result['entries'] = recent_entries(recent_limit, user_id=current_user.id)
 
     status_code = 200 if result['integrity'] == 'OK' else 409
     return jsonify(result), status_code

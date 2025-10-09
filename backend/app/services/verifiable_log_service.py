@@ -1,26 +1,21 @@
 """Helpers for managing the verifiable append-only log."""
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any, Dict, Iterable, List, Optional
+from datetime import datetime
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set
+
+from sqlalchemy import or_, select
+from sqlalchemy.exc import InvalidRequestError
 
 from app import db
-from app.models import VerifiableLog
+from app.models import ProductBatch, ProcessingStep, SheepEvent, VerifiableLog
 from app.schemas import VerifiableLogEventModel
+from app.utils import normalise_json_payload
 
 from .hash_service import HashService
 
 
-def _normalise_value(value: Any) -> Any:
-    if isinstance(value, datetime):
-        return value.isoformat(timespec="microseconds")
-    if isinstance(value, date):
-        return value.isoformat()
-    if isinstance(value, (list, tuple)):
-        return [_normalise_value(item) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _normalise_value(val) for key, val in value.items()}
-    return value
+LEDGER_VERIFICATION_BATCH_SIZE = 200
 
 
 def append_event(
@@ -33,32 +28,45 @@ def append_event(
 
     event_model = event if isinstance(event, VerifiableLogEventModel) else VerifiableLogEventModel(**event)
     payload = event_model.model_dump()
-    payload["metadata"] = _normalise_value(payload.get("metadata") or {})
-    timestamp = datetime.utcnow()
+    payload["metadata"] = normalise_json_payload(payload.get("metadata") or {})
 
-    previous_entry = (
-        VerifiableLog.query.order_by(VerifiableLog.id.desc()).first()
-    )
-    previous_hash = previous_entry.current_hash if previous_entry else None
+    session = db.session()
 
-    hash_payload = {
-        "entity_type": entity_type,
-        "entity_id": entity_id,
-        "event_data": payload,
-        "timestamp": timestamp.isoformat(timespec="microseconds"),
-    }
-    current_hash = HashService.generate_hash(previous_hash, hash_payload)
+    def _append() -> VerifiableLog:
+        previous_entry = _lock_current_tail()
+        timestamp = datetime.utcnow()
+        previous_hash = previous_entry.current_hash if previous_entry else None
 
-    entry = VerifiableLog(
-        entity_type=entity_type,
-        entity_id=entity_id,
-        event_data=payload,
-        timestamp=timestamp,
-        previous_hash=previous_hash,
-        current_hash=current_hash,
-    )
-    db.session.add(entry)
-    db.session.flush()
+        hash_payload = {
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "event_data": payload,
+            "timestamp": timestamp.isoformat(timespec="microseconds"),
+        }
+        current_hash = HashService.generate_hash(previous_hash, hash_payload)
+
+        entry = VerifiableLog(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            event_data=payload,
+            timestamp=timestamp,
+            previous_hash=previous_hash,
+            current_hash=current_hash,
+        )
+        session.add(entry)
+        session.flush()
+        return entry
+
+    if session.in_transaction():
+        entry = _append()
+    else:
+        try:
+            with session.begin():
+                entry = _append()
+        except InvalidRequestError:
+            with session.begin_nested():
+                entry = _append()
+
     return entry
 
 
@@ -76,7 +84,7 @@ def verify_chain(*, start_id: Optional[int] = None, limit: Optional[int] = None)
     broken_at_id: Optional[int] = None
     last_hash: Optional[str] = None
 
-    for entry in query.yield_per(200):
+    for entry in query.yield_per(LEDGER_VERIFICATION_BATCH_SIZE):
         if previous_hash is None and start_id is None and entry.previous_hash not in (None, ""):
             broken_at_id = entry.id
             break
@@ -109,8 +117,17 @@ def verify_chain(*, start_id: Optional[int] = None, limit: Optional[int] = None)
     }
 
 
-def list_entity_entries(entity_type: str, entity_id: int) -> List[Dict[str, Any]]:
-    """Return serialised log entries for a specific entity."""
+def list_entity_entries(
+    entity_type: str,
+    entity_id: int,
+    *,
+    user_id: int,
+) -> Optional[List[Dict[str, Any]]]:
+    """Return serialised log entries for a specific entity, scoped to a user."""
+
+    allowed_ids = _owned_ids_for_type(entity_type, {entity_id}, user_id)
+    if entity_id not in allowed_ids:
+        return None
 
     entries: Iterable[VerifiableLog] = (
         VerifiableLog.query.filter_by(entity_type=entity_type, entity_id=entity_id)
@@ -135,13 +152,90 @@ def serialize_entry(entry: VerifiableLog) -> Dict[str, Any]:
     }
 
 
-def recent_entries(limit: int = 100) -> List[Dict[str, Any]]:
-    """Return the most recent log entries in chronological order."""
+def recent_entries(limit: int = 100, *, user_id: int) -> List[Dict[str, Any]]:
+    """Return the most recent log entries visible to the user in chronological order."""
 
     limit = max(limit, 1)
+
+    conditions = []
+
+    product_batch_ids = select(ProductBatch.id).where(ProductBatch.user_id == user_id)
+    conditions.append(
+        (VerifiableLog.entity_type == "product_batch")
+        & VerifiableLog.entity_id.in_(product_batch_ids)
+    )
+
+    processing_step_ids = (
+        select(ProcessingStep.id)
+        .join(ProductBatch, ProcessingStep.batch_id == ProductBatch.id)
+        .where(ProductBatch.user_id == user_id)
+    )
+    conditions.append(
+        (VerifiableLog.entity_type == "processing_step")
+        & VerifiableLog.entity_id.in_(processing_step_ids)
+    )
+
+    sheep_event_ids = select(SheepEvent.id).where(SheepEvent.user_id == user_id)
+    conditions.append(
+        (VerifiableLog.entity_type == "sheep_event")
+        & VerifiableLog.entity_id.in_(sheep_event_ids)
+    )
+
     entries = (
-        VerifiableLog.query.order_by(VerifiableLog.id.desc())
+        VerifiableLog.query.filter(or_(*conditions))
+        .order_by(VerifiableLog.id.desc())
         .limit(limit)
         .all()
     )
+
     return [serialize_entry(entry) for entry in reversed(entries)]
+
+
+def _owned_ids_for_type(entity_type: str, entity_ids: Iterable[int], user_id: int) -> Set[int]:
+    ids = {int(entity_id) for entity_id in entity_ids if entity_id is not None}
+    if not ids:
+        return set()
+
+    query_factory = OWNERSHIP_QUERY_FACTORIES.get(entity_type)
+    if query_factory is None:
+        return set()
+
+    rows = query_factory(ids, user_id).all()
+    return {row[0] for row in rows}
+
+
+def _lock_current_tail() -> Optional[VerifiableLog]:
+    """以行級鎖鎖定並取得當前尾端條目。需在交易中呼叫以序列化 append 操作。"""
+
+    return (
+        VerifiableLog.query.order_by(VerifiableLog.id.desc()).with_for_update().first()
+    )
+
+
+def _product_batch_ownership_query(entity_ids: Set[int], user_id: int):
+    return (
+        ProductBatch.query.with_entities(ProductBatch.id)
+        .filter(ProductBatch.id.in_(entity_ids), ProductBatch.user_id == user_id)
+    )
+
+
+def _processing_step_ownership_query(entity_ids: Set[int], user_id: int):
+    return (
+        ProcessingStep.query.with_entities(ProcessingStep.id)
+        .join(ProductBatch, ProcessingStep.batch_id == ProductBatch.id)
+        .filter(ProcessingStep.id.in_(entity_ids), ProductBatch.user_id == user_id)
+    )
+
+
+def _sheep_event_ownership_query(entity_ids: Set[int], user_id: int):
+    return (
+        SheepEvent.query.with_entities(SheepEvent.id)
+        .filter(SheepEvent.id.in_(entity_ids), SheepEvent.user_id == user_id)
+    )
+
+
+OWNERSHIP_QUERY_FACTORIES: Dict[str, Callable[[Set[int], int], Any]] = {
+    "product_batch": _product_batch_ownership_query,
+    "processing_step": _processing_step_ownership_query,
+    "sheep_event": _sheep_event_ownership_query,
+}
