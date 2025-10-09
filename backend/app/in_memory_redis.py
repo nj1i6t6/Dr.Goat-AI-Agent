@@ -77,6 +77,22 @@ class InMemoryRedis:
             self._data[key] = value
             self._expirations[key] = time.time() + ttl
 
+    def incr(self, key: str, amount: int = 1) -> int:
+        with self._mutex:
+            self._purge(key)
+            value = self._data.get(key)
+            if value is None:
+                new_value = amount
+            else:
+                new_value = int(value) + amount
+            self._data[key] = new_value
+            return new_value
+
+    def expire(self, key: str, ttl: int) -> None:
+        with self._mutex:
+            if key in self._data:
+                self._expirations[key] = time.time() + ttl
+
     def delete(self, key: str) -> None:
         with self._mutex:
             self._data.pop(key, None)

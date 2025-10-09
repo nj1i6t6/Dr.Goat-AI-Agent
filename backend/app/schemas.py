@@ -119,6 +119,171 @@ class AgentChatModel(BaseModel):
     ear_num_context: Optional[str] = Field(None, description="羊隻耳號上下文")
 
 
+# === Analytics 報告模型 ===
+
+
+class AnalyticsReportRequestModel(BaseModel):
+    api_key: str = Field(..., min_length=1, description="API 金鑰")
+    filters: Dict[str, Any] = Field(default_factory=dict, description="使用的篩選條件")
+    cohort: List[Dict[str, Any]] = Field(default_factory=list, description="分群分析結果")
+    cost_benefit: Dict[str, Any] = Field(default_factory=dict, description="成本收益摘要")
+    insights: List[str] = Field(default_factory=list, description="使用者手動新增的觀察")
+
+
+# === 成本 / 收益資料模型 ===
+
+
+class TimeRangeModel(BaseModel):
+    start: Optional[datetime] = Field(None, description="開始時間")
+    end: Optional[datetime] = Field(None, description="結束時間")
+
+    @field_validator('end')
+    @classmethod
+    def validate_order(cls, value, values):
+        start = values.data.get('start') if hasattr(values, 'data') else values.get('start')
+        if value and start and value < start:
+            raise ValueError('結束時間必須晚於開始時間')
+        return value
+
+
+class FinanceEntryBaseModel(BaseModel):
+    recorded_at: datetime = Field(..., description="記錄時間")
+    category: str = Field(..., min_length=1, max_length=100, description="分類")
+    subcategory: Optional[str] = Field(None, max_length=100, description="子分類")
+    label: Optional[str] = Field(None, max_length=150, description="標籤")
+    amount: float = Field(..., description="金額")
+    currency: Optional[str] = Field('TWD', max_length=8, description="幣別")
+    sheep_id: Optional[int] = Field(None, ge=1, description="羊隻 ID")
+    breed: Optional[str] = Field(None, max_length=100, description="品種")
+    age_months: Optional[int] = Field(None, ge=0, le=600, description="月齡")
+    lactation_number: Optional[int] = Field(None, ge=0, le=20, description="胎次")
+    production_stage: Optional[str] = Field(None, max_length=100, description="生產階段")
+    notes: Optional[str] = Field(None, description="備註")
+    extra_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="額外欄位")
+
+    @field_validator('amount')
+    @classmethod
+    def validate_amount(cls, value: float) -> float:
+        if value is None:
+            raise ValueError('amount 不能為空')
+        return float(value)
+
+    @field_validator('extra_metadata', mode='before')
+    @classmethod
+    def validate_metadata(cls, value):
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError('metadata 必須為物件')
+        json.dumps(value)
+        return value
+
+
+class CostEntryCreateModel(FinanceEntryBaseModel):
+    pass
+
+
+class CostEntryUpdateModel(BaseModel):
+    recorded_at: Optional[datetime] = Field(None, description="記錄時間")
+    category: Optional[str] = Field(None, min_length=1, max_length=100)
+    subcategory: Optional[str] = Field(None, max_length=100)
+    label: Optional[str] = Field(None, max_length=150)
+    amount: Optional[float] = Field(None)
+    currency: Optional[str] = Field(None, max_length=8)
+    sheep_id: Optional[int] = Field(None, ge=1)
+    breed: Optional[str] = Field(None, max_length=100)
+    age_months: Optional[int] = Field(None, ge=0, le=600)
+    lactation_number: Optional[int] = Field(None, ge=0, le=20)
+    production_stage: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = Field(None)
+    extra_metadata: Optional[Dict[str, Any]] = Field(default=None)
+
+    @field_validator('extra_metadata', mode='before')
+    @classmethod
+    def validate_optional_metadata(cls, value):
+        if value is None:
+            return value
+        if not isinstance(value, dict):
+            raise ValueError('metadata 必須為物件')
+        json.dumps(value)
+        return value
+
+
+class RevenueEntryCreateModel(FinanceEntryBaseModel):
+    pass
+
+
+class RevenueEntryUpdateModel(CostEntryUpdateModel):
+    pass
+
+
+class FinanceBulkImportModel(BaseModel):
+    entries: List[FinanceEntryBaseModel] = Field(..., min_length=1, description="匯入資料列")
+
+
+class CohortFilterModel(BaseModel):
+    breed: Optional[List[str]] = Field(None, description="品種過濾")
+    lactation_number: Optional[List[int]] = Field(None, description="胎次過濾")
+    production_stage: Optional[List[str]] = Field(None, description="生產階段過濾")
+    category: Optional[List[str]] = Field(None, description="分類過濾")
+    min_age_months: Optional[int] = Field(None, ge=0, le=600, description="最小月齡")
+    max_age_months: Optional[int] = Field(None, ge=0, le=600, description="最大月齡")
+
+    @field_validator('max_age_months')
+    @classmethod
+    def validate_age_range(cls, value, values):
+        min_age = values.data.get('min_age_months') if hasattr(values, 'data') else values.get('min_age_months')
+        if value is not None and min_age is not None and value < min_age:
+            raise ValueError('最大月齡需大於等於最小月齡')
+        return value
+
+
+COHORT_METRICS = (
+    'sheep_count',
+    'avg_weight',
+    'avg_milk_yield',
+    'total_cost',
+    'total_revenue',
+    'net_profit',
+    'cost_per_head',
+    'revenue_per_head',
+)
+
+
+class CohortAnalysisRequest(BaseModel):
+    filters: Optional[CohortFilterModel] = Field(None, description="篩選條件")
+    time_range: Optional[TimeRangeModel] = Field(None, description="時間範圍")
+    cohort_by: List[Literal['breed', 'lactation_number', 'production_stage']] = Field(default_factory=lambda: ['breed'], description="聚合維度")
+    metrics: List[Literal[*COHORT_METRICS]] = Field(default_factory=lambda: ['sheep_count', 'avg_weight', 'total_cost', 'total_revenue'], description="指標列表")
+
+    @field_validator('cohort_by')
+    @classmethod
+    def validate_cohort_by(cls, value: List[str]) -> List[str]:
+        if not value:
+            raise ValueError('cohort_by 不能為空')
+        seen = set()
+        for dimension in value:
+            if dimension in seen:
+                raise ValueError('cohort_by 不能包含重複維度')
+            seen.add(dimension)
+        return value
+
+    @field_validator('metrics')
+    @classmethod
+    def validate_metrics(cls, value: List[str]) -> List[str]:
+        if not value:
+            raise ValueError('至少需要一個指標')
+        return value
+
+
+class CostBenefitRequest(BaseModel):
+    filters: Optional[CohortFilterModel] = Field(None, description="篩選條件")
+    time_range: Optional[TimeRangeModel] = Field(None, description="時間範圍")
+    metrics: List[Literal['total_cost', 'total_revenue', 'net_profit', 'avg_cost_per_head', 'avg_revenue_per_head']] = Field(default_factory=lambda: ['total_cost', 'total_revenue', 'net_profit'], description="指標列表")
+    group_by: Literal['month', 'category', 'breed', 'lactation_number', 'production_stage', 'none'] = Field('month', description="分組方式")
+    include_timeseries: bool = Field(True, description="是否包含時間序列")
+
+
 # === 數據管理相關模型 ===
 class ImportMappingModel(BaseModel):
     """資料匯入映射配置模型"""
@@ -385,5 +550,18 @@ def get_field_display_name(field_name: str) -> str:
         'record_date': '記錄日期',
         'record_type': '記錄類型',
         'value': '數值',
+        'recorded_at': '紀錄時間',
+        'category': '分類',
+        'subcategory': '子分類',
+        'label': '標籤',
+        'amount': '金額',
+        'currency': '幣別',
+        'lactation_number': '胎次',
+        'production_stage': '生產階段',
+        'extra_metadata': '額外欄位',
+        'filters': '篩選條件',
+        'cohort': '分群資料',
+        'cost_benefit': '成本收益摘要',
+        'insights': '觀察',
     }
     return field_names.get(field_name, field_name)
