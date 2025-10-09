@@ -23,5 +23,11 @@
 | Worker Queue | 佇列 | Redis queue feeding the worker process. |
 | Alembic Migration | 資料庫遷移 | Schema migration script under `backend/migrations/`. |
 | Coverage Report | 覆蓋率報告 | Stored under `docs/backend/coverage/` and `docs/frontend/coverage/`. |
+| Analytics Hub | 分析駕駛艙 | Unified BI dashboard combining filters, charts, and KPIs. |
+| Cohort Analysis | Cohort 分析 | Group-level aggregation based on breed, parity, time, etc. |
+| Cost Entry | 成本紀錄 | User-recorded expense item with category, amount, metadata. |
+| Revenue Entry | 收益紀錄 | User-recorded income item linked to herd attributes. |
+| Cost-Benefit Ratio | 成本收益比 | Total cost divided by total revenue for a cohort. |
+| AI Operations Report | AI 營運報告 | Gemini-generated narrative summarising BI results. |
 
 Maintain this glossary whenever terminology changes in the English SoT or zh-TW documentation.

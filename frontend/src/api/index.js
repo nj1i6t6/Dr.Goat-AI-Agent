@@ -166,12 +166,57 @@ export default {
     }
   },
 
-  // 儀表板 API
-  getDashboardData(errorHandler) { 
-    return withErrorHandling(() => apiClient.get('/api/dashboard/data'), errorHandler); 
+  // 成本 / 收益管理 API
+  getCostEntries(params = {}, errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/finance/costs', { params }), errorHandler);
   },
-  getFarmReport(errorHandler) { 
-    return withErrorHandling(() => apiClient.get('/api/dashboard/farm_report'), errorHandler); 
+  createCostEntry(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/finance/costs', data), errorHandler);
+  },
+  updateCostEntry(id, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/finance/costs/${id}`, data), errorHandler);
+  },
+  deleteCostEntry(id, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/finance/costs/${id}`), errorHandler);
+  },
+  bulkCreateCostEntries(entries, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/finance/costs/bulk', { entries }), errorHandler);
+  },
+  getRevenueEntries(params = {}, errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/finance/revenues', { params }), errorHandler);
+  },
+  createRevenueEntry(data, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/finance/revenues', data), errorHandler);
+  },
+  updateRevenueEntry(id, data, errorHandler) {
+    return withErrorHandling(() => apiClient.put(`/api/finance/revenues/${id}`, data), errorHandler);
+  },
+  deleteRevenueEntry(id, errorHandler) {
+    return withErrorHandling(() => apiClient.delete(`/api/finance/revenues/${id}`), errorHandler);
+  },
+  bulkCreateRevenueEntries(entries, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/finance/revenues/bulk', { entries }), errorHandler);
+  },
+
+  // 儀表板 API
+  getDashboardData(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/dashboard/data'), errorHandler);
+  },
+  getFarmReport(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/dashboard/farm_report'), errorHandler);
+  },
+
+  // BI Analytics API
+  requestCohortAnalysis(payload, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/bi/cohort-analysis', payload), errorHandler);
+  },
+  requestCostBenefit(payload, errorHandler) {
+    return withErrorHandling(() => apiClient.post('/api/bi/cost-benefit', payload), errorHandler);
+  },
+  requestBiAiReport(apiKey, payload, errorHandler) {
+    const headers = { 'X-Api-Key': apiKey };
+    const body = { ...payload, api_key: apiKey };
+    return withErrorHandling(() => apiClient.post('/api/bi/ai-report', body, { headers }), errorHandler);
   },
 
   // 資料管理 API

@@ -5,9 +5,43 @@ Pydantic 資料驗證模型
 
 import json
 from datetime import datetime, date
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+def _quantize_amount(value: Decimal) -> Decimal:
+    quantized = value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    if quantized <= Decimal('0.00'):
+        raise ValueError('金額必須大於 0')
+    return quantized
+
+
+def _parse_iso_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            raise ValueError('recorded_at 不能為空字串')
+        if text.endswith('Z'):
+            text = text[:-1] + '+00:00'
+        try:
+            return datetime.fromisoformat(text)
+        except ValueError as exc:  # pragma: no cover - defensive branch
+            raise ValueError('recorded_at 不是有效的 ISO 8601 時間格式') from exc
+    raise ValueError('recorded_at 需要是 ISO8601 字串或 datetime 物件')
+
+
+def _parse_metadata(value: Any) -> Optional[Dict[str, Any]]:
+    if value in (None, ''):
+        return None
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        return json.loads(value)
+    raise ValueError('metadata 僅接受 JSON 字串或物件')
 
 
 # === 認證相關模型 ===
@@ -92,6 +126,190 @@ class HistoricalDataCreateModel(BaseModel):
     record_type: str = Field(..., min_length=1, max_length=100, description="記錄類型")
     value: float = Field(..., description="數值")
     notes: Optional[str] = Field(None, description="備註")
+
+
+# === 成本 / 收益資料模型 ===
+class CostRevenueBaseModel(BaseModel):
+    category: str = Field(..., min_length=1, max_length=120, description="分類")
+    subcategory: Optional[str] = Field(None, max_length=120, description="子分類")
+    description: Optional[str] = Field(None, description="敘述")
+    amount: Decimal = Field(..., description="金額")
+    currency: str = Field('TWD', min_length=1, max_length=16, description="幣別")
+    recorded_at: datetime = Field(default_factory=datetime.utcnow, description="紀錄時間")
+    breed: Optional[str] = Field(None, max_length=100, description="品種")
+    age_group: Optional[str] = Field(None, max_length=50, description="月齡群組")
+    parity: Optional[int] = Field(None, ge=0, le=20, description="胎次")
+    herd_tag: Optional[str] = Field(None, max_length=100, description="群組標籤")
+    notes: Optional[str] = Field(None, description="備註")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="自訂欄位")
+
+    @field_validator('amount')
+    @classmethod
+    def validate_amount(cls, value: Decimal) -> Decimal:
+        return _quantize_amount(value)
+
+    @field_validator('recorded_at', mode='before')
+    @classmethod
+    def validate_recorded_at(cls, value: Any) -> datetime:
+        return _parse_iso_datetime(value)
+
+    @field_validator('metadata', mode='before')
+    @classmethod
+    def validate_metadata(cls, value: Any) -> Optional[Dict[str, Any]]:
+        return _parse_metadata(value)
+
+
+class CostEntryCreateModel(CostRevenueBaseModel):
+    pass
+
+
+class CostEntryUpdateModel(BaseModel):
+    category: Optional[str] = Field(None, min_length=1, max_length=120)
+    subcategory: Optional[str] = Field(None, max_length=120)
+    description: Optional[str] = Field(None)
+    amount: Optional[Decimal] = Field(None)
+    currency: Optional[str] = Field(None, min_length=1, max_length=16)
+    recorded_at: Optional[datetime] = Field(None)
+    breed: Optional[str] = Field(None, max_length=100)
+    age_group: Optional[str] = Field(None, max_length=50)
+    parity: Optional[int] = Field(None, ge=0, le=20)
+    herd_tag: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = Field(None)
+    metadata: Optional[Dict[str, Any]] = Field(None)
+
+    @field_validator('amount')
+    @classmethod
+    def validate_amount(cls, value: Optional[Decimal]) -> Optional[Decimal]:
+        if value is None:
+            return value
+        return _quantize_amount(value)
+
+    @field_validator('recorded_at', mode='before')
+    @classmethod
+    def validate_recorded_at(cls, value: Any) -> Optional[datetime]:
+        if value is None:
+            return None
+        return _parse_iso_datetime(value)
+
+    @field_validator('metadata', mode='before')
+    @classmethod
+    def validate_metadata(cls, value: Any) -> Optional[Dict[str, Any]]:
+        if value is None:
+            return None
+        return _parse_metadata(value)
+
+
+class CostEntryBulkImportModel(BaseModel):
+    entries: List[CostEntryCreateModel] = Field(..., min_length=1, max_length=500, description="成本資料列")
+
+
+class RevenueEntryCreateModel(CostRevenueBaseModel):
+    pass
+
+
+class RevenueEntryUpdateModel(CostEntryUpdateModel):
+    pass
+
+
+class RevenueEntryBulkImportModel(BaseModel):
+    entries: List[RevenueEntryCreateModel] = Field(..., min_length=1, max_length=500, description="收益資料列")
+
+
+class TimeRangeModel(BaseModel):
+    start: Optional[datetime] = Field(None, description="起始時間")
+    end: Optional[datetime] = Field(None, description="結束時間")
+
+    @field_validator('start', 'end', mode='before')
+    @classmethod
+    def validate_bound(cls, value: Any) -> Optional[datetime]:
+        if value is None:
+            return None
+        return _parse_iso_datetime(value)
+
+    @model_validator(mode='after')
+    def validate_range(self) -> 'TimeRangeModel':
+        if self.start and self.end and self.start > self.end:
+            raise ValueError('時間區間的 start 不能晚於 end')
+        return self
+
+
+ALLOWED_BI_DIMENSIONS = {'category', 'subcategory', 'breed', 'age_group', 'parity', 'herd_tag', 'recorded_date'}
+ALLOWED_BI_METRICS = {
+    'total_cost',
+    'total_revenue',
+    'net_income',
+    'cost_entries',
+    'revenue_entries',
+    'avg_cost',
+    'avg_revenue',
+    'cost_revenue_ratio',
+}
+
+
+class CohortAnalysisQueryModel(BaseModel):
+    dimensions: List[str] = Field(..., min_length=1, max_length=4, description="分群欄位")
+    metrics: List[str] = Field(..., min_length=1, max_length=7, description="指標列表")
+    filters: Optional[Dict[str, List[Any]]] = Field(default=None, description="複合篩選條件")
+    time_range: Optional[TimeRangeModel] = Field(default=None, description="時間範圍")
+    limit: int = Field(50, ge=1, le=200, description="最大返回筆數")
+
+    @model_validator(mode='after')
+    def validate_payload(self) -> 'CohortAnalysisQueryModel':
+        for dim in self.dimensions:
+            if dim not in ALLOWED_BI_DIMENSIONS:
+                raise ValueError(f'不支援的分群欄位: {dim}')
+        for metric in self.metrics:
+            if metric not in ALLOWED_BI_METRICS:
+                raise ValueError(f'不支援的指標: {metric}')
+        if self.filters:
+            for key, values in self.filters.items():
+                if key not in ALLOWED_BI_DIMENSIONS:
+                    raise ValueError(f'不支援的篩選欄位: {key}')
+                if not isinstance(values, list) or not values:
+                    raise ValueError(f'篩選欄位 {key} 必須是非空列表')
+        return self
+
+
+class CostBenefitQueryModel(BaseModel):
+    metrics: List[str] = Field(..., min_length=1, max_length=7, description="指標列表")
+    filters: Optional[Dict[str, List[Any]]] = Field(default=None, description="篩選條件")
+    time_range: Optional[TimeRangeModel] = Field(default=None, description="時間範圍")
+    granularity: Literal['day', 'month'] = Field('month', description="時間粒度")
+
+    @model_validator(mode='after')
+    def validate_payload(self) -> 'CostBenefitQueryModel':
+        for metric in self.metrics:
+            if metric not in ALLOWED_BI_METRICS:
+                raise ValueError(f'不支援的指標: {metric}')
+        if self.filters:
+            for key, values in self.filters.items():
+                if key not in ALLOWED_BI_DIMENSIONS:
+                    raise ValueError(f'不支援的篩選欄位: {key}')
+                if not isinstance(values, list) or not values:
+                    raise ValueError(f'篩選欄位 {key} 必須是非空列表')
+        return self
+
+
+class BiAiReportRequestModel(BaseModel):
+    api_key: str = Field(..., min_length=16, description="AI 代理金鑰")
+    metrics: List[str] = Field(..., min_length=1, max_length=7, description="指標列表")
+    filters: Optional[Dict[str, List[Any]]] = Field(default=None, description="篩選條件")
+    time_range: Optional[TimeRangeModel] = Field(default=None, description="查詢時間範圍")
+    highlights: Optional[List[str]] = Field(default=None, description="人工整理亮點")
+    aggregates: Dict[str, Any] = Field(..., description="前端整合的 KPI 摘要")
+
+    @model_validator(mode='after')
+    def validate_metrics(self) -> 'BiAiReportRequestModel':
+        for metric in self.metrics:
+            if metric not in ALLOWED_BI_METRICS:
+                raise ValueError(f'不支援的指標: {metric}')
+        if self.filters:
+            for key, values in self.filters.items():
+                if key not in ALLOWED_BI_DIMENSIONS:
+                    raise ValueError(f'不支援的篩選欄位: {key}')
+                if not isinstance(values, list) or not values:
+                    raise ValueError(f'篩選欄位 {key} 必須是非空列表')
+        return self
 
 
 # === AI 代理人相關模型 ===

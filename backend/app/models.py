@@ -19,6 +19,8 @@ class User(UserMixin, db.Model):
     product_batches = db.relationship('ProductBatch', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
     iot_devices = db.relationship('IotDevice', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
     automation_rules = db.relationship('AutomationRule', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
+    cost_entries = db.relationship('CostEntry', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
+    revenue_entries = db.relationship('RevenueEntry', backref='owner', lazy='dynamic', cascade="all, delete-orphan")
 
 
     def set_password(self, password):
@@ -222,6 +224,94 @@ class VerifiableLog(db.Model):
             'timestamp': self.timestamp.isoformat() if self.timestamp else None,
             'previous_hash': self.previous_hash,
             'current_hash': self.current_hash,
+        }
+
+
+class CostEntry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    category = db.Column(db.String(120), nullable=False)
+    subcategory = db.Column(db.String(120))
+    description = db.Column(db.Text)
+    amount = db.Column(db.Numeric(14, 2), nullable=False)
+    currency = db.Column(db.String(16), nullable=False, default='TWD')
+    recorded_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    breed = db.Column(db.String(100))
+    age_group = db.Column(db.String(50))
+    parity = db.Column(db.Integer)
+    herd_tag = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    metadata_json = db.Column('metadata', db.JSON)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index('ix_cost_entry_user_category', 'user_id', 'category'),
+        db.Index('ix_cost_entry_user_recorded_at', 'user_id', 'recorded_at'),
+        db.Index('ix_cost_entry_user_breed', 'user_id', 'breed'),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'category': self.category,
+            'subcategory': self.subcategory,
+            'description': self.description,
+            'amount': float(self.amount) if self.amount is not None else None,
+            'currency': self.currency,
+            'recorded_at': self.recorded_at.isoformat() if self.recorded_at else None,
+            'breed': self.breed,
+            'age_group': self.age_group,
+            'parity': self.parity,
+            'herd_tag': self.herd_tag,
+            'notes': self.notes,
+            'metadata': self.metadata_json,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class RevenueEntry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    category = db.Column(db.String(120), nullable=False)
+    subcategory = db.Column(db.String(120))
+    description = db.Column(db.Text)
+    amount = db.Column(db.Numeric(14, 2), nullable=False)
+    currency = db.Column(db.String(16), nullable=False, default='TWD')
+    recorded_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    breed = db.Column(db.String(100))
+    age_group = db.Column(db.String(50))
+    parity = db.Column(db.Integer)
+    herd_tag = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    metadata_json = db.Column('metadata', db.JSON)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index('ix_revenue_entry_user_category', 'user_id', 'category'),
+        db.Index('ix_revenue_entry_user_recorded_at', 'user_id', 'recorded_at'),
+        db.Index('ix_revenue_entry_user_breed', 'user_id', 'breed'),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'category': self.category,
+            'subcategory': self.subcategory,
+            'description': self.description,
+            'amount': float(self.amount) if self.amount is not None else None,
+            'currency': self.currency,
+            'recorded_at': self.recorded_at.isoformat() if self.recorded_at else None,
+            'breed': self.breed,
+            'age_group': self.age_group,
+            'parity': self.parity,
+            'herd_tag': self.herd_tag,
+            'notes': self.notes,
+            'metadata': self.metadata_json,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
 
 

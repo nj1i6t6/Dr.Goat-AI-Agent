@@ -16,6 +16,7 @@
         router
       >
         <el-menu-item index="/dashboard">代理人儀表板</el-menu-item>
+        <el-menu-item index="/analytics">Analytics Hub</el-menu-item>
         <el-menu-item index="/consultation">飼養建議諮詢</el-menu-item>
         <el-menu-item index="/chat">AI 問答助理</el-menu-item>
         <el-menu-item index="/flock">羊群總覽</el-menu-item>
@@ -55,6 +56,10 @@
         <el-menu-item index="/dashboard">
           <el-icon><DataAnalysis /></el-icon>
           <span>代理人儀表板</span>
+        </el-menu-item>
+        <el-menu-item index="/analytics">
+          <el-icon><Histogram /></el-icon>
+          <span>Analytics Hub</span>
         </el-menu-item>
         <el-menu-item index="/consultation">
           <el-icon><HelpFilled /></el-icon>
@@ -111,6 +116,7 @@ import {
   Upload,
   Setting,
   TrendCharts,
+  Histogram,
   Collection,
   Cpu,
 } from '@element-plus/icons-vue';
