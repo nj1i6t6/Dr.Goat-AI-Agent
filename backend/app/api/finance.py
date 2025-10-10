@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from pydantic import ValidationError
 from sqlalchemy import and_, select
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models import CostEntry, RevenueEntry, Sheep
@@ -239,6 +240,12 @@ def bulk_import_costs():
     except ValueError as exc:
         db.session.rollback()
         return jsonify(create_error_response(str(exc))), 400
+    except IntegrityError:
+        db.session.rollback()
+        return (
+            jsonify(create_error_response('資料庫完整性錯誤，可能存在重複資料或違反限制。')),
+            409,
+        )
 
     return jsonify(result), 201
 
@@ -332,5 +339,11 @@ def bulk_import_revenues():
     except ValueError as exc:
         db.session.rollback()
         return jsonify(create_error_response(str(exc))), 400
+    except IntegrityError:
+        db.session.rollback()
+        return (
+            jsonify(create_error_response('資料庫完整性錯誤，可能存在重複資料或違反限制。')),
+            409,
+        )
 
     return jsonify(result), 201

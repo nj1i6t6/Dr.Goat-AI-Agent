@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -46,7 +47,7 @@ _DIMENSION_CONFIG = {
 def _dimension_expression(
     model: type[Sheep] | type[CostEntry] | type[RevenueEntry],
     dimension: str,
-) -> ColumnElement:
+) -> ColumnElement[Any]:
     config = _DIMENSION_CONFIG[dimension]
     column = getattr(model, config['sheep_attr'] if model is Sheep else config['finance_attr'])
     fallback = config['fallback']

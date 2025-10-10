@@ -31,6 +31,8 @@ _RECOMMENDATION_FIELD_LABELS = {
     'primary_forage_type': '主要草料',
 }
 
+MAX_BREAKDOWN_ITEMS_FOR_PROMPT = 6
+
 
 def _format_rag_context(chunks: list[dict[str, object]]) -> str:
     if not chunks:
@@ -134,7 +136,7 @@ def _format_cost_benefit(summary: dict[str, object]) -> str:
         parts.append('目前缺少成本收益資料。')
 
     breakdowns = []
-    for item in summary.get('items', [])[:6]:
+    for item in summary.get('items', [])[:MAX_BREAKDOWN_ITEMS_FOR_PROMPT]:
         label = item.get('group', '未分組')
         metrics = item.get('metrics', {})
         metric_text = ', '.join(f"{k}={v}" for k, v in metrics.items() if v is not None)
