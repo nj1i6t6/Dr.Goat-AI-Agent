@@ -20,6 +20,7 @@
         <el-menu-item index="/chat">AI 問答助理</el-menu-item>
         <el-menu-item index="/flock">羊群總覽</el-menu-item>
         <el-menu-item index="/prediction">生長預測</el-menu-item>
+        <el-menu-item index="/analytics">Analytics Hub</el-menu-item>
         <el-menu-item index="/iot">智慧牧場 IoT</el-menu-item>
         <el-menu-item index="/traceability">產銷履歷管理</el-menu-item>
         <el-menu-item index="/data-management">數據管理</el-menu-item>
@@ -71,6 +72,10 @@
         <el-menu-item index="/prediction">
           <el-icon><TrendCharts /></el-icon>
           <span>生長預測</span>
+        </el-menu-item>
+        <el-menu-item index="/analytics">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>Analytics Hub</span>
         </el-menu-item>
         <el-menu-item index="/iot">
           <el-icon><Cpu /></el-icon>

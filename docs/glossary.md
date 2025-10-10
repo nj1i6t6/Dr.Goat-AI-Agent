@@ -23,5 +23,10 @@
 | Worker Queue | 佇列 | Redis queue feeding the worker process. |
 | Alembic Migration | 資料庫遷移 | Schema migration script under `backend/migrations/`. |
 | Coverage Report | 覆蓋率報告 | Stored under `docs/backend/coverage/` and `docs/frontend/coverage/`. |
+| Cost Entry | 成本紀錄 | Ledger row stored via `CostEntry` model/API. |
+| Revenue Entry | 收益紀錄 | Ledger row stored via `RevenueEntry` model/API. |
+| Cohort Analysis | 分群分析 | `/api/bi/cohort-analysis` 聚合結果。 |
+| Cost-Benefit Dashboard | 成本效益分析 | `/api/bi/cost-benefit` 匯總結果與 KPI。 |
+| Analytics Hub | Analytics Hub 分析中心 | Vue 頁面整合財務資料、KPI 與 AI 報告。 |
 
 Maintain this glossary whenever terminology changes in the English SoT or zh-TW documentation.

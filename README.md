@@ -47,6 +47,7 @@
 | 資料治理 | Excel 匯出/匯入、AI 導入建議、聊天紀錄匯出 | `app/api/data_management.py`、`app/utils.py` | `DataManagementView.vue`、`stores/data` | `tests/test_data_management_api.py`、`tests/test_data_management_enhanced.py`、`tests/test_data_management_error_handling.py` |
 | AI 協作 | 每日提示、營養/ESG 建議、多模態聊天 | `app/api/agent.py`、`app/utils.py`、`app/models.ChatHistory` | `ConsultationView.vue`、`ChatView.vue`、`stores/consultation.js`、`stores/chat.js` | `tests/test_agent_api.py` |
 | 生長預測 | 體重預估、信賴區間、ESG 說明 | `app/api/prediction.py`、`backend/models/*.joblib` | `PredictionView.vue`、`stores/prediction.js` | `tests/test_prediction_api.py` |
+| 財務分析 | 成本/收益 CRUD、批次匯入、分群分析（資料庫 Join）、全域 KPI 卡片與錯誤提示、浮動主要操作、AI 報告 | `app/api/finance.py`、`app/api/bi.py`、`app/cache.py`、`app/models.py` | `AnalyticsHubView.vue`、`stores/analytics.js` | `tests/test_finance_api.py`、`tests/test_bi_api.py`、`tests/test_agent_analytics_report.py`、`frontend/src/stores/analytics.test.js` |
 | 產銷履歷 | 批次流程、加工步驟、羊隻貢獻、公眾故事、可驗證 Hash 鏈 | `app/api/traceability.py` | `TraceabilityManagementView.vue`、`TraceabilityPublicView.vue`、`stores/traceability.js` | `tests/test_traceability_api.py`、`tests/test_verifiable_log.py` |
 | IoT 自動化 | 裝置註冊、HMAC API Key、資料攝取、規則判斷、控制紀錄 | `app/api/iot.py`、`app/iot/automation.py` | `IotManagementView.vue`、`stores/iot.js` | `tests/test_iot_api.py`、`tests/test_iot_worker.py` |
 | 背景任務 | 輕量佇列與示範任務端點 | `app/tasks.py`、`app/simple_queue.py`、`app/api/tasks.py` | 設定/維運頁面觸發 | `tests/test_tasks_api.py` |
@@ -131,20 +132,23 @@ graph TB
   - `dashboard`：提醒、停藥期、體重/奶量趨勢分析、事件選項管理、Redis 快取。
   - `agent`：Gemini 每日提示、營養+ESG 建議、多模態聊天紀錄。
   - `prediction`：LightGBM+線性回歸、數據品質檢查、ESG LLM 解讀、圖表資料。
+  - `finance`：成本/收益 CRUD 與批次匯入，驗證欄位與使用者隔離。
+  - `bi`：分群分析、成本效益彙總、Redis 快取與限流。
   - `traceability`：批次/加工步驟/羊隻關聯、公眾故事 payload、可驗證賬本寫入。
   - `iot`：裝置註冊與 HMAC API key、感測資料攝取、規則判斷、控制指令紀錄。
   - `tasks`：透過 `SimpleQueue` 排程示範任務。
   - `verify`：提供 Hash 鏈完整性檢查、串流查詢與稽核用 API。
-- **資料模型**：`app/models.py` 涵蓋羊隻、事件、歷史、聊天、IoT 裝置、規則、可驗證賬本與控制紀錄，並以 Unique Constraint 確保用戶隔離。
+- **資料模型**：`app/models.py` 涵蓋羊隻、事件、歷史、聊天、IoT 裝置、規則、可驗證賬本、財務帳本（`CostEntry`、`RevenueEntry`）與控制紀錄，並以 Unique Constraint 確保用戶隔離。
 - **工具**：`app/utils.py` 統一 Gemini 呼叫、羊隻上下文、圖片編碼；`app/cache.py` 封裝 Redis 快取與鎖。
 
 ## 4. 前端應用 (Vue 3)
 
 - **技術**：Vue 3 `<script setup>`、Vite、Pinia、Element Plus、Axios、Chart.js、ECharts。
-- **路由**：`src/router/index.js` 包含 Dashboard、Consultation、Chat、Flock、Data Management、Prediction、IoT、Traceability、Settings 等需登入路由，以及 `/login`、`/trace/:batchNumber` 公開頁面。
-- **狀態管理**：`src/stores/` 依功能拆分（auth、sheep、consultation、chat、prediction、iot、traceability、settings），皆附 Vitest 覆蓋。
+- **路由**：`src/router/index.js` 包含 Dashboard、Consultation、Chat、Flock、Data Management、Prediction、Analytics、IoT、Traceability、Settings 等需登入路由，以及 `/login`、`/trace/:batchNumber` 公開頁面。
+- **狀態管理**：`src/stores/` 依功能拆分（auth、sheep、consultation、chat、prediction、analytics、iot、traceability、settings），皆附 Vitest 覆蓋。
 - **API 層**：`src/api/index.js` 統一錯誤處理、Gemini Header 注入、Multipart 上傳。
 - **視圖與測試**：每個頁面皆有對應測試 (`*.test.js` / `*.behavior.test.js`) 驗證路由守衛、表單驗證、Store 行為與 UI 呈現。
+- **UI 預覽**：Analytics Hub 螢幕截圖 (`analytics-hub.png`) 會隨 PR／Release 附件提供，讓團隊成員無需啟動開發伺服器也能預覽儀表板元件配置。
 - **UX**：
   - Element Plus 排版、統一 loading/toast、AI Markdown 呈現、API Key 彈窗一次顯示。
   - 公開產銷履歷每個加工步驟提供「數據指紋」彈窗，可檢視 Hash 鏈資訊並支援複製/下載，方便稽核。
@@ -156,6 +160,7 @@ graph TB
   - `/api/agent/tip`：依季節產出每日提示。
   - `/api/agent/recommendation`：融合羊隻資料與歷史事件，提供營養與 ESG 建議。
   - `/api/agent/chat`：支援圖片 (JPEG/PNG/GIF/WebP，≤10 MB) 與對話歷史。
+  - `/api/agent/analytics-report`：將分群與財務摘要轉成行動建議與 KPI 提醒的 Markdown 報告，呼叫時需在標頭附上 `X-Api-Key`（Gemini 金鑰），JSON Body 僅包含篩選條件與摘要資料。
   - `/api/prediction/*`：使用相同 helper 產出預測解說與 ESG 建議。
 - **檢索增強生成（RAG）**：
   - 知識來源位於 `docs/rag_sources/`（Markdown / 純文字）。執行 `make rag-update` 可完成切塊、嵌入（Gemini `gemini-embedding-001`、768 維 L2 正規化）並輸出 `docs/rag_vectors/corpus.parquet` 至 Git LFS。

@@ -463,6 +463,204 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VerifyChainResponse'
+  /api/finance/costs:
+    get:
+      summary: List cost entries
+      responses:
+        '200':
+          description: Cost entry list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinanceEntryListResponse'
+    post:
+      summary: Create cost entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinanceEntryPayload'
+      responses:
+        '201': { description: Created }
+        '400': { description: Validation error }
+  /api/finance/costs/{entry_id}:
+    put:
+      summary: Update cost entry
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinanceEntryUpdate'
+      responses:
+        '200': { description: Updated }
+        '404': { description: Not found }
+    delete:
+      summary: Delete cost entry
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200': { description: Deleted }
+        '404': { description: Not found }
+  /api/finance/costs/bulk-import:
+    post:
+      summary: Bulk import cost entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                entries:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FinanceEntryPayload'
+      responses:
+        '201': { description: Imported }
+        '400': { description: Validation error }
+  /api/finance/revenues:
+    get:
+      summary: List revenue entries
+      responses:
+        '200':
+          description: Revenue entry list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinanceEntryListResponse'
+    post:
+      summary: Create revenue entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinanceEntryPayload'
+      responses:
+        '201': { description: Created }
+        '400': { description: Validation error }
+  /api/finance/revenues/{entry_id}:
+    put:
+      summary: Update revenue entry
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinanceEntryUpdate'
+      responses:
+        '200': { description: Updated }
+        '404': { description: Not found }
+    delete:
+      summary: Delete revenue entry
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200': { description: Deleted }
+        '404': { description: Not found }
+  /api/finance/revenues/bulk-import:
+    post:
+      summary: Bulk import revenue entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                entries:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FinanceEntryPayload'
+      responses:
+        '201': { description: Imported }
+        '400': { description: Validation error }
+  /api/bi/cohort-analysis:
+    post:
+      summary: Cohort analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CohortAnalysisRequest'
+      responses:
+        '200':
+          description: Cohort metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortAnalysisResponse'
+        '400': { description: Validation error }
+        '429': { description: Rate limited }
+  /api/bi/cost-benefit:
+    post:
+      summary: Cost benefit aggregation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostBenefitRequest'
+      responses:
+        '200':
+          description: Cost benefit summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostBenefitResponse'
+        '400': { description: Validation error }
+        '429': { description: Rate limited }
+  /api/agent/analytics-report:
+    post:
+      summary: Generate analytics report via AI
+      parameters:
+        - in: header
+          name: X-Api-Key
+          required: true
+          schema:
+            type: string
+          description: Gemini API key used for report generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyticsReportRequest'
+      responses:
+        '200':
+          description: Report generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report_html: { type: string }
+                  report_markdown: { type: string }
+        '400': { description: Validation error }
+
 components:
   securitySchemes:
     cookieAuth:
@@ -470,6 +668,118 @@ components:
       in: cookie
       name: session
   schemas:
+    FinanceEntryPayload:
+      type: object
+      required: [recorded_at, category, amount]
+      properties:
+        recorded_at: { type: string, format: date-time }
+        category: { type: string }
+        subcategory: { type: string }
+        label: { type: string }
+        amount: { type: number }
+        currency: { type: string }
+        sheep_id: { type: integer, nullable: true }
+        breed: { type: string, nullable: true }
+        age_months: { type: integer, nullable: true }
+        lactation_number: { type: integer, nullable: true }
+        production_stage: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        extra_metadata:
+          type: object
+          additionalProperties: true
+    FinanceEntryUpdate:
+      allOf:
+        - $ref: '#/components/schemas/FinanceEntryPayload'
+      required: []
+    FinanceEntry:
+      allOf:
+        - $ref: '#/components/schemas/FinanceEntryPayload'
+      properties:
+        id: { type: integer }
+    FinanceEntryListResponse:
+      type: object
+      properties:
+        total: { type: integer }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinanceEntry'
+    CohortAnalysisRequest:
+      type: object
+      properties:
+        filters:
+          type: object
+        time_range:
+          type: object
+          properties:
+            start: { type: string, format: date-time }
+            end: { type: string, format: date-time }
+        cohort_by:
+          type: array
+          items: { type: string }
+        metrics:
+          type: array
+          items: { type: string }
+    CohortAnalysisResponse:
+      type: object
+      properties:
+        metrics:
+          type: array
+          items: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              metrics:
+                type: object
+                additionalProperties: true
+    CostBenefitRequest:
+      type: object
+      properties:
+        filters:
+          type: object
+        time_range:
+          type: object
+        metrics:
+          type: array
+          items: { type: string }
+        group_by: { type: string }
+    CostBenefitResponse:
+      type: object
+      properties:
+        summary:
+          type: object
+          additionalProperties: true
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              group: { type: string }
+              metrics:
+                type: object
+                additionalProperties: true
+        metrics:
+          type: array
+          items: { type: string }
+    AnalyticsReportRequest:
+      type: object
+      properties:
+        filters:
+          type: object
+          additionalProperties: true
+        cohort:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        cost_benefit:
+          type: object
+          additionalProperties: true
+        insights:
+          type: array
+          items: { type: string }
     VerifiableLogEntry:
       type: object
       properties:
