@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Iterable, Type
 
 from flask import Blueprint, jsonify, request
+from flask.views import MethodView
 from flask_login import current_user, login_required
 from pydantic import ValidationError
 from sqlalchemy import and_, select
@@ -151,201 +152,134 @@ def _handle_bulk_import(model_cls: Type[CostEntry | RevenueEntry], entries: list
     return {'items': [_serialize_entry(e) for e in created]}
 
 
-@bp.route('/costs', methods=['GET'])
-@login_required
-def list_costs():
-    try:
-        conditions = _apply_filters(CostEntry)
-    except ValueError as exc:
-        return jsonify(create_error_response(str(exc))), 400
+class FinanceEntryAPI(MethodView):
+    decorators = [login_required]
 
-    try:
-        page = int(request.args.get('page', 1))
-        page_size = int(request.args.get('page_size', 50))
-        if page < 1 or page_size < 1:
-            raise ValueError
-    except (TypeError, ValueError):
-        return jsonify(create_error_response('分頁參數必須為正整數')), 400
+    def __init__(self, model: Type[CostEntry | RevenueEntry], create_schema, update_schema):
+        self.model = model
+        self.create_schema = create_schema
+        self.update_schema = update_schema
 
-    base_stmt = select(CostEntry).where(conditions)
-    total = db.session.scalar(select(db.func.count()).select_from(base_stmt.subquery()))
-    stmt = base_stmt.order_by(CostEntry.recorded_at.desc())
-    items = db.session.scalars(
-        stmt.offset((page - 1) * page_size).limit(page_size)
-    ).all()
+    def _list(self):
+        try:
+            conditions = _apply_filters(self.model)
+        except ValueError as exc:
+            return jsonify(create_error_response(str(exc))), 400
 
-    return jsonify({
-        'total': total or 0,
-        'items': [_serialize_entry(item) for item in items],
-    })
+        try:
+            page = int(request.args.get('page', 1))
+            page_size = int(request.args.get('page_size', 50))
+            if page < 1 or page_size < 1:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify(create_error_response('分頁參數必須為正整數')), 400
 
+        base_stmt = select(self.model).where(conditions)
+        total = db.session.scalar(select(db.func.count()).select_from(base_stmt.subquery()))
+        stmt = base_stmt.order_by(self.model.recorded_at.desc())
+        items = db.session.scalars(
+            stmt.offset((page - 1) * page_size).limit(page_size)
+        ).all()
 
-@bp.route('/costs', methods=['POST'])
-@login_required
-def create_cost():
-    try:
-        payload = CostEntryCreateModel(**request.get_json()).model_dump(exclude_unset=True)
-    except ValidationError as exc:
-        return jsonify(create_error_response('輸入資料驗證失敗', exc.errors())), 400
+        return jsonify({
+            'total': total or 0,
+            'items': [_serialize_entry(item) for item in items],
+        })
 
-    try:
-        result = _create_entry(CostEntry, payload)
-    except ValueError as exc:
-        db.session.rollback()
-        return jsonify(create_error_response(str(exc))), 400
+    def get(self):
+        return self._list()
 
-    return jsonify(result), 201
+    def post(self):
+        try:
+            payload = self.create_schema(**(request.get_json() or {})).model_dump(exclude_unset=True)
+        except ValidationError as exc:
+            return jsonify(create_error_response('輸入資料驗證失敗', exc.errors())), 400
 
+        try:
+            result = _create_entry(self.model, payload)
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify(create_error_response(str(exc))), 400
 
-@bp.route('/costs/<int:entry_id>', methods=['PUT'])
-@login_required
-def update_cost(entry_id: int):
-    try:
-        payload = CostEntryUpdateModel(**request.get_json()).model_dump(exclude_unset=True)
-    except ValidationError as exc:
-        return jsonify(create_error_response('輸入資料驗證失敗', exc.errors())), 400
+        return jsonify(result), 201
 
-    try:
-        result = _update_entry(CostEntry, entry_id, payload)
-    except LookupError:
-        return jsonify(create_error_response('資料不存在')), 404
-    except ValueError as exc:
-        db.session.rollback()
-        return jsonify(create_error_response(str(exc))), 400
+    def put(self, entry_id: int):
+        try:
+            payload = self.update_schema(**(request.get_json() or {})).model_dump(exclude_unset=True)
+        except ValidationError as exc:
+            return jsonify(create_error_response('輸入資料驗證失敗', exc.errors())), 400
 
-    return jsonify(result)
+        try:
+            result = _update_entry(self.model, entry_id, payload)
+        except LookupError:
+            return jsonify(create_error_response('資料不存在')), 404
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify(create_error_response(str(exc))), 400
 
+        return jsonify(result)
 
-@bp.route('/costs/<int:entry_id>', methods=['DELETE'])
-@login_required
-def delete_cost(entry_id: int):
-    entry = db.session.get(CostEntry, entry_id)
-    if not entry or entry.user_id != current_user.id:
-        return jsonify(create_error_response('資料不存在')), 404
+    def delete(self, entry_id: int):
+        entry = db.session.get(self.model, entry_id)
+        if not entry or entry.user_id != current_user.id:
+            return jsonify(create_error_response('資料不存在')), 404
 
-    db.session.delete(entry)
-    db.session.commit()
-    return jsonify({'success': True})
-
-
-@bp.route('/costs/bulk-import', methods=['POST'])
-@login_required
-def bulk_import_costs():
-    try:
-        payload = FinanceBulkImportModel(**request.get_json()).model_dump()
-    except ValidationError as exc:
-        return jsonify(create_error_response('匯入資料驗證失敗', exc.errors())), 400
-
-    try:
-        result = _handle_bulk_import(CostEntry, payload['entries'])
-    except ValueError as exc:
-        db.session.rollback()
-        return jsonify(create_error_response(str(exc))), 400
-    except IntegrityError:
-        db.session.rollback()
-        return (
-            jsonify(create_error_response('資料庫完整性錯誤，可能存在重複資料或違反限制。')),
-            409,
-        )
-
-    return jsonify(result), 201
+        db.session.delete(entry)
+        db.session.commit()
+        return jsonify({'success': True})
 
 
-@bp.route('/revenues', methods=['GET'])
-@login_required
-def list_revenues():
-    try:
-        conditions = _apply_filters(RevenueEntry)
-    except ValueError as exc:
-        return jsonify(create_error_response(str(exc))), 400
+def _bulk_import_view(model_cls: Type[CostEntry | RevenueEntry], endpoint_name: str):
+    @login_required
+    def handler():
+        try:
+            payload = FinanceBulkImportModel(**(request.get_json() or {})).model_dump()
+        except ValidationError as exc:
+            return jsonify(create_error_response('匯入資料驗證失敗', exc.errors())), 400
 
-    try:
-        page = int(request.args.get('page', 1))
-        page_size = int(request.args.get('page_size', 50))
-        if page < 1 or page_size < 1:
-            raise ValueError
-    except (TypeError, ValueError):
-        return jsonify(create_error_response('分頁參數必須為正整數')), 400
+        try:
+            result = _handle_bulk_import(model_cls, payload['entries'])
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify(create_error_response(str(exc))), 400
+        except IntegrityError:
+            db.session.rollback()
+            return (
+                jsonify(create_error_response('資料庫完整性錯誤，可能存在重複資料或違反限制。')),
+                409,
+            )
 
-    base_stmt = select(RevenueEntry).where(conditions)
-    total = db.session.scalar(select(db.func.count()).select_from(base_stmt.subquery()))
-    stmt = base_stmt.order_by(RevenueEntry.recorded_at.desc())
-    items = db.session.scalars(
-        stmt.offset((page - 1) * page_size).limit(page_size)
-    ).all()
+        return jsonify(result), 201
 
-    return jsonify({
-        'total': total or 0,
-        'items': [_serialize_entry(item) for item in items],
-    })
+    handler.__name__ = endpoint_name
+    return handler
 
 
-@bp.route('/revenues', methods=['POST'])
-@login_required
-def create_revenue():
-    try:
-        payload = RevenueEntryCreateModel(**request.get_json()).model_dump(exclude_unset=True)
-    except ValidationError as exc:
-        return jsonify(create_error_response('輸入資料驗證失敗', exc.errors())), 400
-
-    try:
-        result = _create_entry(RevenueEntry, payload)
-    except ValueError as exc:
-        db.session.rollback()
-        return jsonify(create_error_response(str(exc))), 400
-
-    return jsonify(result), 201
+cost_view = FinanceEntryAPI.as_view(
+    'cost_api',
+    model=CostEntry,
+    create_schema=CostEntryCreateModel,
+    update_schema=CostEntryUpdateModel,
+)
+bp.add_url_rule('/costs', view_func=cost_view, methods=['GET', 'POST'])
+bp.add_url_rule('/costs/<int:entry_id>', view_func=cost_view, methods=['PUT', 'DELETE'])
+bp.add_url_rule(
+    '/costs/bulk-import',
+    view_func=_bulk_import_view(CostEntry, 'bulk_import_costs'),
+    methods=['POST'],
+)
 
 
-@bp.route('/revenues/<int:entry_id>', methods=['PUT'])
-@login_required
-def update_revenue(entry_id: int):
-    try:
-        payload = RevenueEntryUpdateModel(**request.get_json()).model_dump(exclude_unset=True)
-    except ValidationError as exc:
-        return jsonify(create_error_response('輸入資料驗證失敗', exc.errors())), 400
-
-    try:
-        result = _update_entry(RevenueEntry, entry_id, payload)
-    except LookupError:
-        return jsonify(create_error_response('資料不存在')), 404
-    except ValueError as exc:
-        db.session.rollback()
-        return jsonify(create_error_response(str(exc))), 400
-
-    return jsonify(result)
-
-
-@bp.route('/revenues/<int:entry_id>', methods=['DELETE'])
-@login_required
-def delete_revenue(entry_id: int):
-    entry = db.session.get(RevenueEntry, entry_id)
-    if not entry or entry.user_id != current_user.id:
-        return jsonify(create_error_response('資料不存在')), 404
-
-    db.session.delete(entry)
-    db.session.commit()
-    return jsonify({'success': True})
-
-
-@bp.route('/revenues/bulk-import', methods=['POST'])
-@login_required
-def bulk_import_revenues():
-    try:
-        payload = FinanceBulkImportModel(**request.get_json()).model_dump()
-    except ValidationError as exc:
-        return jsonify(create_error_response('匯入資料驗證失敗', exc.errors())), 400
-
-    try:
-        result = _handle_bulk_import(RevenueEntry, payload['entries'])
-    except ValueError as exc:
-        db.session.rollback()
-        return jsonify(create_error_response(str(exc))), 400
-    except IntegrityError:
-        db.session.rollback()
-        return (
-            jsonify(create_error_response('資料庫完整性錯誤，可能存在重複資料或違反限制。')),
-            409,
-        )
-
-    return jsonify(result), 201
+revenue_view = FinanceEntryAPI.as_view(
+    'revenue_api',
+    model=RevenueEntry,
+    create_schema=RevenueEntryCreateModel,
+    update_schema=RevenueEntryUpdateModel,
+)
+bp.add_url_rule('/revenues', view_func=revenue_view, methods=['GET', 'POST'])
+bp.add_url_rule('/revenues/<int:entry_id>', view_func=revenue_view, methods=['PUT', 'DELETE'])
+bp.add_url_rule(
+    '/revenues/bulk-import',
+    view_func=_bulk_import_view(RevenueEntry, 'bulk_import_revenues'),
+    methods=['POST'],
+)
