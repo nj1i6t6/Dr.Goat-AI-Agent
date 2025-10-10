@@ -39,9 +39,10 @@ const props = defineProps({
 const target = ref(null);
 const targetIsVisible = ref(false);
 
-useIntersectionObserver(target, ([entry]) => {
+const { stop } = useIntersectionObserver(target, ([entry]) => {
   if (entry?.isIntersecting) {
     targetIsVisible.value = true;
+    stop();
   }
 });
 

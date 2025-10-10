@@ -52,13 +52,14 @@ export function useLazyCharts(targetRef, options = {}) {
   };
 
   if (config.autoInit && typeof window !== 'undefined') {
-    useIntersectionObserver(
+    const { stop } = useIntersectionObserver(
       targetRef,
       ([entry]) => {
         if (!entry) return;
         isIntersecting.value = entry.isIntersecting;
         if (entry.isIntersecting) {
           ensureChart();
+          stop();
         }
       },
       { threshold: config.threshold }
