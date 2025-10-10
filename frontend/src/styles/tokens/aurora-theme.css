@@ -47,8 +47,6 @@
   --aurora-shadow-strong: 0 30px 65px rgba(37, 99, 235, 0.28);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --aurora-transition-base: 0ms linear;
-  }
+:root[data-aurora-motion='reduced'] {
+  --aurora-transition-base: 0ms linear;
 }

@@ -9,6 +9,11 @@ function getSystemColorScheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function getSystemMotionPreference() {
+  if (typeof window === 'undefined') return true;
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 function applyColorScheme(value) {
   if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-theme', value);
@@ -26,7 +31,9 @@ export const useThemeStore = defineStore('theme', () => {
     typeof localStorage !== 'undefined' ? localStorage.getItem(MOTION_STORAGE_KEY) : null;
 
   const colorScheme = ref(storedScheme || getSystemColorScheme());
-  const motionEnabled = ref(storedMotion ? storedMotion === 'true' : true);
+  const motionEnabled = ref(
+    storedMotion ? storedMotion === 'true' : getSystemMotionPreference()
+  );
 
   const isDark = computed(() => colorScheme.value === 'dark');
   const motionPreference = computed(() => (motionEnabled.value ? 'enabled' : 'reduced'));

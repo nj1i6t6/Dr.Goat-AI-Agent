@@ -5,6 +5,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useLazyCharts } from '@/composables/useLazyCharts';
+import { useTheme } from '@/composables/useTheme';
 
 const props = defineProps({
   items: {
@@ -15,8 +16,31 @@ const props = defineProps({
 
 const chartRef = ref(null);
 const { ensureChart, dispose } = useLazyCharts(chartRef, { initOptions: { renderer: 'canvas' } });
+const { isDark } = useTheme();
 
 const hasData = computed(() => (props.items ?? []).length > 0);
+
+const readCssVar = (name) => {
+  if (typeof window === 'undefined') return '';
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+};
+
+const withAlpha = (color, alpha) => {
+  if (!color) return '';
+  if (color.startsWith('#')) {
+    const hex = color.replace('#', '');
+    const normalized = hex.length === 3 ? hex.split('').map((char) => char + char).join('') : hex;
+    const bigint = parseInt(normalized, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  const rgbMatch = color.match(/\d+(?:\.\d+)?/g);
+  if (!rgbMatch || rgbMatch.length < 3) return color;
+  const [r, g, b] = rgbMatch;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const renderChart = async () => {
   if (!hasData.value) {
@@ -31,6 +55,12 @@ const renderChart = async () => {
   const costData = props.items.map((item) => Number(item.metrics?.total_cost ?? 0));
   const revenueData = props.items.map((item) => Number(item.metrics?.total_revenue ?? 0));
 
+  const axisLineColor = readCssVar('--aurora-border') || 'rgba(148, 163, 184, 0.4)';
+  const axisLabelColor = readCssVar('--aurora-text-muted') || '#94a3b8';
+  const gridlineColor = readCssVar('--aurora-gridline') || 'rgba(148, 163, 184, 0.25)';
+  const accentPrimary = readCssVar('--aurora-accent-strong') || '#0ea5e9';
+  const accentSecondary = readCssVar('--aurora-accent-secondary') || '#a855f7';
+
   chart.setOption(
     {
       grid: {
@@ -39,22 +69,27 @@ const renderChart = async () => {
         top: 48,
         bottom: 40,
       },
-      tooltip: { trigger: 'axis' },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: readCssVar('--aurora-surface-strong') || 'rgba(255,255,255,0.92)',
+        borderColor: axisLineColor,
+        textStyle: { color: readCssVar('--aurora-text-primary') || '#1f2937' },
+      },
       legend: {
         data: ['總成本', '總收益'],
-        textStyle: { color: 'var(--aurora-text-muted)' },
+        textStyle: { color: axisLabelColor },
       },
       xAxis: {
         type: 'category',
         data: labels,
-        axisLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.4)' } },
-        axisLabel: { color: 'var(--aurora-text-muted)' },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        axisLabel: { color: axisLabelColor },
       },
       yAxis: {
         type: 'value',
-        axisLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.4)' } },
-        splitLine: { lineStyle: { color: 'var(--aurora-gridline)' } },
-        axisLabel: { color: 'var(--aurora-text-muted)' },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: gridlineColor } },
+        axisLabel: { color: axisLabelColor },
       },
       series: [
         {
@@ -64,10 +99,10 @@ const renderChart = async () => {
           data: costData,
           lineStyle: {
             width: 3,
-            color: 'rgba(14, 165, 233, 0.85)',
+            color: withAlpha(accentPrimary, 0.85),
           },
           areaStyle: {
-            color: 'rgba(14, 165, 233, 0.18)',
+            color: withAlpha(accentPrimary, 0.18),
           },
         },
         {
@@ -77,10 +112,10 @@ const renderChart = async () => {
           data: revenueData,
           lineStyle: {
             width: 3,
-            color: 'rgba(168, 85, 247, 0.85)',
+            color: withAlpha(accentSecondary, 0.85),
           },
           areaStyle: {
-            color: 'rgba(168, 85, 247, 0.18)',
+            color: withAlpha(accentSecondary, 0.18),
           },
         },
       ],
@@ -96,6 +131,10 @@ watch(
   },
   { deep: true }
 );
+
+watch(isDark, () => {
+  renderChart();
+});
 
 onMounted(() => {
   renderChart();

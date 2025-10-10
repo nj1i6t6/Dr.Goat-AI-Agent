@@ -124,10 +124,14 @@ const resolvedColumns = computed(() => props.columns || defaultColumns);
 
 const rows = computed(() => store.formattedEntries);
 
-const handleScroll = async ({ scrollTop, scrollHeight, clientHeight }) => {
+const handleScroll = async ({ scrollTop }) => {
   if (store.isLoading || store.isEnd) return;
-  const distanceToBottom = scrollHeight - scrollTop - clientHeight;
-  if (distanceToBottom < props.loadMoreOffset) {
+
+  const bodyEl = containerRef.value?.querySelector('.el-table-v2__body');
+  if (!bodyEl) return;
+
+  const distanceToBottom = bodyEl.scrollHeight - scrollTop - bodyEl.clientHeight;
+  if (distanceToBottom <= props.loadMoreOffset) {
     await store.fetchNextPage();
   }
 };
@@ -176,6 +180,7 @@ onMounted(() => {
 }
 
 :deep(.el-table-v2__header-wrapper) {
+  /* 覆寫 Element Plus 預設背景，使表頭融入 Aurora 玻璃質感卡片 */
   background: transparent;
 }
 

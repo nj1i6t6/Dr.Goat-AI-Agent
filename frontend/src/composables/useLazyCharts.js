@@ -22,7 +22,7 @@ export function useLazyCharts(targetRef, options = {}) {
     loading.value = true;
     try {
       const echarts = await import('echarts');
-      chartInstance.value = echarts.init(targetRef.value, config.theme, config.initOptions);
+      chartInstance.value = echarts.init(targetRef.value, null, config.initOptions);
       hasLoadedOnce.value = true;
       hasError.value = null;
     } catch (error) {

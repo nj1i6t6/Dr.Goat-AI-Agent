@@ -6,6 +6,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useLazyCharts } from '@/composables/useLazyCharts';
 import { formatCohortGroupLabel } from '@/utils/analyticsFormatting';
+import { useTheme } from '@/composables/useTheme';
 
 const props = defineProps({
   items: {
@@ -16,8 +17,31 @@ const props = defineProps({
 
 const chartRef = ref(null);
 const { ensureChart, dispose } = useLazyCharts(chartRef, { initOptions: { renderer: 'canvas' } });
+const { isDark } = useTheme();
 
 const hasData = computed(() => (props.items ?? []).length > 0);
+
+const readCssVar = (name) => {
+  if (typeof window === 'undefined') return '';
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+};
+
+const withAlpha = (color, alpha) => {
+  if (!color) return '';
+  if (color.startsWith('#')) {
+    const hex = color.replace('#', '');
+    const normalized = hex.length === 3 ? hex.split('').map((char) => char + char).join('') : hex;
+    const bigint = parseInt(normalized, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  const rgbMatch = color.match(/\d+(?:\.\d+)?/g);
+  if (!rgbMatch || rgbMatch.length < 3) return color;
+  const [r, g, b] = rgbMatch;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const renderChart = async () => {
   if (!hasData.value) {
@@ -31,6 +55,12 @@ const renderChart = async () => {
   const categories = props.items.map((item) => formatCohortGroupLabel(item));
   const profits = props.items.map((item) => Number(item.metrics?.net_profit ?? 0));
 
+  const axisLineColor = readCssVar('--aurora-border') || 'rgba(148, 163, 184, 0.4)';
+  const axisLabelColor = readCssVar('--aurora-text-muted') || '#94a3b8';
+  const gridlineColor = readCssVar('--aurora-gridline') || 'rgba(148, 163, 184, 0.25)';
+  const accentStart = readCssVar('--aurora-accent-strong') || '#0ea5e9';
+  const accentEnd = readCssVar('--aurora-accent-secondary') || '#a855f7';
+
   chart.setOption(
     {
       grid: {
@@ -39,19 +69,24 @@ const renderChart = async () => {
         top: 40,
         bottom: 40,
       },
-      tooltip: { trigger: 'axis' },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: readCssVar('--aurora-surface-strong') || 'rgba(255,255,255,0.92)',
+        borderColor: axisLineColor,
+        textStyle: { color: readCssVar('--aurora-text-primary') || '#1f2937' },
+      },
       xAxis: {
         type: 'category',
         data: categories,
-        axisLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.4)' } },
-        axisLabel: { color: 'var(--aurora-text-muted)' },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        axisLabel: { color: axisLabelColor },
       },
       yAxis: {
         type: 'value',
         name: '淨收益 (TWD)',
-        axisLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.4)' } },
-        splitLine: { lineStyle: { color: 'var(--aurora-gridline)' } },
-        axisLabel: { color: 'var(--aurora-text-muted)' },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: gridlineColor } },
+        axisLabel: { color: axisLabelColor },
       },
       series: [
         {
@@ -67,8 +102,8 @@ const renderChart = async () => {
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(14, 165, 233, 0.95)' },
-                { offset: 1, color: 'rgba(168, 85, 247, 0.65)' },
+                { offset: 0, color: withAlpha(accentStart, 0.95) },
+                { offset: 1, color: withAlpha(accentEnd, 0.65) },
               ],
             },
           },
@@ -86,6 +121,10 @@ watch(
   },
   { deep: true }
 );
+
+watch(isDark, () => {
+  renderChart();
+});
 
 onMounted(() => {
   renderChart();

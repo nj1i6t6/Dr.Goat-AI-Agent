@@ -1,16 +1,32 @@
 <template>
-  <div class="app-layout-container">
-    <el-header class="top-nav">
-      <!-- Logo -->
-      <div class="logo" @click="$router.push('/dashboard')">
-        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNOSAxNWMtMi41IDEuNS01LjI1IDIuNS04IDMiLz48cGF0aCBkPSJNMy41IDIxYzEuMjUtMS4xNyAyLTUuNSAzLTEwLjVjMC01LjM5IDEuNzctOC41IDIuNS05LjVjMS0xLjI1IDIuMjUtMS41IDQuNS0uNWMzLjM4IDEuNSAzLjUgMy41IDQuNSA5LjVjMCAuMzEgMCAxLjE5LS4wOCA1Ii8+PHBhdGggZD0iTTE4IDIxYzAgLTEuNDQtLjUtMy41LTEuNS01LjVjLTEtMi0yLjUtMy00LjUtMy41Ii8+PHBhdGggZD0iTTIyIDIwLjVjLTEuODEtMS4xNy0zLjc1LTEuNS01Ljg3LTEuNSIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iMTAiIHI9IjEiLz48Y2lyY2xlIGN4PSIxNiIgY3k9IjEwIiByPSIxIi8+PC9zdmc+" alt="Logo" />
-        <span>領頭羊博士</span>
+  <div class="app-layout">
+    <header class="glass-nav">
+      <div
+        class="nav-brand"
+        role="button"
+        tabindex="0"
+        @click="$router.push('/dashboard')"
+        @keyup.enter="$router.push('/dashboard')"
+      >
+        <img
+          class="nav-brand__logo"
+          src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIg
+ dmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2Ut
+ bGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNOSAxNWMtMi41IDEuNS01LjI1IDIuNS04IDMiLz48cGF0aCBkPSJNMy41IDIxYzEuMjUtMS4xNyAyLTUuNSAzLTEwLjVj
+ MC01LjM5IDEuNzctOC41IDIuNS05LjVjMS0xLjI1IDIuMjUtMS41IDQuNS0uNWMzLjM4IDEuNSAzLjUgMy41IDQuNSA5LjVjMCAuMzEgMCAxLjE5LS4wOCA1Ii8+PHBh
+ dGggZD0iTTE4IDIxYzAgLTEuNDQtLjUtMy41LTEuNS01LjVjLTEtMi0yLjUtMy00LjUtMy41Ii8+PHBhdGggZD0iTTIyIDIwLjVjLTEuODEtMS4xNy0zLjc1LTEuNS01
+ Ljg3LTEuNSIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iMTAiIHI9IjEiLz48Y2lyY2xlIGN4PSIxNiIgY3k9IjEwIiByPSIxIi8+PC9zdmc+"
+          alt="Aurora Navigation Logo"
+        />
+        <div class="nav-brand__label">
+          <span class="nav-brand__title">領頭羊博士</span>
+          <span class="nav-brand__subtitle">Aurora Biophilic Tech Console</span>
+        </div>
       </div>
 
-      <!-- 頂部導航菜單 (桌面版) -->
       <el-menu
         :default-active="$route.path"
-        class="top-menu"
+        class="nav-links"
         mode="horizontal"
         :ellipsis="false"
         router
@@ -27,19 +43,19 @@
         <el-menu-item index="/settings">系統設定</el-menu-item>
       </el-menu>
 
-      <!-- 用戶資訊與漢堡選單 -->
-      <div class="right-panel">
-        <div class="theme-controls">
+      <div class="nav-actions">
+        <div class="control-cluster">
           <el-tooltip :content="isDark ? '切換為淺色主題' : '切換為深色主題'">
             <el-button
               circle
               size="small"
-              class="theme-toggle"
+              class="control-button"
               :aria-label="isDark ? '切換為淺色主題' : '切換為深色主題'"
+              :aria-pressed="isDark"
               @click="toggleColorScheme"
             >
               <el-icon>
-                <Moon v-if="isDark" />
+                <MoonNight v-if="isDark" />
                 <Sunny v-else />
               </el-icon>
             </el-button>
@@ -48,27 +64,33 @@
             <el-button
               circle
               size="small"
-              class="theme-toggle"
-              :type="motionEnabled ? 'primary' : 'info'"
+              class="control-button"
+              :class="{ 'is-active': motionEnabled }"
               :aria-label="motionEnabled ? '停用 Aurora 動效' : '啟用 Aurora 動效'"
-              plain
+              :aria-pressed="motionEnabled"
               @click="toggleMotion"
             >
               <el-icon><MagicStick /></el-icon>
             </el-button>
           </el-tooltip>
         </div>
-        <div class="user-info">
-          <span>{{ authStore.username }}</span>
-          <el-button @click="handleLogout" type="danger" size="small" plain>登出</el-button>
+
+        <div class="user-panel">
+          <div class="user-panel__details">
+            <span class="user-panel__name">{{ authStore.username }}</span>
+            <span class="user-panel__role">Aurora Admin</span>
+          </div>
+          <el-button class="user-panel__logout" size="small" plain type="danger" @click="handleLogout">
+            登出
+          </el-button>
         </div>
+
         <div class="hamburger-menu" @click="drawerVisible = true">
           <el-icon><Menu /></el-icon>
         </div>
       </div>
-    </el-header>
+    </header>
 
-    <!-- 抽屜菜單 (移動版) -->
     <el-drawer
       v-model="drawerVisible"
       title="導航選單"
@@ -125,9 +147,10 @@
       </el-menu>
     </el-drawer>
 
-    <!-- 主內容區域 -->
     <main class="main-content">
-      <router-view />
+      <div class="main-content__surface aurora-scrollbar">
+        <router-view />
+      </div>
     </main>
   </div>
 </template>
@@ -148,7 +171,7 @@ import {
   Collection,
   Cpu,
   Sunny,
-  Moon,
+  MoonNight,
   MagicStick,
 } from '@element-plus/icons-vue';
 import { useTheme } from '@/composables/useTheme';
@@ -162,140 +185,236 @@ const handleLogout = () => {
     confirmButtonText: '確定',
     cancelButtonText: '取消',
     type: 'warning',
-  }).then(async () => {
-    await authStore.logout();
-    ElMessage({ type: 'success', message: '您已成功登出' });
-  }).catch(() => {});
+  })
+    .then(async () => {
+      await authStore.logout();
+      ElMessage({ type: 'success', message: '您已成功登出' });
+    })
+    .catch(() => {});
 };
 </script>
 
 <style scoped>
-.app-layout-container {
+.app-layout {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
 
-.top-nav {
-  background: linear-gradient(120deg, rgba(14, 165, 233, 0.92), rgba(168, 85, 247, 0.88));
-  color: #f8fafc;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  height: 64px;
+.glass-nav {
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
-}
-
-.logo {
   display: flex;
   align-items: center;
+  gap: 1.5rem;
+  padding: 0 28px;
+  height: 72px;
+  background: linear-gradient(115deg, rgba(20, 184, 166, 0.22), rgba(59, 130, 246, 0.28));
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
   cursor: pointer;
-  margin-right: 20px;
-  gap: 10px;
+  color: inherit;
+  text-decoration: none;
 }
 
-.logo img {
-  height: 34px;
+.nav-brand:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.75);
+  outline-offset: 4px;
+  border-radius: 999px;
 }
 
-.logo span {
-  font-size: 1.55em;
+.nav-brand__logo {
+  height: 40px;
+  width: 40px;
+  filter: drop-shadow(0 4px 8px rgba(15, 23, 42, 0.35));
+}
+
+.nav-brand__label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.nav-brand__title {
+  font-size: 1.35rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   color: #f8fafc;
 }
 
-.top-menu {
-  flex-grow: 1;
-  background-color: transparent;
+.nav-brand__subtitle {
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(241, 245, 249, 0.78);
+}
+
+.nav-links {
+  flex: 1;
+  background: transparent;
   border-bottom: none;
   height: 100%;
+  --el-menu-active-color: #ffffff;
 }
 
-.top-menu .el-menu-item {
-  color: rgba(241, 245, 249, 0.85);
-  font-size: 0.95em;
+.nav-links :deep(.el-menu-item) {
+  color: rgba(241, 245, 249, 0.78);
   font-weight: 500;
-  background-color: transparent !important;
+  background: transparent !important;
   border-bottom: 3px solid transparent !important;
+  transition: color var(--aurora-transition-base), border-color var(--aurora-transition-base);
 }
 
-.top-menu .el-menu-item:hover {
-  background-color: rgba(255, 255, 255, 0.18) !important;
+.nav-links :deep(.el-menu-item:hover),
+.nav-links :deep(.el-menu-item.is-active) {
   color: #ffffff !important;
+  border-bottom-color: rgba(255, 255, 255, 0.8) !important;
 }
 
-.top-menu .el-menu-item.is-active {
-  color: #ffffff !important;
-  border-bottom-color: rgba(255, 255, 255, 0.9) !important;
-}
-
-.right-panel {
-  margin-left: auto;
+.nav-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
-.theme-controls {
+.control-cluster {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  gap: 0.55rem;
 }
 
-.theme-toggle {
-  backdrop-filter: var(--aurora-backdrop-blur);
-  background: rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.45);
+.control-button {
+  background: rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #0f172a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform var(--aurora-transition-base), box-shadow var(--aurora-transition-base),
+    background var(--aurora-transition-base);
+}
+
+.control-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.control-button.is-active {
+  background: rgba(59, 130, 246, 0.35);
   color: #0f172a;
 }
 
-.user-info {
+.user-panel {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.85rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.user-panel__details {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
   color: #f8fafc;
+}
+
+.user-panel__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.user-panel__role {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.user-panel__logout {
+  --el-button-bg-color: rgba(255, 255, 255, 0.2);
+  --el-button-hover-bg-color: rgba(248, 113, 113, 0.18);
+  --el-button-hover-text-color: #fee2e2;
+  border-radius: 999px;
+  font-weight: 600;
 }
 
 .hamburger-menu {
   display: none;
   cursor: pointer;
-  font-size: 24px;
+  color: #f8fafc;
+  font-size: 1.5rem;
 }
 
 .main-content {
   flex: 1;
-  padding: 28px 32px 44px;
-  max-width: 1360px;
-  margin: 0 auto;
   width: 100%;
+  padding: 28px 32px 48px;
   box-sizing: border-box;
-  background: radial-gradient(circle at 20% 20%, rgba(94, 234, 212, 0.14), transparent 58%),
-    radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.16), transparent 60%);
+  display: flex;
+  justify-content: center;
+}
+
+.main-content__surface {
+  width: 100%;
+  max-width: 1360px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.main-content__surface :deep(> *) {
+  width: 100%;
 }
 
 .drawer-menu {
   border-right: none;
 }
 
-:deep(.theme-toggle .el-icon) {
+:deep(.control-button .el-icon) {
   color: inherit;
 }
 
-@media (max-width: 1024px) {
-  .top-menu {
+@media (max-width: 1200px) {
+  .nav-links {
     display: none;
   }
 
   .hamburger-menu {
     display: block;
   }
+}
 
-  .theme-controls {
+@media (max-width: 960px) {
+  .user-panel {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .glass-nav {
+    padding: 0 18px;
+    gap: 1rem;
+  }
+
+  .main-content {
+    padding: 20px 18px 36px;
+  }
+
+  .main-content__surface {
+    padding: 20px;
   }
 }
 </style>

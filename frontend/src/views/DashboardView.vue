@@ -1,7 +1,6 @@
 <template>
   <div class="dashboard-page" v-loading="initialLoading">
-    <div v-if="!initialLoading && !hasSheep">
-      <!-- 羊群為空時的引導畫面 -->
+    <div v-if="!initialLoading && !hasSheep" class="empty-state">
       <el-result
         icon="info"
         title="歡迎, 開始建立您的羊群檔案吧！"
@@ -15,84 +14,75 @@
       </el-result>
     </div>
 
-    <div v-else-if="!initialLoading && hasSheep">
-      <!-- 儀表板主內容 -->
-      <el-card shadow="never" class="welcome-card">
-        <h3 class="welcome-title">領頭羊博士的問候！</h3>
-        <!-- 修改：直接綁定 settingsStore 中的 agentTip 狀態 -->
+    <div v-else-if="!initialLoading && hasSheep" class="dashboard-content">
+      <BaseAuroraCard class="welcome-card" title="領頭羊博士的問候！">
         <div class="agent-tip" v-loading="settingsStore.agentTip.loading" v-html="settingsStore.agentTip.html"></div>
-      </el-card>
+      </BaseAuroraCard>
 
-      <el-row :gutter="20">
-        <el-col :md="12">
-          <el-card shadow="never">
-            <template #header>
-              <div class="card-header">
-                <span>📅 任務與安全提醒</span>
+      <section class="dashboard-grid">
+        <BaseAuroraCard title="📅 任務與安全提醒">
+          <el-empty
+            v-if="!dashboardData.reminders || dashboardData.reminders.length === 0"
+            description="暫無待辦事項"
+          />
+          <ul v-else class="capsule-list">
+            <li v-for="(reminder, index) in dashboardData.reminders" :key="`reminder-${index}`" class="capsule-item">
+              <div class="capsule-item__primary">
+                <span class="ear-num-link">{{ reminder.ear_num }}</span>
+                <span class="capsule-item__title">{{ reminder.type }}</span>
+                <span class="capsule-item__meta">至 {{ reminder.due_date }}</span>
               </div>
-            </template>
-            <el-empty v-if="!dashboardData.reminders || dashboardData.reminders.length === 0" description="暫無待辦事項" />
-            <ul v-else class="dashboard-list">
-              <li v-for="(reminder, index) in dashboardData.reminders" :key="index">
-                <span class="ear-num-link">{{ reminder.ear_num }}</span>: {{ reminder.type }} (至 {{ reminder.due_date }})
-                <el-tag :type="getTagType(reminder.status)" size="small" effect="light">{{ reminder.status }}</el-tag>
-              </li>
-            </ul>
-          </el-card>
-        </el-col>
-        <el-col :md="12">
-           <el-card shadow="never">
-            <template #header>
-              <div class="card-header">
-                <span>❤️ 健康與福利警示</span>
+              <el-tag :type="getTagType(reminder.status)" size="small" effect="light">{{ reminder.status }}</el-tag>
+            </li>
+          </ul>
+        </BaseAuroraCard>
+
+        <BaseAuroraCard title="❤️ 健康與福利警示">
+          <el-empty
+            v-if="!dashboardData.health_alerts || dashboardData.health_alerts.length === 0"
+            description="羊群健康狀況良好"
+          />
+          <ul v-else class="capsule-list">
+            <li v-for="(alert, index) in dashboardData.health_alerts" :key="`alert-${index}`" class="capsule-item">
+              <div class="capsule-item__primary">
+                <strong class="capsule-item__title">{{ alert.type }}</strong>
+                <span class="ear-num-link">{{ alert.ear_num }}</span>
+                <span class="capsule-item__meta">{{ alert.message }}</span>
               </div>
-            </template>
-            <el-empty v-if="!dashboardData.health_alerts || dashboardData.health_alerts.length === 0" description="羊群健康狀況良好" />
-             <ul v-else class="dashboard-list">
-              <li v-for="(alert, index) in dashboardData.health_alerts" :key="index" class="alert-item">
-                <strong>{{ alert.type }}</strong>
-                <div>
-                  <span class="ear-num-link">{{ alert.ear_num }}</span> - 
-                  <span class="alert-message">{{ alert.message }}</span>
-                </div>
-              </li>
-            </ul>
-          </el-card>
-        </el-col>
-      </el-row>
-      
-      <el-card shadow="never" style="margin-top: 20px;">
-        <el-row :gutter="40">
-          <el-col :md="12">
-            <h3>🐑 羊群狀態速覽</h3>
-             <el-empty v-if="!dashboardData.flock_status_summary || dashboardData.flock_status_summary.length === 0" description="暫無狀態數據" />
-            <div v-else>
-              <p v-for="summary in dashboardData.flock_status_summary" :key="summary.status">
-                <strong>{{ getStatusText(summary.status) }}:</strong> {{ summary.count }} 隻
-              </p>
-            </div>
-          </el-col>
-          <el-col :md="12">
-             <h3>🌿 ESG 指標速覽</h3>
-             <div v-if="dashboardData.esg_metrics">
-               <p>
-                 <strong>飼料轉換率 (FCR) 估算:</strong>
-                 <span v-if="dashboardData.esg_metrics.fcr" class="esg-value">{{ dashboardData.esg_metrics.fcr.toFixed(2) }}</span>
-                 <el-tag v-else type="info" size="small">數據不足</el-tag>
-                 <span class="form-note">(kg飼料/kg增重)</span>
-               </p>
-               <el-button
-                 type="success"
-                 :loading="reportLoading"
-                 @click="generateFarmReport"
-                 style="margin-top: 15px;"
-               >
-                 生成牧場報告
-               </el-button>
-             </div>
-          </el-col>
-        </el-row>
-      </el-card>
+            </li>
+          </ul>
+        </BaseAuroraCard>
+      </section>
+
+      <section class="dashboard-grid">
+        <BaseAuroraCard title="🐑 羊群狀態速覽">
+          <el-empty
+            v-if="!dashboardData.flock_status_summary || dashboardData.flock_status_summary.length === 0"
+            description="暫無狀態數據"
+          />
+          <ul v-else class="summary-list">
+            <li v-for="summary in dashboardData.flock_status_summary" :key="summary.status">
+              <span class="summary-list__label">{{ getStatusText(summary.status) }}</span>
+              <span class="summary-list__value">{{ summary.count }} 隻</span>
+            </li>
+          </ul>
+        </BaseAuroraCard>
+
+        <BaseAuroraCard title="🌿 ESG 指標速覽">
+          <div v-if="dashboardData.esg_metrics" class="esg-card">
+            <p>
+              <strong>飼料轉換率 (FCR) 估算:</strong>
+              <span v-if="dashboardData.esg_metrics.fcr" class="esg-value">
+                {{ dashboardData.esg_metrics.fcr.toFixed(2) }}
+              </span>
+              <el-tag v-else type="info" size="small">數據不足</el-tag>
+              <span class="form-note">(kg飼料/kg增重)</span>
+            </p>
+            <el-button type="success" :loading="reportLoading" @click="generateFarmReport">生成牧場報告</el-button>
+          </div>
+          <el-empty v-else description="暫無 ESG 數據" />
+        </BaseAuroraCard>
+      </section>
 
       <section class="activity-log-section">
         <VirtualizedLogTable />
@@ -103,13 +93,12 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { useSettingsStore } from '../stores/settings';
 import api from '../api';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import VirtualizedLogTable from '@/components/tables/VirtualizedLogTable.vue';
+import BaseAuroraCard from '@/components/common/BaseAuroraCard.vue';
 
-const router = useRouter();
 const settingsStore = useSettingsStore();
 
 const initialLoading = ref(true);
@@ -123,11 +112,20 @@ const dashboardData = reactive({
 });
 
 const statusMap = {
-  maintenance: "維持期", growing_young: "生長前期", growing_finishing: "生長育肥期",
-  gestating_early: "懷孕早期", gestating_late: "懷孕晚期", lactating_early: "泌乳早期",
-  lactating_peak: "泌乳高峰期", lactating_mid: "泌乳中期", lactating_late: "泌乳晚期",
-  dry_period: "乾乳期", breeding_male_active: "配種期公羊", breeding_male_non_active: "非配種期公羊",
-  fiber_producing: "產毛期", other_status: "其他"
+  maintenance: '維持期',
+  growing_young: '生長前期',
+  growing_finishing: '生長育肥期',
+  gestating_early: '懷孕早期',
+  gestating_late: '懷孕晚期',
+  lactating_early: '泌乳早期',
+  lactating_peak: '泌乳高峰期',
+  lactating_mid: '泌乳中期',
+  lactating_late: '泌乳晚期',
+  dry_period: '乾乳期',
+  breeding_male_active: '配種期公羊',
+  breeding_male_non_active: '非配種期公羊',
+  fiber_producing: '產毛期',
+  other_status: '其他',
 };
 const getStatusText = (status) => statusMap[status] || status || '未分類';
 
@@ -142,7 +140,7 @@ async function fetchInitialData() {
   try {
     const sheepList = await api.getAllSheep();
     hasSheep.value = sheepList && sheepList.length > 0;
-    
+
     if (hasSheep.value) {
       fetchDashboardContent();
     }
@@ -154,7 +152,6 @@ async function fetchInitialData() {
 }
 
 async function fetchDashboardContent() {
-  // 修改：調用 store 中的 action 來獲取每日提示
   settingsStore.fetchAndSetAgentTip();
   fetchDashboardData();
 }
@@ -175,8 +172,12 @@ async function generateFarmReport() {
     const reportHtml = `
       <h4>羊群結構 (總計: ${report.flock_composition.total} 隻)</h4>
       <div style="display:flex; gap: 20px;">
-        <div style="flex:1;"><strong>品種分佈:</strong><ul>${report.flock_composition.by_breed.map(b => `<li>${b.name}: ${b.count} 隻</li>`).join('')}</ul></div>
-        <div style="flex:1;"><strong>性別分佈:</strong><ul>${report.flock_composition.by_sex.map(s => `<li>${s.name}: ${s.count} 隻</li>`).join('')}</ul></div>
+        <div style="flex:1;"><strong>品種分佈:</strong><ul>${report.flock_composition.by_breed
+          .map((b) => `<li>${b.name}: ${b.count} 隻</li>`)
+          .join('')}</ul></div>
+        <div style="flex:1;"><strong>性別分佈:</strong><ul>${report.flock_composition.by_sex
+          .map((s) => `<li>${s.name}: ${s.count} 隻</li>`)
+          .join('')}</ul></div>
       </div>
       <hr>
       <h4>生產性能摘要</h4>
@@ -188,7 +189,13 @@ async function generateFarmReport() {
       <hr>
       <h4>健康狀況摘要 (最常見的5項疾病事件)</h4>
       <ul>
-        ${report.health_summary.top_diseases.length > 0 ? report.health_summary.top_diseases.map(d => `<li>${d.name}: ${d.count} 次</li>`).join('') : '<li>暫無疾病記錄</li>'}
+        ${
+          report.health_summary.top_diseases.length > 0
+            ? report.health_summary.top_diseases
+                .map((d) => `<li>${d.name}: ${d.count} 次</li>`)
+                .join('')
+            : '<li>暫無疾病記錄</li>'
+        }
       </ul>
     `;
     ElMessageBox.alert(reportHtml, '牧場年度報告摘要', {
@@ -211,70 +218,154 @@ onMounted(() => {
 .dashboard-page {
   animation: fadeIn 0.5s ease-out;
 }
-.welcome-card {
-  margin-bottom: 20px;
+
+.empty-state {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 0;
 }
-.welcome-title {
-  font-size: 1.5em;
-  color: #1e40af;
-  margin-top: 0;
-  margin-bottom: 10px;
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
-.agent-tip {
-  font-size: 1em;
-  color: #4b5563;
+
+.welcome-card .agent-tip {
+  font-size: 1rem;
+  color: var(--aurora-text-secondary);
   font-style: italic;
   min-height: 24px;
 }
-.card-header {
-  font-size: 1.2em;
-  font-weight: bold;
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
 }
-.dashboard-list {
+
+.capsule-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
-.dashboard-list li {
+
+.capsule-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  backdrop-filter: blur(12px);
+  transition: transform var(--aurora-transition-base), box-shadow var(--aurora-transition-base);
+}
+
+.capsule-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.capsule-item__primary {
+  display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f2f5;
+  align-items: center;
+  gap: 0.5rem;
 }
-.dashboard-list li:last-child {
-  border-bottom: none;
+
+.capsule-item__title {
+  font-weight: 600;
+  color: var(--aurora-text-primary);
 }
+
+.capsule-item__meta {
+  font-size: 0.85rem;
+  color: var(--aurora-text-muted);
+}
+
 .ear-num-link {
-  font-weight: bold;
-  color: #3b82f6;
-  cursor: pointer;
+  font-weight: 600;
+  color: var(--aurora-accent-strong);
 }
-.alert-item {
+
+.summary-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  gap: 0.75rem;
 }
-.alert-message {
-  font-size: 0.9em;
-  color: #555;
+
+.summary-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(10px);
 }
+
+.summary-list__label {
+  font-weight: 600;
+  color: var(--aurora-text-secondary);
+}
+
+.summary-list__value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--aurora-accent-secondary);
+}
+
+.esg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .esg-value {
-  font-size: 1.2em;
-  font-weight: bold;
-  color: #8b5cf6;
-  margin: 0 5px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--aurora-accent-secondary);
+  margin: 0 0.5rem;
 }
+
 .form-note {
-  font-size: 0.85em;
-  color: #94a3b8;
+  font-size: 0.85rem;
+  color: var(--aurora-text-muted);
 }
+
 .activity-log-section {
-  margin-top: 24px;
+  margin-top: 0.5rem;
 }
+
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .capsule-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .capsule-item__primary {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 </style>
