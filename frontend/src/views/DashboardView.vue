@@ -76,14 +76,14 @@
              <h3>🌿 ESG 指標速覽</h3>
              <div v-if="dashboardData.esg_metrics">
                <p>
-                 <strong>飼料轉換率 (FCR) 估算:</strong> 
+                 <strong>飼料轉換率 (FCR) 估算:</strong>
                  <span v-if="dashboardData.esg_metrics.fcr" class="esg-value">{{ dashboardData.esg_metrics.fcr.toFixed(2) }}</span>
                  <el-tag v-else type="info" size="small">數據不足</el-tag>
                  <span class="form-note">(kg飼料/kg增重)</span>
                </p>
-               <el-button 
-                 type="success" 
-                 :loading="reportLoading" 
+               <el-button
+                 type="success"
+                 :loading="reportLoading"
                  @click="generateFarmReport"
                  style="margin-top: 15px;"
                >
@@ -93,6 +93,10 @@
           </el-col>
         </el-row>
       </el-card>
+
+      <section class="activity-log-section">
+        <VirtualizedLogTable />
+      </section>
     </div>
   </div>
 </template>
@@ -103,6 +107,7 @@ import { useRouter } from 'vue-router';
 import { useSettingsStore } from '../stores/settings';
 import api from '../api';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import VirtualizedLogTable from '@/components/tables/VirtualizedLogTable.vue';
 
 const router = useRouter();
 const settingsStore = useSettingsStore();
@@ -264,6 +269,9 @@ onMounted(() => {
 .form-note {
   font-size: 0.85em;
   color: #94a3b8;
+}
+.activity-log-section {
+  margin-top: 24px;
 }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }

@@ -29,6 +29,35 @@
 
       <!-- 用戶資訊與漢堡選單 -->
       <div class="right-panel">
+        <div class="theme-controls">
+          <el-tooltip :content="isDark ? '切換為淺色主題' : '切換為深色主題'">
+            <el-button
+              circle
+              size="small"
+              class="theme-toggle"
+              :aria-label="isDark ? '切換為淺色主題' : '切換為深色主題'"
+              @click="toggleColorScheme"
+            >
+              <el-icon>
+                <Moon v-if="isDark" />
+                <Sunny v-else />
+              </el-icon>
+            </el-button>
+          </el-tooltip>
+          <el-tooltip :content="motionEnabled ? '停用 Aurora 動效' : '啟用 Aurora 動效'">
+            <el-button
+              circle
+              size="small"
+              class="theme-toggle"
+              :type="motionEnabled ? 'primary' : 'info'"
+              :aria-label="motionEnabled ? '停用 Aurora 動效' : '啟用 Aurora 動效'"
+              plain
+              @click="toggleMotion"
+            >
+              <el-icon><MagicStick /></el-icon>
+            </el-button>
+          </el-tooltip>
+        </div>
         <div class="user-info">
           <span>{{ authStore.username }}</span>
           <el-button @click="handleLogout" type="danger" size="small" plain>登出</el-button>
@@ -118,10 +147,15 @@ import {
   TrendCharts,
   Collection,
   Cpu,
+  Sunny,
+  Moon,
+  MagicStick,
 } from '@element-plus/icons-vue';
+import { useTheme } from '@/composables/useTheme';
 
 const authStore = useAuthStore();
 const drawerVisible = ref(false);
+const { isDark, motionEnabled, toggleColorScheme, toggleMotion } = useTheme();
 
 const handleLogout = () => {
   ElMessageBox.confirm('您確定要登出嗎？', '提示', {
@@ -143,16 +177,16 @@ const handleLogout = () => {
 }
 
 .top-nav {
-  background-color: #3b82f6;
-  color: white;
+  background: linear-gradient(120deg, rgba(14, 165, 233, 0.92), rgba(168, 85, 247, 0.88));
+  color: #f8fafc;
   display: flex;
   align-items: center;
   padding: 0 20px;
-  height: 60px;
+  height: 64px;
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
 }
 
 .logo {
@@ -160,15 +194,18 @@ const handleLogout = () => {
   align-items: center;
   cursor: pointer;
   margin-right: 20px;
+  gap: 10px;
 }
+
 .logo img {
-  height: 32px;
-  margin-right: 10px;
+  height: 34px;
 }
+
 .logo span {
-  font-size: 1.6em;
-  font-weight: bold;
-  color: white;
+  font-size: 1.55em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f8fafc;
 }
 
 .top-menu {
@@ -179,7 +216,7 @@ const handleLogout = () => {
 }
 
 .top-menu .el-menu-item {
-  color: #e2e8f0;
+  color: rgba(241, 245, 249, 0.85);
   font-size: 0.95em;
   font-weight: 500;
   background-color: transparent !important;
@@ -187,26 +224,40 @@ const handleLogout = () => {
 }
 
 .top-menu .el-menu-item:hover {
-  background-color: rgba(255, 255, 255, 0.2) !important;
-  color: white !important;
+  background-color: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
 }
 
 .top-menu .el-menu-item.is-active {
-  color: white !important;
-  border-bottom-color: #ffffff !important;
+  color: #ffffff !important;
+  border-bottom-color: rgba(255, 255, 255, 0.9) !important;
 }
 
 .right-panel {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 0.75rem;
+}
+
+.theme-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.theme-toggle {
+  backdrop-filter: var(--aurora-backdrop-blur);
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #0f172a;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
+  color: #f8fafc;
 }
 
 .hamburger-menu {
@@ -216,29 +267,35 @@ const handleLogout = () => {
 }
 
 .main-content {
-  flex-grow: 1;
-  padding: 25px;
-  max-width: 1300px;
+  flex: 1;
+  padding: 28px 32px 44px;
+  max-width: 1360px;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
+  background: radial-gradient(circle at 20% 20%, rgba(94, 234, 212, 0.14), transparent 58%),
+    radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.16), transparent 60%);
 }
 
 .drawer-menu {
   border-right: none;
 }
 
-/* 響應式斷點 */
+:deep(.theme-toggle .el-icon) {
+  color: inherit;
+}
+
 @media (max-width: 1024px) {
   .top-menu {
     display: none;
   }
+
   .hamburger-menu {
     display: block;
   }
-  /* .user-info {
-    在小螢幕也可以選擇隱藏部分用戶資訊
-  } 
-  */
+
+  .theme-controls {
+    display: none;
+  }
 }
 </style>

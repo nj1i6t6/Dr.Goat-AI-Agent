@@ -354,6 +354,11 @@ export default {
     return withErrorHandling(() => apiClient.delete(`/api/iot/rules/${ruleId}`), errorHandler);
   },
 
+  // 活動日誌 / 系統追蹤
+  getActivityLogs(params = {}, errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/activity/logs', { params }), errorHandler);
+  },
+
   // 原始錯誤處理包裝函數，供外部使用
   withErrorHandling
 };

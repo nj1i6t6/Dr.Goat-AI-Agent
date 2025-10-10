@@ -1,11 +1,8 @@
 <template>
-  <el-card class="chart-card" shadow="never">
-    <template #header>
-      <div class="card-header">
-        <span>{{ title }}</span>
-      </div>
+  <BaseAuroraCard :title="title">
+    <template v-if="hasData">
+      <AsyncChartWrapper :loader="chartLoader" :component-props="{ items }" />
     </template>
-    <div v-if="hasData" ref="chartRef" class="chart-container"></div>
     <div v-else class="empty-wrapper">
       <el-empty :description="emptyDescription">
         <template #extra>
@@ -15,12 +12,13 @@
         </template>
       </el-empty>
     </div>
-  </el-card>
+  </BaseAuroraCard>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import * as echarts from 'echarts'
+import { computed } from 'vue';
+import AsyncChartWrapper from '@/components/common/AsyncChartWrapper.vue';
+import BaseAuroraCard from '@/components/common/BaseAuroraCard.vue';
 
 const props = defineProps({
   title: {
@@ -43,58 +41,19 @@ const props = defineProps({
     type: String,
     default: '尚無資料',
   },
-})
+});
 
-const chartRef = ref(null)
-let chartInstance = null
+const hasData = computed(() => (props.items ?? []).length > 0);
 
-const hasData = computed(() => (props.items ?? []).length > 0)
-
-const renderChart = () => {
-  if (!chartRef.value || !hasData.value) {
-    if (chartInstance) {
-      chartInstance.dispose()
-      chartInstance = null
-    }
-    return
-  }
-
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
-
-  chartInstance = echarts.init(chartRef.value)
-  const labels = props.items.map((item) => item.group)
-  const costData = props.items.map((item) => Number(item.metrics?.total_cost ?? 0))
-  const revenueData = props.items.map((item) => Number(item.metrics?.total_revenue ?? 0))
-
-  chartInstance.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['總成本', '總收益'] },
-    xAxis: { type: 'category', data: labels },
-    yAxis: { type: 'value' },
-    series: [
-      { name: '總成本', type: 'line', data: costData, smooth: true },
-      { name: '總收益', type: 'line', data: revenueData, smooth: true },
-    ],
-  })
-}
-
-watch(
-  () => props.items,
-  () => {
-    nextTick(() => renderChart())
-  },
-  { deep: true }
-)
-
-onMounted(() => {
-  nextTick(() => renderChart())
-})
-
-onBeforeUnmount(() => {
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
-})
+const chartLoader = () =>
+  import(/* webpackChunkName: "cost-benefit-chart-renderer" */ './renderers/CostBenefitChartRenderer.vue');
 </script>
+
+<style scoped>
+.empty-wrapper {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  color: var(--aurora-text-muted);
+}
+</style>
