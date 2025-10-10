@@ -7,6 +7,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useLazyCharts } from '@/composables/useLazyCharts';
 import { formatCohortGroupLabel } from '@/utils/analyticsFormatting';
 import { useTheme } from '@/composables/useTheme';
+import { readCssVar, withAlpha } from '@/utils/themeColors';
 
 const props = defineProps({
   items: {
@@ -21,28 +22,6 @@ const { isDark } = useTheme();
 
 const hasData = computed(() => (props.items ?? []).length > 0);
 
-const readCssVar = (name) => {
-  if (typeof window === 'undefined') return '';
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-};
-
-const withAlpha = (color, alpha) => {
-  if (!color) return '';
-  if (color.startsWith('#')) {
-    const hex = color.replace('#', '');
-    const normalized = hex.length === 3 ? hex.split('').map((char) => char + char).join('') : hex;
-    const bigint = parseInt(normalized, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  const rgbMatch = color.match(/\d+(?:\.\d+)?/g);
-  if (!rgbMatch || rgbMatch.length < 3) return color;
-  const [r, g, b] = rgbMatch;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
 const renderChart = async () => {
   if (!hasData.value) {
     dispose();
@@ -55,11 +34,11 @@ const renderChart = async () => {
   const categories = props.items.map((item) => formatCohortGroupLabel(item));
   const profits = props.items.map((item) => Number(item.metrics?.net_profit ?? 0));
 
-  const axisLineColor = readCssVar('--aurora-border') || 'rgba(148, 163, 184, 0.4)';
-  const axisLabelColor = readCssVar('--aurora-text-muted') || '#94a3b8';
-  const gridlineColor = readCssVar('--aurora-gridline') || 'rgba(148, 163, 184, 0.25)';
-  const accentStart = readCssVar('--aurora-accent-strong') || '#0ea5e9';
-  const accentEnd = readCssVar('--aurora-accent-secondary') || '#a855f7';
+  const axisLineColor = readCssVar('--aurora-border', 'rgba(148, 163, 184, 0.4)');
+  const axisLabelColor = readCssVar('--aurora-text-muted', '#94a3b8');
+  const gridlineColor = readCssVar('--aurora-gridline', 'rgba(148, 163, 184, 0.25)');
+  const accentStart = readCssVar('--aurora-accent-strong', '#0ea5e9');
+  const accentEnd = readCssVar('--aurora-accent-secondary', '#a855f7');
 
   chart.setOption(
     {
@@ -71,9 +50,9 @@ const renderChart = async () => {
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: readCssVar('--aurora-surface-strong') || 'rgba(255,255,255,0.92)',
+        backgroundColor: readCssVar('--aurora-surface-strong', 'rgba(255,255,255,0.92)'),
         borderColor: axisLineColor,
-        textStyle: { color: readCssVar('--aurora-text-primary') || '#1f2937' },
+        textStyle: { color: readCssVar('--aurora-text-primary', '#1f2937') },
       },
       xAxis: {
         type: 'category',
