@@ -139,7 +139,7 @@ import CohortChartCard from '../components/analytics/CohortChartCard.vue'
 import CostBenefitChartCard from '../components/analytics/CostBenefitChartCard.vue'
 import FinanceEntryForm from '../components/analytics/FinanceEntryForm.vue'
 import AnalyticsReportPanel from '../components/analytics/AnalyticsReportPanel.vue'
-import { buildCsvContent, formatCsvNumber } from '../utils/analyticsCsv'
+import { exportCsv, formatCsvNumber } from '../utils/analyticsCsv'
 import { useAnalyticsStore } from '../stores/analytics'
 
 const store = useAnalyticsStore()
@@ -309,14 +309,7 @@ const exportCostBenefitCsv = () => {
     ])
   }
 
-  const csvContent = buildCsvContent(rows)
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `cost-benefit-${Date.now()}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
+  exportCsv(`cost-benefit-${Date.now()}.csv`, rows)
   ElMessage.success('已匯出成本收益 CSV')
 }
 

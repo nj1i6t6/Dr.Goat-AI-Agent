@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Iterable
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from pydantic import ValidationError
 from sqlalchemy import and_, func, literal, select, union
+from sqlalchemy.sql import Select
+from sqlalchemy.sql.elements import ColumnElement
 
 from app import db
 from app.cache import check_bi_rate_limit, get_bi_cache, set_bi_cache
 from app.models import CostEntry, RevenueEntry, Sheep
-from app.schemas import CohortAnalysisRequest, CostBenefitRequest, create_error_response
+from app.schemas import (
+    CohortAnalysisRequest,
+    CohortFilterModel,
+    CostBenefitRequest,
+    TimeRangeModel,
+    create_error_response,
+)
 
 bp = Blueprint('bi', __name__)
 
@@ -36,14 +43,17 @@ _DIMENSION_CONFIG = {
 }
 
 
-def _dimension_expression(model, dimension: str):
+def _dimension_expression(
+    model: type[Sheep] | type[CostEntry] | type[RevenueEntry],
+    dimension: str,
+) -> ColumnElement:
     config = _DIMENSION_CONFIG[dimension]
     column = getattr(model, config['sheep_attr'] if model is Sheep else config['finance_attr'])
     fallback = config['fallback']
     return func.coalesce(column, literal(fallback))
 
 
-def _apply_sheep_filters(query, filters) -> Iterable:
+def _apply_sheep_filters(query: Select, filters: CohortFilterModel | None) -> Select:
     if not filters:
         return query
     if filters.breed:
@@ -59,7 +69,12 @@ def _apply_sheep_filters(query, filters) -> Iterable:
     return query
 
 
-def _apply_finance_filters(query, model, filters, time_range):
+def _apply_finance_filters(
+    query: Select,
+    model: type[CostEntry] | type[RevenueEntry],
+    filters: CohortFilterModel | None,
+    time_range: TimeRangeModel | None,
+) -> Select:
     conditions = [model.user_id == current_user.id]
 
     if filters:
@@ -153,7 +168,7 @@ def _cohort_analysis(payload: dict) -> dict:
     ]
 
     # 移除可能的重複群組並確保包含沒有對應羊隻資料的財務紀錄
-    groups_query = union(*group_selects) if len(group_selects) > 1 else group_selects[0]
+    groups_query = union(*group_selects)
     groups_subquery = groups_query.subquery('cohort_groups')
 
     join_condition_sheep = and_(
@@ -229,7 +244,7 @@ def _cohort_analysis(payload: dict) -> dict:
     return {'data': result, 'status': 200}
 
 
-def _time_group_expression(model, group_by: str):
+def _time_group_expression(model: type[CostEntry] | type[RevenueEntry], group_by: str) -> list[ColumnElement]:
     if group_by == 'none':
         return []
     if group_by == 'month':

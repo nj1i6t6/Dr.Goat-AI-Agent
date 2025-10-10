@@ -136,20 +136,40 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   }
 
   const saveCostEntry = async (entry) => {
+    error.value = null
     if (entry.id) {
-      return api.updateCostEntry(entry.id, entry, (err) => (error.value = err.message))
+      const updated = await api.updateCostEntry(entry.id, entry, (err) => (error.value = err.message))
+      if (updated) {
+        const index = costEntries.value.findIndex((item) => item.id === entry.id)
+        if (index !== -1) {
+          costEntries.value.splice(index, 1, updated)
+        }
+      }
+      return updated
     }
     const created = await api.createCostEntry(entry, (err) => (error.value = err.message))
-    await loadCostEntries()
+    if (created) {
+      costEntries.value.unshift(created)
+    }
     return created
   }
 
   const saveRevenueEntry = async (entry) => {
+    error.value = null
     if (entry.id) {
-      return api.updateRevenueEntry(entry.id, entry, (err) => (error.value = err.message))
+      const updated = await api.updateRevenueEntry(entry.id, entry, (err) => (error.value = err.message))
+      if (updated) {
+        const index = revenueEntries.value.findIndex((item) => item.id === entry.id)
+        if (index !== -1) {
+          revenueEntries.value.splice(index, 1, updated)
+        }
+      }
+      return updated
     }
     const created = await api.createRevenueEntry(entry, (err) => (error.value = err.message))
-    await loadRevenueEntries()
+    if (created) {
+      revenueEntries.value.unshift(created)
+    }
     return created
   }
 

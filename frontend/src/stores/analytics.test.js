@@ -27,6 +27,10 @@ describe('analytics store', () => {
     vi.clearAllMocks()
     apiMock.listCostEntries.mockResolvedValue({ items: [] })
     apiMock.listRevenueEntries.mockResolvedValue({ items: [] })
+    apiMock.createCostEntry.mockResolvedValue({ id: 1, category: 'feed' })
+    apiMock.updateCostEntry.mockResolvedValue({ id: 1, category: 'feed' })
+    apiMock.createRevenueEntry.mockResolvedValue({ id: 2, category: 'milk' })
+    apiMock.updateRevenueEntry.mockResolvedValue({ id: 2, category: 'milk' })
     apiMock.runCohortAnalysis.mockResolvedValue({ metrics: [], items: [] })
     apiMock.runCostBenefit.mockResolvedValue({ summary: {}, items: [], metrics: [] })
     apiMock.generateAnalyticsReport.mockResolvedValue({ report_html: '<p>ok</p>', report_markdown: 'ok' })
@@ -58,5 +62,37 @@ describe('analytics store', () => {
       'key',
       expect.any(Function)
     )
+  })
+
+  it('optimistically adds cost entry after creation', async () => {
+    const store = useAnalyticsStore()
+    apiMock.createCostEntry.mockResolvedValueOnce({ id: 10, category: 'hay' })
+    await store.saveCostEntry({ category: 'hay' })
+    expect(store.costEntries[0]).toMatchObject({ id: 10, category: 'hay' })
+    expect(apiMock.listCostEntries).not.toHaveBeenCalled()
+  })
+
+  it('updates cost entry in place when editing', async () => {
+    const store = useAnalyticsStore()
+    store.costEntries = [{ id: 3, category: 'grain' }]
+    apiMock.updateCostEntry.mockResolvedValueOnce({ id: 3, category: 'supplement' })
+    await store.saveCostEntry({ id: 3, category: 'supplement' })
+    expect(store.costEntries[0]).toMatchObject({ id: 3, category: 'supplement' })
+  })
+
+  it('optimistically adds revenue entry after creation', async () => {
+    const store = useAnalyticsStore()
+    apiMock.createRevenueEntry.mockResolvedValueOnce({ id: 20, category: 'cheese' })
+    await store.saveRevenueEntry({ category: 'cheese' })
+    expect(store.revenueEntries[0]).toMatchObject({ id: 20, category: 'cheese' })
+    expect(apiMock.listRevenueEntries).not.toHaveBeenCalled()
+  })
+
+  it('updates revenue entry in place when editing', async () => {
+    const store = useAnalyticsStore()
+    store.revenueEntries = [{ id: 4, category: 'milk' }]
+    apiMock.updateRevenueEntry.mockResolvedValueOnce({ id: 4, category: 'yogurt' })
+    await store.saveRevenueEntry({ id: 4, category: 'yogurt' })
+    expect(store.revenueEntries[0]).toMatchObject({ id: 4, category: 'yogurt' })
   })
 })
