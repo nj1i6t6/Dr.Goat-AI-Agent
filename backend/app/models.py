@@ -194,7 +194,7 @@ class FinanceEntryMixin:
     __abstract__ = True
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     sheep_id = db.Column(db.Integer, db.ForeignKey('sheep.id', ondelete='SET NULL'))
 
     recorded_at = db.Column(db.DateTime, nullable=False, index=True)
@@ -212,8 +212,8 @@ class FinanceEntryMixin:
     notes = db.Column(db.Text)
     extra_metadata = db.Column(db.JSON, default=dict)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
 
     @declared_attr
     def __table_args__(cls):  # type: ignore[override]

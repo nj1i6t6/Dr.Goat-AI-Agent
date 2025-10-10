@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column('notes', sa.Text(), nullable=True),
         sa.Column('extra_metadata', sa.JSON(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), nullable=True, server_default=sa.func.now()),
+        sa.Column('updated_at', sa.DateTime(), nullable=True, server_default=sa.func.now(), onupdate=sa.func.now()),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_cost_entry_user_recorded', 'cost_entry', ['user_id', 'recorded_at'], unique=False)
@@ -53,7 +53,7 @@ def upgrade() -> None:
         sa.Column('notes', sa.Text(), nullable=True),
         sa.Column('extra_metadata', sa.JSON(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), nullable=True, server_default=sa.func.now()),
+        sa.Column('updated_at', sa.DateTime(), nullable=True, server_default=sa.func.now(), onupdate=sa.func.now()),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_revenue_entry_user_recorded', 'revenue_entry', ['user_id', 'recorded_at'], unique=False)

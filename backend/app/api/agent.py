@@ -156,7 +156,7 @@ def generate_analytics_report():
         return jsonify(create_error_response('未提供 API 金鑰', [{'loc': ['header', 'X-Api-Key'], 'msg': '必須包含 X-Api-Key'}])), 401
 
     try:
-        payload = AnalyticsReportRequestModel(**request.get_json())
+        payload = AnalyticsReportRequestModel(**(request.get_json() or {}))
     except ValidationError as exc:
         return jsonify(create_error_response('請求資料驗證失敗', exc.errors())), 400
 

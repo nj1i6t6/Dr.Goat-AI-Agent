@@ -167,8 +167,9 @@ def list_costs():
     except (TypeError, ValueError):
         return jsonify(create_error_response('分頁參數必須為正整數')), 400
 
-    stmt = select(CostEntry).where(conditions).order_by(CostEntry.recorded_at.desc())
-    total = db.session.scalar(select(db.func.count()).select_from(stmt.subquery()))
+    base_stmt = select(CostEntry).where(conditions)
+    total = db.session.scalar(select(db.func.count()).select_from(base_stmt.subquery()))
+    stmt = base_stmt.order_by(CostEntry.recorded_at.desc())
     items = db.session.scalars(
         stmt.offset((page - 1) * page_size).limit(page_size)
     ).all()
@@ -266,8 +267,9 @@ def list_revenues():
     except (TypeError, ValueError):
         return jsonify(create_error_response('分頁參數必須為正整數')), 400
 
-    stmt = select(RevenueEntry).where(conditions).order_by(RevenueEntry.recorded_at.desc())
-    total = db.session.scalar(select(db.func.count()).select_from(stmt.subquery()))
+    base_stmt = select(RevenueEntry).where(conditions)
+    total = db.session.scalar(select(db.func.count()).select_from(base_stmt.subquery()))
+    stmt = base_stmt.order_by(RevenueEntry.recorded_at.desc())
     items = db.session.scalars(
         stmt.offset((page - 1) * page_size).limit(page_size)
     ).all()
