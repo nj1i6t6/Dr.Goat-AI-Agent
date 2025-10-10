@@ -15,6 +15,7 @@
   --aurora-warning: #f97316;
   --aurora-danger: #ef4444;
   --aurora-gridline: rgba(148, 163, 184, 0.25);
+  --aurora-meta-theme-color: #eef2ff;
   --aurora-backdrop-blur: blur(18px);
   --aurora-shadow-soft: 0 20px 45px rgba(14, 165, 233, 0.08);
   --aurora-shadow-strong: 0 30px 60px rgba(168, 85, 247, 0.1);
@@ -42,6 +43,7 @@
   --aurora-warning: #fb923c;
   --aurora-danger: #f87171;
   --aurora-gridline: rgba(148, 163, 184, 0.25);
+  --aurora-meta-theme-color: #0f172a;
   --aurora-backdrop-blur: blur(20px);
   --aurora-shadow-soft: 0 25px 45px rgba(2, 132, 199, 0.2);
   --aurora-shadow-strong: 0 30px 65px rgba(37, 99, 235, 0.28);

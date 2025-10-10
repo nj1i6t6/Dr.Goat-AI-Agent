@@ -1,10 +1,11 @@
 import { storeToRefs } from 'pinia';
-import { computed, watch } from 'vue';
+import { computed, watch, nextTick } from 'vue';
 import { useThemeStore } from '@/stores/theme';
+import { readCssVar } from '@/utils/themeColors';
 
 const THEME_COLOR_META = 'theme-color';
 
-function updateThemeColorMeta(isDark) {
+function updateThemeColorMeta() {
   if (typeof document === 'undefined') return;
   let meta = document.querySelector(`meta[name="${THEME_COLOR_META}"]`);
   if (!meta) {
@@ -12,7 +13,10 @@ function updateThemeColorMeta(isDark) {
     meta.setAttribute('name', THEME_COLOR_META);
     document.head.appendChild(meta);
   }
-  meta.setAttribute('content', isDark ? '#0f172a' : '#eef2ff');
+  const color = readCssVar('--aurora-meta-theme-color');
+  if (color) {
+    meta.setAttribute('content', color);
+  }
 }
 
 export function useTheme() {
@@ -21,8 +25,9 @@ export function useTheme() {
 
   watch(
     isDark,
-    (value) => {
-      updateThemeColorMeta(value);
+    async () => {
+      await nextTick();
+      updateThemeColorMeta();
     },
     { immediate: true }
   );
