@@ -34,19 +34,6 @@ body {
   transition: background 400ms ease, color var(--aurora-transition-base);
 }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  background:
-    radial-gradient(circle at 20% 15%, rgba(56, 189, 248, 0.22), transparent 58%),
-    radial-gradient(circle at 80% 10%, rgba(45, 212, 191, 0.2), transparent 60%),
-    radial-gradient(circle at 50% 75%, rgba(147, 197, 253, 0.18), transparent 58%),
-    radial-gradient(circle at 15% 80%, rgba(167, 139, 250, 0.2), transparent 65%),
-    linear-gradient(135deg, rgba(241, 245, 249, 0.9), rgba(226, 232, 240, 0.78), rgba(224, 231, 255, 0.9));
-}
-
 body .el-container {
   min-height: 100%;
 }

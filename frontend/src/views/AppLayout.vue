@@ -8,7 +8,7 @@
         @click="$router.push('/dashboard')"
         @keyup.enter="$router.push('/dashboard')"
       >
-        <img class="nav-brand__logo" :src="logoSvgDataUri" alt="Aurora Navigation Logo" />
+        <img class="nav-brand__logo" :src="logoUrl" alt="Aurora Navigation Logo" />
         <div class="nav-brand__label">
           <span class="nav-brand__title">領頭羊博士</span>
           <span class="nav-brand__subtitle">Aurora Biophilic Tech Console</span>
@@ -166,13 +166,11 @@ import {
   MagicStick,
 } from '@element-plus/icons-vue';
 import { useTheme } from '@/composables/useTheme';
+import logoUrl from '@/assets/images/logo.svg';
 
 const authStore = useAuthStore();
 const drawerVisible = ref(false);
 const { isDark, motionEnabled, toggleColorScheme, toggleMotion } = useTheme();
-
-const logoSvgDataUri =
-  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBkPSJNOSAxNWMtMi41IDEuNS01LjI1IDIuNS04IDMiLz48cGF0aCBkPSJNMy41IDIxYzEuMjUtMS4xNyAyLTUuNSAzLTEwLjVjMC01LjM5IDEuNzctOC41IDIuNS05LjVjMS0xLjI1IDIuMjUtMS41IDQuNS0uNWMzLjM4IDEuNSAzLjUgMy41IDQuNSA5LjVjMCAuMzEgMCAxLjE5LS4wOCA1Ii8+PHBhdGggZD0iTTE4IDIxYzAgLTEuNDQtLjUtMy41LTEuNS01LjVjLTEtMi0yLjUtMy00LjUtMy41Ii8+PHBhdGggZD0iTTIyIDIwLjVjLTEuODEtMS4xNy0zLjc1LTEuNS01Ljg3LTEuNSIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iMTAiIHI9IjEiLz48Y2lyY2xlIGN4PSIxNiIgY3k9IjEwIiByPSIxIi8+PC9zdmc+';
 
 const handleLogout = () => {
   ElMessageBox.confirm('您確定要登出嗎？', '提示', {

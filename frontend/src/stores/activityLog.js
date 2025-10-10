@@ -39,7 +39,7 @@ export const useActivityLogStore = defineStore('activityLog', () => {
 
     try {
       const nextPage = page.value + 1;
-      const response = await api.getActivityLogs?.({ page: nextPage, page_size: pageSize.value });
+      const response = await api.getActivityLogs({ page: nextPage, page_size: pageSize.value });
       const items = response?.items || response || [];
 
       if (!Array.isArray(items) || items.length === 0) {
