@@ -1,0 +1,136 @@
+《領頭羊博士》前端體驗優化與視覺升級 · 終極藍圖 2.0 (整合版)
+1. 設計理念與風格 (無變動)
+核心風格：極光仿生科技 (Aurora Biophilic Tech) + 玻璃擬態 (Glassmorphism)
+圖表庫選擇：ECharts
+2. 最終檔案結構規劃 (微調)
+檔案/目錄路徑	核心作用 (✨ 表示已根據新建議強化)
+docs/frontend/style-guide.md	(最重要) 視覺與元件使用規範。
+src/styles/tokens/aurora-theme.css	全局設計 Token。
+src/composables/useTheme.js	✨ 封裝主題狀態 (深/淺模式、動效開關)，使用 Pinia。
+src/composables/useLazyCharts.js	✨ 抽象化 ECharts 的異步加載 (內部整合 IntersectionObserver)。
+... (其他檔案不變) ...	...
+3. 核心實施步驟與程式碼範例 (重大升級)
+核心元件 2 (升級版)：AsyncChartWrapper.vue
+整合細節：採納版本 4 的 IntersectionObserver 建議。
+理由：這讓圖表只在即將進入使用者視窗時才開始加載，比原來的 defineAsyncComponent 基礎用法更智能、更高效能，能顯著改善長頁面的滾動體驗和資源利用率。
+code
+Vue
+<!-- src/components/common/AsyncChartWrapper.vue -->
+<template>
+  <div ref="target" class="min-h-[200px]"> <!-- 提供一個最小高度以觸發觀察 -->
+    <ChartComponent v-if="targetIsVisible" />
+  </div>
+</template>
+
+<script setup>
+import { ref, defineAsyncComponent, h } from 'vue';
+import { useIntersectionObserver } from '@vueuse/core';
+import { ElSkeleton, ElResult } from 'element-plus';
+
+const props = defineProps({
+  loader: { type: Function, required: true }
+});
+
+// 1. 建立一個目標 DOM 元素的引用
+const target = ref(null);
+const targetIsVisible = ref(false);
+
+// 2. 使用 useIntersectionObserver 監控目標元素
+useIntersectionObserver(
+  target,
+  ([{ isIntersecting }]) => {
+    // 3. 當元素進入視窗時，將 targetIsVisible 設為 true，觸發組件載入
+    if (isIntersecting) {
+      targetIsVisible.value = true;
+    }
+  },
+);
+
+const ChartComponent = defineAsyncComponent({
+  loader: props.loader,
+  loadingComponent: ElSkeleton,
+  delay: 200,
+  errorComponent: {
+    setup() {
+      return () => h(ElResult, {
+        icon: 'error',
+        title: '圖表載入失敗',
+        subTitle: '請稍後再試或聯繫管理員'
+      });
+    }
+  },
+  timeout: 15000
+});
+</script>
+核心元件 3 (升級版)：VirtualizedLogTable.vue
+整合細節：採納版本 5 的 scroll 事件監控建議。
+理由：虛擬滾動解決的是 DOM 渲染 的性能問題，而 scroll 事件監控解決的是 數據增量加載 (Infinite Scroll) 的問題。兩者結合，才是處理海量數據的完整解決方案。
+code
+Vue
+<!-- src/components/tables/VirtualizedLogTable.vue -->
+<template>
+  <BaseAuroraCard :title="title" ref="cardRef">
+    <el-table-v2
+      :columns="columns"
+      :data="data"
+      :width="tableWidth"
+      :height="height"
+      fixed
+      :estimated-row-height="54"
+      @scroll="handleScroll"
+    />
+    <div v-if="isLoadingMore" class="text-center p-4 text-cyan-300/70">載入更多...</div>
+  </BaseAuroraCard>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { useElementSize } from '@vueuse/core';
+import { ElTableV2 } from 'element-plus';
+import BaseAuroraCard from './BaseAuroraCard.vue';
+// 假設你有一個 Pinia Store 來管理日誌
+import { useLogStore } from '@/stores/logStore';
+
+const props = defineProps({
+  // ... (同前)
+});
+
+const store = useLogStore();
+const cardRef = ref(null);
+const { width: tableWidth } = useElementSize(cardRef);
+const isLoadingMore = ref(false);
+
+// 滾動事件處理函數
+const handleScroll = async ({ scrollTop, scrollLeft, scrollHeight, clientHeight }) => {
+  // 如果正在加載中，或者已經沒有更多數據，則直接返回
+  if (isLoadingMore.value || store.isEnd) return;
+
+  // 判斷是否滾動到底部 (預留 100px 的緩衝區)
+  if (scrollHeight - scrollTop - clientHeight < 100) {
+    isLoadingMore.value = true;
+    await store.fetchNextPage(); // 觸發 Pinia action 請求下一頁數據
+    isLoadingMore.value = false;
+  }
+};
+</script>
+4. 最終量化成效與風險分析 (重大升級)
+整合細節：採納版本 6 的「KPI 辨識率」指標。
+理由：技術指標 (LCP, FPS) 衡量的是「性能」，而 UX 指標衡量的是「效率和體驗」。加入辨識率指標，讓我們的優化目標從「快」進化到「又快又好用」，這才是體驗優化的真正核心。
+指標	目標值	測量方法	關鍵技術
+LCP (最大內容繪製)	≤ 2.3s	Chrome DevTools Performance (模擬中階手機/慢速4G)	路由分塊、AsyncChartWrapper、骨架屏、關鍵CSS
+首屏 JS Bundle	↓ 30%	Vite build report (vite-bundle-visualizer)	Code Splitting、ECharts 按需引入、Tree-shaking
+INP (互動到下一次繪製)	≤ 200ms	Lighthouse / Web Vitals 持續監測	虛擬滾動、事件節流/防抖、避免長任務
+核心任務點擊次數	↓ 1-2 次	UX 走查與埋點事件追蹤 (GA/Mixpanel)	優化佈局、提供快捷入口、合併操作
+日誌滾動 FPS	≥ 55 FPS	Chrome Performance FPS meter	ElTableV2 虛擬滾動、Intersection Observer
+✨ ESG KPI 重要性辨識率	+25%	5秒測試 (5-Second Test) 或使用者訪談	優化的視覺層級、Aurora 風格的重點色與光暈效果
+
+風險與規避策略 (更深入)
+設計一致性衰退 (Design Consistency Decay)
+風險：隨著時間推移和多人協作，新頁面與元件不再遵循 Aurora 風格。
+規避：建立 Storybook 元件庫。將 BaseAuroraCard 等核心元件文件化，讓所有開發者都在一個共享的視覺庫中工作。docs/frontend/style-guide.md 是理論，Storybook 是實踐。
+Tailwind 與 Element Plus 樣式衝突
+風險：全域樣式污染、padding/margin 規則不一致。
+規避：確立 Tailwind 主導佈局，Element Plus 主導元件內部狀態 的原則。使用 tailwind.config.js 的 prefix 選項 (如 tw-)，或在必要時使用 :deep() 進行樣式穿透，但應嚴格限制範圍。
+狀態管理複雜度
+風險：主題狀態、使用者偏好、API 資料散落在各處。
+規避：嚴格遵守 Pinia 模組化。建立 useThemeStore, useUserStore, useDashboardStore 等，職責分離。禁止在元件內部直接發起全域狀態的 API 請求，應通過 Store 的 actions 執行。
