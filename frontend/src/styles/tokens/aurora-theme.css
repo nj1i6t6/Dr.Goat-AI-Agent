@@ -8,6 +8,7 @@
   --aurora-text-primary: #1f2937;
   --aurora-text-secondary: #475569;
   --aurora-text-muted: #64748b;
+  --aurora-selection-text: #0f172a;
   --aurora-accent: #38bdf8;
   --aurora-accent-strong: #0ea5e9;
   --aurora-accent-secondary: #a855f7;
@@ -36,6 +37,7 @@
   --aurora-text-primary: #e2e8f0;
   --aurora-text-secondary: #cbd5f5;
   --aurora-text-muted: #94a3b8;
+  --aurora-selection-text: #e2e8f0;
   --aurora-accent: #38bdf8;
   --aurora-accent-strong: #0ea5e9;
   --aurora-accent-secondary: #c084fc;
