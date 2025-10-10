@@ -147,50 +147,6 @@ def _cohort_analysis(payload: dict) -> dict:
         revenue_query = revenue_query.group_by(*revenue_group_exprs)
     revenue_subquery = revenue_query.subquery('revenue_cohort')
 
-    if not dimension_labels:
-        sheep_row = db.session.execute(
-            select(
-                sheep_subquery.c.sheep_count,
-                sheep_subquery.c.avg_weight,
-                sheep_subquery.c.avg_milk,
-            )
-        ).first()
-        cost_row = db.session.execute(select(cost_subquery.c.total_cost)).first()
-        revenue_row = db.session.execute(select(revenue_subquery.c.total_revenue)).first()
-
-        sheep_count = (sheep_row._mapping['sheep_count'] if sheep_row else 0) or 0
-        avg_weight = sheep_row._mapping['avg_weight'] if sheep_row else None
-        avg_milk = sheep_row._mapping['avg_milk'] if sheep_row else None
-        total_cost = (cost_row._mapping['total_cost'] if cost_row else None) or Decimal('0')
-        total_revenue = (revenue_row._mapping['total_revenue'] if revenue_row else None) or Decimal('0')
-
-        if not (sheep_count or total_cost or total_revenue):
-            result = {'items': [], 'metrics': request_model.metrics}
-            set_bi_cache(current_user.id, wrapped_payload, result)
-            return {'data': result, 'status': 200}
-
-        metrics_payload = {
-            'sheep_count': sheep_count,
-            'avg_weight': float(avg_weight) if avg_weight is not None else None,
-            'avg_milk_yield': float(avg_milk) if avg_milk is not None else None,
-            'total_cost': _serialize_decimal(total_cost),
-            'total_revenue': _serialize_decimal(total_revenue),
-            'net_profit': _serialize_decimal(total_revenue - total_cost),
-            'cost_per_head': _serialize_decimal((total_cost / sheep_count) if sheep_count else None),
-            'revenue_per_head': _serialize_decimal((total_revenue / sheep_count) if sheep_count else None),
-        }
-
-        result = {
-            'items': [
-                {
-                    'metrics': {metric: metrics_payload.get(metric) for metric in request_model.metrics},
-                }
-            ],
-            'metrics': request_model.metrics,
-        }
-        set_bi_cache(current_user.id, wrapped_payload, result)
-        return {'data': result, 'status': 200}
-
     group_selects = [
         select(*[subquery.c[label] for label in dimension_labels]).select_from(subquery)
         for subquery in (sheep_subquery, cost_subquery, revenue_subquery)

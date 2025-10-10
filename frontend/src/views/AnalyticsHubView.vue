@@ -205,8 +205,8 @@ const runAnalysis = async () => {
   }
   if (filters.timeRange?.length === 2) {
     payload.time_range = {
-      start: new Date(filters.timeRange[0]).toISOString(),
-      end: new Date(filters.timeRange[1]).toISOString(),
+      start: `${filters.timeRange[0]}T00:00:00Z`,
+      end: `${filters.timeRange[1]}T23:59:59Z`,
     }
   }
   await Promise.all([
@@ -223,7 +223,7 @@ const runAnalysis = async () => {
 const submitCostForm = async () => {
   await store.saveCostEntry({
     ...costForm,
-    recorded_at: costForm.recorded_at ? new Date(costForm.recorded_at).toISOString() : null,
+    recorded_at: costForm.recorded_at ? `${costForm.recorded_at}T00:00:00Z` : null,
   })
   Object.assign(costForm, { recorded_at: '', category: '', amount: null, notes: '' })
   costFormRef.value?.clearValidation()
@@ -233,7 +233,7 @@ const submitCostForm = async () => {
 const submitRevenueForm = async () => {
   await store.saveRevenueEntry({
     ...revenueForm,
-    recorded_at: revenueForm.recorded_at ? new Date(revenueForm.recorded_at).toISOString() : null,
+    recorded_at: revenueForm.recorded_at ? `${revenueForm.recorded_at}T00:00:00Z` : null,
   })
   Object.assign(revenueForm, { recorded_at: '', category: '', amount: null, notes: '' })
   revenueFormRef.value?.clearValidation()
