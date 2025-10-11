@@ -77,11 +77,9 @@ def _secure_link_callback(attrs: dict[str, str], new: bool = False) -> dict[str,
         return attrs
 
     attrs['target'] = '_blank'
-    rel_tokens = [token for token in attrs.get('rel', '').split() if token]
-    for token in ['noopener', 'noreferrer', 'nofollow']:
-        if token not in rel_tokens:
-            rel_tokens.append(token)
-    attrs['rel'] = ' '.join(rel_tokens)
+    rel_values = set(token for token in attrs.get('rel', '').split() if token)
+    rel_values.update({'noopener', 'noreferrer', 'nofollow'})
+    attrs['rel'] = ' '.join(sorted(rel_values))
     return attrs
 
 

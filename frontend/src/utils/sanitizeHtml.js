@@ -29,30 +29,29 @@ const ALLOWED_TAGS = [
   'h6',
 ];
 
-const ALLOWED_ATTR = ['href', 'title', 'rel', 'target'];
-const LINK_REL = 'noopener noreferrer nofollow';
-
-function applySafeLinkAttributes(root) {
-  root.querySelectorAll('a[href]').forEach((anchor) => {
-    anchor.setAttribute('target', '_blank');
-    anchor.setAttribute('rel', LINK_REL);
-  });
-}
+const ALLOWED_ATTR = ['href', 'title', 'rel', 'target', 'class'];
+const LINK_REL = 'nofollow noopener noreferrer';
 
 export function sanitizeHtml(html) {
-  if (!html || typeof window === 'undefined' || typeof document === 'undefined') {
+  if (!html || typeof window === 'undefined') {
     return '';
   }
 
-  const clean = DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ALLOW_DATA_ATTR: false,
-    RETURN_TRUSTED_TYPE: false,
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName === 'A' && node.hasAttribute('href')) {
+      node.setAttribute('target', '_blank');
+      node.setAttribute('rel', LINK_REL);
+    }
   });
 
-  const template = document.createElement('template');
-  template.innerHTML = clean;
-  applySafeLinkAttributes(template.content);
-  return template.innerHTML;
+  try {
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS,
+      ALLOWED_ATTR,
+      ALLOW_DATA_ATTR: false,
+      RETURN_TRUSTED_TYPE: false,
+    });
+  } finally {
+    DOMPurify.removeHook('afterSanitizeAttributes');
+  }
 }

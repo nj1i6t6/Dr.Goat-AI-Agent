@@ -40,7 +40,9 @@ class TestAgentAPI:
         tip_html = data.get('tip_html', '')
         assert '<script>' not in tip_html
         assert 'javascript:' not in tip_html
-        assert 'noopener noreferrer' in tip_html
+        assert 'noopener' in tip_html
+        assert 'noreferrer' in tip_html
+        assert 'nofollow' in tip_html
 
     def test_get_agent_tip_missing_api_key(self, authenticated_client):
         """測試缺少 API 金鑰的情況"""

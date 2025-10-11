@@ -69,4 +69,6 @@ def test_generate_analytics_report_sanitizes_html(authenticated_client, monkeypa
     html = data.get('report_html', '')
     assert '<script>' not in html
     assert 'javascript:' not in html
-    assert 'noopener noreferrer' in html
+    assert 'noopener' in html
+    assert 'noreferrer' in html
+    assert 'nofollow' in html
