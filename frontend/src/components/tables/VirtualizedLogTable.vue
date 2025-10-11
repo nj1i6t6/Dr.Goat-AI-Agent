@@ -31,7 +31,7 @@
 
 <script setup>
 import { computed, h, onMounted, ref } from 'vue';
-import { useElementSize } from '@vueuse/core';
+import { useElementSize, useThrottleFn } from '@vueuse/core';
 import { Warning } from '@element-plus/icons-vue';
 import { ElTag } from 'element-plus';
 import BaseAuroraCard from '@/components/common/BaseAuroraCard.vue';
@@ -96,7 +96,6 @@ const defaultColumns = [
     dataKey: 'message',
     title: '事件',
     width: 320,
-    cellRenderer: ({ cellData }) => cellData,
   },
   {
     key: 'severity',
@@ -124,7 +123,7 @@ const resolvedColumns = computed(() => props.columns || defaultColumns);
 
 const rows = computed(() => store.formattedEntries);
 
-const handleScroll = async ({ scrollTop }) => {
+const handleScroll = useThrottleFn(async ({ scrollTop }) => {
   if (store.isLoading || store.isEnd) return;
 
   const bodyEl = containerRef.value?.querySelector('.el-table-v2__body');
@@ -134,7 +133,7 @@ const handleScroll = async ({ scrollTop }) => {
   if (distanceToBottom <= props.loadMoreOffset) {
     await store.fetchNextPage();
   }
-};
+}, 200);
 
 onMounted(() => {
   if (!store.entries.length) {
