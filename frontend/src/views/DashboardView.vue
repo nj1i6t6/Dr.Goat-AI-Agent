@@ -99,6 +99,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import VirtualizedLogTable from '@/components/tables/VirtualizedLogTable.vue';
 import BaseAuroraCard from '@/components/common/BaseAuroraCard.vue';
 import { sanitizeHtml } from '@/utils/sanitizeHtml';
+import { escapeHtml } from '@/utils/text';
 
 const settingsStore = useSettingsStore();
 
@@ -175,14 +176,6 @@ async function generateFarmReport() {
     const flockComposition = report.flock_composition || {};
     const productionSummary = report.production_summary || {};
     const healthSummary = report.health_summary || {};
-    const escapeHtml = (value) =>
-      String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-
     const breedList = (flockComposition.by_breed || [])
       .map((breed) => `<li>${escapeHtml(breed.name)}: ${escapeHtml(breed.count)} 隻</li>`)
       .join('');

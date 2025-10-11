@@ -13,9 +13,8 @@ from pydantic import ValidationError
 from datetime import datetime
 import markdown
 import base64
-from html import escape
-from html.parser import HTMLParser
-from urllib.parse import urlparse
+import bleach
+from bleach.linkifier import Linker
 
 bp = Blueprint('agent', __name__)
 
@@ -66,126 +65,41 @@ _ALLOWED_RICH_TEXT_TAGS = {
 }
 
 _ALLOWED_RICH_TEXT_ATTRS = {
-    'a': {'href', 'title'},
+    'a': ['href', 'title', 'rel', 'target'],
 }
 
-_ALLOWED_PROTOCOLS = {'http', 'https', 'mailto'}
+_ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
 
 
-def _is_relative_href(href: str) -> bool:
-    return href.startswith(('/', './', '../', '#'))
-
-
-def _is_allowed_href(href: str) -> bool:
+def _secure_link_callback(attrs: dict[str, str], new: bool = False) -> dict[str, str]:
+    href = attrs.get('href')
     if not href:
-        return False
-    candidate = href.strip()
-    if not candidate:
-        return False
-    if _is_relative_href(candidate):
-        return True
-    parsed = urlparse(candidate)
-    if not parsed.scheme:
-        return False
-    return parsed.scheme.lower() in _ALLOWED_PROTOCOLS
+        return attrs
+
+    attrs['target'] = '_blank'
+    rel_tokens = [token for token in attrs.get('rel', '').split() if token]
+    for token in ['noopener', 'noreferrer', 'nofollow']:
+        if token not in rel_tokens:
+            rel_tokens.append(token)
+    attrs['rel'] = ' '.join(rel_tokens)
+    return attrs
 
 
-class _RichTextSanitizer(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=False)
-        self._parts: list[str] = []
-        self._blocked_depth = 0
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str]]) -> None:
-        tag = tag.lower()
-        if tag not in _ALLOWED_RICH_TEXT_TAGS:
-            self._blocked_depth += 1
-            return
-
-        allowed_attrs = _ALLOWED_RICH_TEXT_ATTRS.get(tag, set())
-        normalized_attrs: list[tuple[str, str]] = []
-        for name, value in attrs:
-            if value is None:
-                continue
-            name = name.lower()
-            if name.startswith('on'):
-                continue
-            if name not in allowed_attrs:
-                continue
-            trimmed = value.strip()
-            if name == 'href':
-                if not _is_allowed_href(trimmed):
-                    continue
-                normalized_attrs.append(('href', trimmed))
-                normalized_attrs.append(('rel', 'noopener noreferrer nofollow'))
-                normalized_attrs.append(('target', '_blank'))
-                continue
-            normalized_attrs.append((name, trimmed))
-
-        attr_str = ''.join(f' {name}="{escape(val, quote=True)}"' for name, val in normalized_attrs)
-        self._parts.append(f'<{tag}{attr_str}>')
-
-    def handle_endtag(self, tag: str) -> None:
-        tag = tag.lower()
-        if tag not in _ALLOWED_RICH_TEXT_TAGS:
-            if self._blocked_depth:
-                self._blocked_depth -= 1
-            return
-        self._parts.append(f'</{tag}>')
-
-    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str]]) -> None:
-        tag = tag.lower()
-        if tag not in _ALLOWED_RICH_TEXT_TAGS:
-            return
-        allowed_attrs = _ALLOWED_RICH_TEXT_ATTRS.get(tag, set())
-        normalized_attrs: list[tuple[str, str]] = []
-        for name, value in attrs:
-            if value is None:
-                continue
-            name = name.lower()
-            if name.startswith('on'):
-                continue
-            if name not in allowed_attrs:
-                continue
-            trimmed = value.strip()
-            if name == 'href':
-                if not _is_allowed_href(trimmed):
-                    continue
-                normalized_attrs.append(('href', trimmed))
-                normalized_attrs.append(('rel', 'noopener noreferrer nofollow'))
-                normalized_attrs.append(('target', '_blank'))
-                continue
-            normalized_attrs.append((name, trimmed))
-
-        attr_str = ''.join(f' {name}="{escape(val, quote=True)}"' for name, val in normalized_attrs)
-        self._parts.append(f'<{tag}{attr_str}>')
-
-    def handle_data(self, data: str) -> None:
-        if self._blocked_depth:
-            return
-        self._parts.append(escape(data))
-
-    def handle_entityref(self, name: str) -> None:
-        if self._blocked_depth:
-            return
-        self._parts.append(f'&{name};')
-
-    def handle_charref(self, name: str) -> None:
-        if self._blocked_depth:
-            return
-        self._parts.append(f'&#{name};')
-
-    def get_html(self) -> str:
-        return ''.join(self._parts)
+_RICH_TEXT_LINKER = Linker(callbacks=[_secure_link_callback], skip_tags=['code', 'pre'])
 
 
 def _sanitize_rich_text(html: str) -> str:
     if not html:
         return ''
-    sanitizer = _RichTextSanitizer()
-    sanitizer.feed(html)
-    sanitizer.close()
-    return sanitizer.get_html()
+
+    clean_html = bleach.clean(
+        html,
+        tags=_ALLOWED_RICH_TEXT_TAGS,
+        attributes=_ALLOWED_RICH_TEXT_ATTRS,
+        protocols=_ALLOWED_PROTOCOLS,
+        strip=True,
+    )
+    return _RICH_TEXT_LINKER.linkify(clean_html)
 
 
 def _format_rag_context(chunks: list[dict[str, object]]) -> str:
