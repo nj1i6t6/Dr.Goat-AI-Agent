@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set
 
 from sqlalchemy import or_, select
-from sqlalchemy.exc import InvalidRequestError
 
 from app import db
 from app.models import ProductBatch, ProcessingStep, SheepEvent, VerifiableLog
@@ -30,7 +29,7 @@ def append_event(
     payload = event_model.model_dump()
     payload["metadata"] = normalise_json_payload(payload.get("metadata") or {})
 
-    session = db.session()
+    session = db.session
 
     def _append() -> VerifiableLog:
         previous_entry = _lock_current_tail()
@@ -57,15 +56,18 @@ def append_event(
         session.flush()
         return entry
 
-    if session.in_transaction():
+    active_session = getattr(session, "_proxied", session)
+
+    transaction = getattr(active_session, "_transaction", None)
+    if transaction is not None and getattr(transaction, "_parent", None) is not None:
+        return _append()
+
+    try:
         entry = _append()
-    else:
-        try:
-            with session.begin():
-                entry = _append()
-        except InvalidRequestError:
-            with session.begin_nested():
-                entry = _append()
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
 
     return entry
 

@@ -43,11 +43,13 @@ class TestAgentAPI:
         assert 'noopener' in tip_html
         assert 'noreferrer' in tip_html
         assert 'nofollow' in tip_html
+        assert 'rel="noopener noreferrer nofollow">連結</a>' in tip_html
+        assert 'target="_blank"' in tip_html
 
     def test_get_agent_tip_missing_api_key(self, authenticated_client):
         """測試缺少 API 金鑰的情況"""
         response = authenticated_client.get('/api/agent/tip')
-        
+
         assert response.status_code == 401
         data = json.loads(response.data)
         assert 'error' in data
@@ -141,10 +143,30 @@ class TestAgentAPI:
         }
         
         response = authenticated_client.post('/api/agent/chat', json=chat_data)
-        
+
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'reply_html' in data
+
+    def test_agent_status_requires_api_key(self, authenticated_client):
+        response = authenticated_client.get('/api/agent/status')
+        assert response.status_code == 401
+
+    def test_agent_status_reports_rag_state(self, authenticated_client, monkeypatch):
+        monkeypatch.setattr(
+            'app.api.agent.get_rag_status',
+            lambda: {'available': True, 'message': 'RAG OK', 'detail': 'vectors.parquet'},
+        )
+
+        response = authenticated_client.get(
+            '/api/agent/status', headers={'X-Api-Key': 'valid-key'}
+        )
+
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert payload['rag_enabled'] is True
+        assert payload['message'] == 'RAG OK'
+        assert payload['detail'] == 'vectors.parquet'
         assert len(data['reply_html']) > 0
 
     def test_chat_with_agent_validation_error(self, authenticated_client):

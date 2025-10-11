@@ -17,6 +17,18 @@
     <div v-else-if="!initialLoading && hasSheep" class="dashboard-content">
       <BaseAuroraCard class="welcome-card" title="領頭羊博士的問候！">
         <div class="agent-tip" v-loading="settingsStore.agentTip.loading" v-html="safeAgentTipHtml"></div>
+        <el-alert
+          v-if="ragStatusVisible"
+          :title="ragStatusTitle"
+          :type="ragStatusType"
+          :closable="false"
+          show-icon
+          class="rag-status-alert"
+        >
+          <template #default>
+            <span>{{ ragStatusMessage }}</span>
+          </template>
+        </el-alert>
       </BaseAuroraCard>
 
       <section class="dashboard-grid">
@@ -104,6 +116,16 @@ import { escapeHtml } from '@/utils/text';
 const settingsStore = useSettingsStore();
 
 const safeAgentTipHtml = computed(() => sanitizeHtml(settingsStore.agentTip.html));
+const ragStatusState = computed(() => settingsStore.ragStatus);
+const ragStatusVisible = computed(() => ragStatusState.value.available !== null);
+const ragStatusType = computed(() => (ragStatusState.value.available ? 'success' : 'warning'));
+const ragStatusTitle = computed(() =>
+  ragStatusState.value.available ? 'RAG 知識庫已啟用' : 'RAG 功能已降級'
+);
+const ragStatusMessage = computed(() =>
+  ragStatusState.value.message ||
+  (ragStatusState.value.available ? 'RAG 知識庫已啟用。' : 'RAG 功能已降級，系統將自動退回為一般模式。')
+);
 
 const initialLoading = ref(true);
 const hasSheep = ref(false);
@@ -156,6 +178,7 @@ async function fetchInitialData() {
 }
 
 async function fetchDashboardContent() {
+  settingsStore.refreshRagStatus();
   settingsStore.fetchAndSetAgentTip();
   fetchDashboardData();
 }
@@ -243,6 +266,10 @@ onMounted(() => {
   color: var(--aurora-text-secondary);
   font-style: italic;
   min-height: 24px;
+}
+
+.rag-status-alert {
+  margin-top: 1rem;
 }
 
 .dashboard-grid {

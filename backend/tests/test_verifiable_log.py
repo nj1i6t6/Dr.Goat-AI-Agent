@@ -1,4 +1,5 @@
 from app import db
+from app import db
 from app.models import VerifiableLog
 from app.services.verifiable_log_service import append_event, verify_chain
 

@@ -153,6 +153,7 @@ graph TB
   - Responsive layout via Element Plus grid, consistent loading states, toast notifications for async flows, Markdown rendering for AI output, and modals for API key reveal.
   - Public traceability stories expose a “data fingerprint” modal per processing step showing hash-chain metadata with copy/download helpers for auditors.
   - System Settings includes a persistent font size toggle (default vs. large) that updates the Element Plus base size and CSS variables so older farmers can switch to larger typography across the entire SPA.
+  - The Dashboard view consumes `/api/agent/status` via the settings store to render a live “RAG enabled” badge; the banner collapses automatically when the loader reports vectors are unavailable.
 
 ## 5. AI & Machine Learning Capabilities
 
@@ -167,7 +168,10 @@ graph TB
 - `scripts/ingest_docs.py` performs deterministic chunking (800 char / 100 overlap) and batches embedding calls via `app/ai/embedding.py`, which now reuses a shared `requests.Session` for lower latency.
 - The ingestion and loader pipelines rely on `pyarrow` for Parquet support and `faiss-cpu` for efficient similarity search (both pinned in `backend/requirements.txt`). Install backend dependencies before running the script.
 - `make rag-update` generates vectors and creates a local commit while leaving the final `git push` step to the developer.
-- `app/rag_loader.ensure_vectors()` loads the Parquet snapshot, mirrors the chunks into Redis so multiple workers can share a single cache, and builds a FAISS index. If the file is missing it will issue a one-time `git lfs pull`; failures are logged before degrading to no-context responses.
+- `app/rag_loader.ensure_vectors()` loads the Parquet snapshot, mirrors the chunks into Redis so multiple workers can share a single cache, and builds a FAISS index. If the file is missing it will issue a one-time `git lfs pull`; failures are logged before degrading to no-context responses, and availability telemetry is exposed so operators immediately know when the vectors are unavailable.
+  - When the loader encounters a missing or corrupted Parquet file it now records explicit downgrade messages (`"RAG 檔案遺失"`, `"無法載入 RAG 檔案"`) and flips the in-memory status map to `available=False`.
+  - `/api/agent/status` surfaces that status to authenticated callers (requires the `X-Api-Key` header) so the SPA can show “RAG enabled/disabled” banners without probing inference endpoints.
+  - Sanitisation parity: `_sanitize_rich_text()` enforces `rel="noopener noreferrer nofollow"` on every `<a>` tag even when the backend strips an unsafe `href`, and the frontend’s DOMPurify profile mirrors the same rule set to avoid mismatched rendering.
   - `/api/agent/recommendation` and `/api/agent/chat` prefix Gemini prompts with top-k retrieved snippets (cosine ≥0.75) without altering the existing request/response contracts.
 - **Growth Prediction** (`app/api/prediction.py`):
   - Blends LightGBM quantile models with linear regression fallback for juvenile goats (≤365 days).

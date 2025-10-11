@@ -153,6 +153,7 @@ graph TB
   - Element Plus 排版、統一 loading/toast、AI Markdown 呈現、API Key 彈窗一次顯示。
   - 公開產銷履歷每個加工步驟提供「數據指紋」彈窗，可檢視 Hash 鏈資訊並支援複製/下載，方便稽核。
   - 系統設定新增「字體大小」切換（預設／大字），同步調整 Element Plus 基準字級與全域 CSS 變數，方便熟齡牧場管理者以較大的字體操作系統。
+  - Dashboard 透過設定 Store 呼叫 `/api/agent/status` 取得即時狀態，顯示「RAG 已啟用」徽章並在載入器回報不可用時自動隱藏。
 
 ## 5. AI 與機器學習能力
 
@@ -167,7 +168,10 @@ graph TB
 - `scripts/ingest_docs.py` 採 800 字、重疊 100 的固定切塊策略，並透過 `app/ai/embedding.py`（內建 `requests.Session` 連線池）批次呼叫嵌入 API。
 - 向量快照依賴 `pyarrow` 讀寫 Parquet、`faiss-cpu` 提供高效近似最近鄰檢索，兩者皆已寫入 `backend/requirements.txt`。
 - `make rag-update` 會自動產生向量並建立本地 commit，但保留 `git push` 由開發者手動確認。
-- `app/rag_loader.ensure_vectors()` 啟動時載入 Parquet 向量、序列化快照至 Redis 供多個 Worker 共用，並建構 FAISS Index；若檔案缺失會自動嘗試 `git lfs pull`，仍失敗則僅記錄警告並降級為無 context 模式。
+- `app/rag_loader.ensure_vectors()` 啟動時載入 Parquet 向量、序列化快照至 Redis 供多個 Worker 共用，並建構 FAISS Index；若檔案缺失會自動嘗試 `git lfs pull`，仍失敗則僅記錄警告並降級為無 context 模式，同時更新可用性狀態以利監控。
+  - 當檔案遺失或格式不正確時會記錄「RAG 檔案遺失」、「無法載入 RAG 檔案」等降級訊息，並將狀態設為 `available=False`。
+  - `/api/agent/status` 經 `X-Api-Key` 驗證後即可取得最新狀態，前端可直接顯示「RAG 已啟用/停用」提示而不需嘗試推理端點。
+  - 前後端 HTML 清洗策略完全同步，`_sanitize_rich_text()` 即使移除不安全的 `href` 也會強制 `<a>` 標籤帶上 `rel="noopener noreferrer nofollow"`，DOMPurify 設定亦跟進以避免呈現差異。
   - `/api/agent/recommendation` 與 `/api/agent/chat` 在原有 Prompt 前加入 Top-k 參考片段（餘弦相似度 ≥0.75），維持既有前端與 API 契約。
 - **生長預測**（`app/api/prediction.py`）：
   - LightGBM 分位數模型搭配線性迴歸備援，僅支援 60–365 天幼羊。
