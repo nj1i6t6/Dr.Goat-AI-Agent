@@ -175,6 +175,7 @@ def create_app():
             verify as verify_bp,
             finance as finance_bp,
             bi as bi_bp,
+            activity as activity_bp,
         )
         app.register_blueprint(auth_bp.bp, url_prefix='/api/auth')
         app.register_blueprint(sheep_bp.bp, url_prefix='/api/sheep')
@@ -188,6 +189,7 @@ def create_app():
         app.register_blueprint(verify_bp.bp, url_prefix='/api/verify')
         app.register_blueprint(finance_bp.bp, url_prefix='/api/finance')
         app.register_blueprint(bi_bp.bp, url_prefix='/api/bi')
+        app.register_blueprint(activity_bp.bp, url_prefix='/api/activity')
 
         # --- OpenAPI 規格與 Swagger UI ---
         @app.route('/openapi.yaml')

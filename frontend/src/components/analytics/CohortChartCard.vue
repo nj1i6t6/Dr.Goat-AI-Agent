@@ -1,11 +1,8 @@
 <template>
-  <el-card class="chart-card" shadow="never">
-    <template #header>
-      <div class="card-header">
-        <span>{{ title }}</span>
-      </div>
+  <BaseAuroraCard :title="title">
+    <template v-if="hasData">
+      <AsyncChartWrapper :loader="chartLoader" :component-props="{ items }" />
     </template>
-    <div v-if="hasData" ref="chartRef" class="chart-container"></div>
     <div v-else class="empty-wrapper">
       <el-empty :description="emptyDescription">
         <template #extra>
@@ -15,14 +12,13 @@
         </template>
       </el-empty>
     </div>
-  </el-card>
+  </BaseAuroraCard>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import * as echarts from 'echarts'
-
-import { formatCohortGroupLabel } from '../../utils/analyticsFormatting'
+import { computed } from 'vue';
+import AsyncChartWrapper from '@/components/common/AsyncChartWrapper.vue';
+import BaseAuroraCard from '@/components/common/BaseAuroraCard.vue';
 
 const props = defineProps({
   title: {
@@ -45,60 +41,19 @@ const props = defineProps({
     type: String,
     default: '尚無資料',
   },
-})
+});
 
-const chartRef = ref(null)
-let chartInstance = null
+const hasData = computed(() => (props.items ?? []).length > 0);
 
-const hasData = computed(() => (props.items ?? []).length > 0)
-
-const renderChart = () => {
-  if (!chartRef.value || !hasData.value) {
-    if (chartInstance) {
-      chartInstance.dispose()
-      chartInstance = null
-    }
-    return
-  }
-
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
-
-  chartInstance = echarts.init(chartRef.value)
-  const categories = props.items.map((item) => formatCohortGroupLabel(item))
-  const profits = props.items.map((item) => Number(item.metrics?.net_profit ?? 0))
-
-  chartInstance.setOption({
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: categories },
-    yAxis: { type: 'value', name: '淨收益 (TWD)' },
-    series: [
-      {
-        name: '淨收益',
-        type: 'bar',
-        data: profits,
-        itemStyle: { color: '#3b82f6' },
-      },
-    ],
-  })
-}
-
-watch(
-  () => props.items,
-  () => {
-    nextTick(() => renderChart())
-  },
-  { deep: true }
-)
-
-onMounted(() => {
-  nextTick(() => renderChart())
-})
-
-onBeforeUnmount(() => {
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
-})
+const chartLoader = () =>
+  import(/* webpackChunkName: "cohort-chart-renderer" */ './renderers/CohortChartRenderer.vue');
 </script>
+
+<style scoped>
+.empty-wrapper {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  color: var(--aurora-text-muted);
+}
+</style>

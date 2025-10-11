@@ -13,6 +13,8 @@ from pydantic import ValidationError
 from datetime import datetime
 import markdown
 import base64
+import bleach
+from bleach.linkifier import Linker
 
 bp = Blueprint('agent', __name__)
 
@@ -32,6 +34,70 @@ _RECOMMENDATION_FIELD_LABELS = {
 }
 
 MAX_BREAKDOWN_ITEMS_FOR_PROMPT = 6
+
+_ALLOWED_RICH_TEXT_TAGS = {
+    'a',
+    'p',
+    'br',
+    'strong',
+    'em',
+    'ul',
+    'ol',
+    'li',
+    'code',
+    'pre',
+    'blockquote',
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'th',
+    'td',
+    'hr',
+    'span',
+    'div',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+}
+
+_ALLOWED_RICH_TEXT_ATTRS = {
+    'a': ['href', 'title', 'rel', 'target'],
+}
+
+_ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
+
+
+def _secure_link_callback(attrs: dict[str, str], new: bool = False) -> dict[str, str]:
+    href = attrs.get('href')
+    if not href:
+        return attrs
+
+    attrs['target'] = '_blank'
+    rel_values = set(token for token in attrs.get('rel', '').split() if token)
+    rel_values.update({'noopener', 'noreferrer', 'nofollow'})
+    attrs['rel'] = ' '.join(sorted(rel_values))
+    return attrs
+
+
+_RICH_TEXT_LINKER = Linker(callbacks=[_secure_link_callback], skip_tags=['code', 'pre'])
+
+
+def _sanitize_rich_text(html: str) -> str:
+    if not html:
+        return ''
+
+    clean_html = bleach.clean(
+        html,
+        tags=_ALLOWED_RICH_TEXT_TAGS,
+        attributes=_ALLOWED_RICH_TEXT_ATTRS,
+        protocols=_ALLOWED_PROTOCOLS,
+        strip=True,
+    )
+    return _RICH_TEXT_LINKER.linkify(clean_html)
 
 
 def _format_rag_context(chunks: list[dict[str, object]]) -> str:
@@ -88,7 +154,7 @@ def get_agent_tip():
     
     tip_text = result.get("text", "保持羊舍通風乾燥，提供清潔飲水。")
     tip_html = markdown.markdown(tip_text, extensions=['nl2br', 'fenced_code', 'tables'])
-    return jsonify(tip_html=tip_html)
+    return jsonify(tip_html=_sanitize_rich_text(tip_html))
 
 
 def _format_filters(filters: dict[str, object]) -> str:
@@ -188,7 +254,8 @@ def generate_analytics_report():
 
     report_text = result.get('text', '').strip()
     report_html = markdown.markdown(report_text, extensions=['fenced_code', 'tables', 'nl2br'])
-    return jsonify(report_html=report_html, report_markdown=report_text)
+    clean_report_html = _sanitize_rich_text(report_html)
+    return jsonify(report_html=clean_report_html, report_markdown=report_text)
 
 @bp.route('/recommendation', methods=['POST'])
 @login_required

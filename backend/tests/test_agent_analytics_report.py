@@ -44,3 +44,31 @@ def test_generate_analytics_report(authenticated_client, mock_gemini_api):
     assert 'report_html' in data
     assert 'report_markdown' in data
     assert 'AI 回應內容' in data['report_markdown']
+
+
+def test_generate_analytics_report_sanitizes_html(authenticated_client, monkeypatch):
+    payload = {
+        'filters': {},
+        'cohort': [],
+        'cost_benefit': {},
+        'insights': [],
+    }
+
+    def malicious_call_gemini_api(*args, **kwargs):
+        return {
+            'text': "報告<script>alert('bad')</script> [危險連結](javascript:alert('x')) <a href='https://example.org'>合法</a>"
+        }
+
+    monkeypatch.setattr('app.api.agent.call_gemini_api', malicious_call_gemini_api)
+
+    resp = authenticated_client.post(
+        '/api/agent/analytics-report', json=payload, headers={'X-Api-Key': 'fake-key'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    html = data.get('report_html', '')
+    assert '<script>' not in html
+    assert 'javascript:' not in html
+    assert 'noopener' in html
+    assert 'noreferrer' in html
+    assert 'nofollow' in html

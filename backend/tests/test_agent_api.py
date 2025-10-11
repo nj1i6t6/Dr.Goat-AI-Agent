@@ -17,11 +17,32 @@ class TestAgentAPI:
         response = authenticated_client.get('/api/agent/tip', headers={
             'X-Api-Key': 'test-api-key'
         })
-        
+
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'tip_html' in data
         assert len(data['tip_html']) > 0
+
+    def test_get_agent_tip_sanitizes_html(self, authenticated_client, monkeypatch):
+        """確保每日提示的 HTML 內容被妥善清理"""
+
+        def malicious_call_gemini_api(*args, **kwargs):
+            return {
+                "text": "危險<script>alert('x')</script> [連結](javascript:alert('bad')) <a href='https://example.com'>安全連結</a>"
+            }
+
+        monkeypatch.setattr('app.api.agent.call_gemini_api', malicious_call_gemini_api)
+
+        response = authenticated_client.get('/api/agent/tip', headers={'X-Api-Key': 'test-api-key'})
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        tip_html = data.get('tip_html', '')
+        assert '<script>' not in tip_html
+        assert 'javascript:' not in tip_html
+        assert 'noopener' in tip_html
+        assert 'noreferrer' in tip_html
+        assert 'nofollow' in tip_html
 
     def test_get_agent_tip_missing_api_key(self, authenticated_client):
         """測試缺少 API 金鑰的情況"""
