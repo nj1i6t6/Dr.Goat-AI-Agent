@@ -16,7 +16,7 @@
 
     <div v-else-if="!initialLoading && hasSheep" class="dashboard-content">
       <BaseAuroraCard class="welcome-card" title="領頭羊博士的問候！">
-        <div class="agent-tip" v-loading="settingsStore.agentTip.loading" v-html="settingsStore.agentTip.html"></div>
+        <div class="agent-tip" v-loading="settingsStore.agentTip.loading" v-html="safeAgentTipHtml"></div>
       </BaseAuroraCard>
 
       <section class="dashboard-grid">
@@ -92,14 +92,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { useSettingsStore } from '../stores/settings';
 import api from '../api';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import VirtualizedLogTable from '@/components/tables/VirtualizedLogTable.vue';
 import BaseAuroraCard from '@/components/common/BaseAuroraCard.vue';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
 const settingsStore = useSettingsStore();
+
+const safeAgentTipHtml = computed(() => sanitizeHtml(settingsStore.agentTip.html));
 
 const initialLoading = ref(true);
 const hasSheep = ref(false);
@@ -169,36 +172,47 @@ async function generateFarmReport() {
   reportLoading.value = true;
   try {
     const report = await api.getFarmReport();
+    const flockComposition = report.flock_composition || {};
+    const productionSummary = report.production_summary || {};
+    const healthSummary = report.health_summary || {};
+    const escapeHtml = (value) =>
+      String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const breedList = (flockComposition.by_breed || [])
+      .map((breed) => `<li>${escapeHtml(breed.name)}: ${escapeHtml(breed.count)} 隻</li>`)
+      .join('');
+    const sexList = (flockComposition.by_sex || [])
+      .map((sexItem) => `<li>${escapeHtml(sexItem.name)}: ${escapeHtml(sexItem.count)} 隻</li>`)
+      .join('');
+    const diseaseList = (healthSummary.top_diseases || [])
+      .map((disease) => `<li>${escapeHtml(disease.name)}: ${escapeHtml(disease.count)} 次</li>`)
+      .join('');
+
     const reportHtml = `
-      <h4>羊群結構 (總計: ${report.flock_composition.total} 隻)</h4>
-      <div style="display:flex; gap: 20px;">
-        <div style="flex:1;"><strong>品種分佈:</strong><ul>${report.flock_composition.by_breed
-          .map((b) => `<li>${b.name}: ${b.count} 隻</li>`)
-          .join('')}</ul></div>
-        <div style="flex:1;"><strong>性別分佈:</strong><ul>${report.flock_composition.by_sex
-          .map((s) => `<li>${s.name}: ${s.count} 隻</li>`)
-          .join('')}</ul></div>
-      </div>
+      <h4>羊群結構 (總計: ${escapeHtml(flockComposition.total ?? '0')} 隻)</h4>
+      <h5>品種分佈</h5>
+      <ul>${breedList || '<li>暫無品種資料</li>'}</ul>
+      <h5>性別分佈</h5>
+      <ul>${sexList || '<li>暫無性別資料</li>'}</ul>
       <hr>
       <h4>生產性能摘要</h4>
       <ul>
-        <li>平均出生體重: <strong>${report.production_summary.avg_birth_weight || 'N/A'} kg</strong></li>
-        <li>平均窩仔數: <strong>${report.production_summary.avg_litter_size || 'N/A'} 隻</strong></li>
-        <li>平均日產奶量 (有記錄者): <strong>${report.production_summary.avg_milk_yield || 'N/A'} kg/天</strong></li>
+        <li>平均出生體重: <strong>${escapeHtml(productionSummary.avg_birth_weight || 'N/A')} kg</strong></li>
+        <li>平均窩仔數: <strong>${escapeHtml(productionSummary.avg_litter_size || 'N/A')} 隻</strong></li>
+        <li>平均日產奶量 (有記錄者): <strong>${escapeHtml(productionSummary.avg_milk_yield || 'N/A')} kg/天</strong></li>
       </ul>
       <hr>
       <h4>健康狀況摘要 (最常見的5項疾病事件)</h4>
-      <ul>
-        ${
-          report.health_summary.top_diseases.length > 0
-            ? report.health_summary.top_diseases
-                .map((d) => `<li>${d.name}: ${d.count} 次</li>`)
-                .join('')
-            : '<li>暫無疾病記錄</li>'
-        }
-      </ul>
+      <ul>${diseaseList || '<li>暫無疾病記錄</li>'}</ul>
     `;
-    ElMessageBox.alert(reportHtml, '牧場年度報告摘要', {
+    const sanitizedReportHtml = sanitizeHtml(reportHtml);
+
+    ElMessageBox.alert(sanitizedReportHtml, '牧場年度報告摘要', {
       dangerouslyUseHTMLString: true,
       confirmButtonText: '關閉',
     });
