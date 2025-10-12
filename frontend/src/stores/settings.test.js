@@ -18,7 +18,8 @@ vi.mock('../utils/errorHandler', () => ({
 // Mock API
 vi.mock('../api', () => ({
   default: {
-    getAgentTip: vi.fn()
+    getAgentTip: vi.fn(),
+    getAgentStatus: vi.fn()
   }
 }))
 
@@ -44,6 +45,7 @@ describe('settings Store', () => {
     }
     // 2. 在 beforeEach 中設定預設的 mock 狀態
     setupLocalStorageMocks();
+    api.getAgentStatus.mockResolvedValue({ rag_enabled: false, message: '', detail: null })
   })
 
   describe('初始狀態', () => {
@@ -55,6 +57,11 @@ describe('settings Store', () => {
         html: '',
         loading: false,
         loaded: false
+      })
+      expect(store.ragStatus).toEqual({
+        available: null,
+        message: '',
+        detail: null
       })
       expect(store.hasApiKey).toBe(false)
     })
@@ -112,8 +119,9 @@ describe('settings Store', () => {
       it('應該成功獲取 Agent 提示', async () => {
         const mockTip = '<p>今日提示：注意山羊的營養平衡</p>'
         setupLocalStorageMocks({ apiKey: 'valid-api-key' });
-        
+
         const store = useSettingsStore()
+        api.getAgentStatus.mockResolvedValue({ rag_enabled: true, message: 'RAG Ready', detail: 'vectors.parquet' })
         api.getAgentTip.mockResolvedValue({ tip_html: mockTip })
 
         await store.fetchAndSetAgentTip()
@@ -122,12 +130,15 @@ describe('settings Store', () => {
         expect(store.agentTip.html).toBe(mockTip)
         expect(store.agentTip.loaded).toBe(true)
         expect(api.getAgentTip).toHaveBeenCalledWith('valid-api-key')
+        expect(api.getAgentStatus).toHaveBeenCalledWith('valid-api-key')
+        expect(store.ragStatus).toEqual({ available: true, message: 'RAG Ready', detail: 'vectors.parquet' })
       })
 
       it('應該處理獲取提示失敗', async () => {
         setupLocalStorageMocks({ apiKey: 'invalid-key' });
-        
+
         const store = useSettingsStore()
+        api.getAgentStatus.mockRejectedValue({ error: '狀態失敗' })
         api.getAgentTip.mockRejectedValue({ error: 'API 錯誤' })
 
         await store.fetchAndSetAgentTip()
@@ -135,6 +146,8 @@ describe('settings Store', () => {
         expect(store.agentTip.loading).toBe(false)
         expect(store.agentTip.html).toContain('無法獲取提示: API 錯誤')
         expect(store.agentTip.loaded).toBe(true)
+        expect(store.ragStatus.available).toBe(false)
+        expect(store.ragStatus.message).toContain('無法取得 RAG 狀態')
       })
 
       it('loading 狀態應該正確切換', async () => {
@@ -182,7 +195,7 @@ describe('settings Store', () => {
         setupLocalStorageMocks({ apiKey: 'test-key' });
         
         const store = useSettingsStore()
-        
+
         let resolveFirst
         api.getAgentTip.mockImplementation(() => new Promise(resolve => {
           resolveFirst = resolve
@@ -191,6 +204,7 @@ describe('settings Store', () => {
         const promise1 = store.fetchAndSetAgentTip()
         const promise2 = store.fetchAndSetAgentTip()
 
+        await Promise.resolve()
         resolveFirst({ tip_html: '提示內容' })
         await Promise.all([promise1, promise2])
 

@@ -72,3 +72,4 @@ def test_generate_analytics_report_sanitizes_html(authenticated_client, monkeypa
     assert 'noopener' in html
     assert 'noreferrer' in html
     assert 'nofollow' in html
+    assert 'rel="noopener noreferrer nofollow">危險連結</a>' in html

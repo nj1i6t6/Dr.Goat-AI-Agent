@@ -136,8 +136,11 @@ export default {
   },
 
   // AI 代理 API
-  getAgentTip(apiKey, errorHandler) { 
-    return withErrorHandling(() => apiClient.get('/api/agent/tip', { headers: { 'X-Api-Key': apiKey } }), errorHandler); 
+  getAgentTip(apiKey, errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/agent/tip', { headers: { 'X-Api-Key': apiKey } }), errorHandler);
+  },
+  getAgentStatus(apiKey, errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/agent/status', { headers: { 'X-Api-Key': apiKey } }), errorHandler);
   },
   getRecommendation(apiKey, data, errorHandler) {
     const payload = { ...data, api_key: apiKey };

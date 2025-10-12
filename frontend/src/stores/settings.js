@@ -31,6 +31,11 @@ export const useSettingsStore = defineStore('settings', () => {
     loading: false, // 是否正在加載
     loaded: false,  // 是否已經成功加載過
   });
+  const ragStatus = ref({
+    available: null,
+    message: '',
+    detail: null,
+  });
 
   applyFontScale(fontScale.value);
 
@@ -60,24 +65,58 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   // 新增：獲取並緩存 AI 每日提示的 action
+  async function refreshRagStatus() {
+    if (!hasApiKey.value) {
+      ragStatus.value = { available: null, message: '', detail: null };
+      return;
+    }
+
+    try {
+      const response = await api.getAgentStatus(apiKey.value);
+      ragStatus.value = {
+        available: Boolean(response.rag_enabled),
+        message: response.message || '',
+        detail: response.detail ?? null,
+      };
+    } catch (error) {
+      ragStatus.value = {
+        available: false,
+        message: `無法取得 RAG 狀態: ${error.error || error.message}`,
+        detail: null,
+      };
+    }
+  }
+
   async function fetchAndSetAgentTip() {
-    // 如果沒有 API Key，或者正在加載中，或者已經加載過了，就直接返回，不再重複請求
-    if (!hasApiKey.value || agentTip.value.loading || agentTip.value.loaded) {
-      if (!hasApiKey.value && !agentTip.value.loaded) {
+    if (agentTip.value.loading) {
+      return;
+    }
+
+    if (!hasApiKey.value) {
+      ragStatus.value = { available: null, message: '', detail: null };
+      if (!agentTip.value.loaded) {
         agentTip.value.html = "請先在「系統設定」中設定有效的API金鑰以獲取提示。";
       }
       return;
     }
-    
+
+    const statusPromise = refreshRagStatus();
+
+    if (agentTip.value.loaded) {
+      await statusPromise;
+      return;
+    }
+
     agentTip.value.loading = true;
     try {
       const response = await api.getAgentTip(apiKey.value);
       agentTip.value.html = response.tip_html;
       agentTip.value.loaded = true; // 標記為已成功加載
+      await statusPromise;
     } catch (error) {
       agentTip.value.html = `<span style="color:red;">無法獲取提示: ${error.error || error.message}</span>`;
-      // 注意：即使請求失敗，我們也標記為 loaded，以避免在同一次會話中反覆嘗試失敗的請求
-      agentTip.value.loaded = true; 
+      agentTip.value.loaded = true;
+      await statusPromise;
     } finally {
       agentTip.value.loading = false;
     }
@@ -88,10 +127,12 @@ export const useSettingsStore = defineStore('settings', () => {
     fontScale,
     hasApiKey,
     agentTip, // 導出 agentTip 狀態
+    ragStatus,
     setApiKey,
     clearApiKey,
     setFontScale,
     ensureFontScaleApplied,
+    refreshRagStatus,
     fetchAndSetAgentTip, // 導出新的 action
   };
 });

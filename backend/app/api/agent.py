@@ -8,9 +8,11 @@ from app.schemas import (
     AnalyticsReportRequestModel,
     create_error_response,
 )
-from app.rag_loader import rag_query
+from app.rag_loader import get_status as get_rag_status, rag_query
 from pydantic import ValidationError
 from datetime import datetime
+from html import escape as html_escape
+from html.parser import HTMLParser
 import markdown
 import base64
 import bleach
@@ -69,6 +71,7 @@ _ALLOWED_RICH_TEXT_ATTRS = {
 }
 
 _ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
+_REQUIRED_LINK_REL = ('noopener', 'noreferrer', 'nofollow')
 
 
 def _secure_link_callback(attrs: dict[str, str], new: bool = False) -> dict[str, str]:
@@ -86,6 +89,86 @@ def _secure_link_callback(attrs: dict[str, str], new: bool = False) -> dict[str,
 _RICH_TEXT_LINKER = Linker(callbacks=[_secure_link_callback], skip_tags=['code', 'pre'])
 
 
+class _AnchorAttributeEnforcer(HTMLParser):
+    """Post-sanitisation HTML parser that enforces secure anchor attributes."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self._parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs):
+        self._parts.append(self._render_start(tag, attrs, self_closing=False))
+
+    def handle_startendtag(self, tag: str, attrs):
+        self._parts.append(self._render_start(tag, attrs, self_closing=True))
+
+    def handle_endtag(self, tag: str):
+        self._parts.append(f"</{tag}>")
+
+    def handle_data(self, data: str):
+        self._parts.append(data)
+
+    def handle_entityref(self, name: str):
+        self._parts.append(f"&{name};")
+
+    def handle_charref(self, name: str):
+        self._parts.append(f"&#{name};")
+
+    def handle_comment(self, data: str):
+        self._parts.append(f"<!--{data}-->")
+
+    def handle_decl(self, decl: str):
+        self._parts.append(f"<!{decl}>")
+
+    def unknown_decl(self, data: str):  # pragma: no cover - defensive
+        self._parts.append(f"<![{data}]>")
+
+    def get_html(self) -> str:
+        return ''.join(self._parts)
+
+    def _render_start(self, tag: str, attrs, *, self_closing: bool) -> str:
+        attributes = self._normalise_attrs(tag, attrs)
+        rendered = ''.join(self._render_attr(name, value) for name, value in attributes.items())
+        closing = ' /' if self_closing else ''
+        return f"<{tag}{rendered}{closing}>"
+
+    def _normalise_attrs(self, tag: str, attrs) -> dict[str, str | None]:
+        attr_map: dict[str, str | None] = {}
+        for name, value in attrs:
+            attr_map[name] = value
+
+        if tag.lower() == 'a':
+            rel_tokens = {
+                token.lower()
+                for token in (attr_map.get('rel') or '').split()
+                if token
+            }
+            rel_tokens.update(_REQUIRED_LINK_REL)
+            ordered_rel = ' '.join(token for token in _REQUIRED_LINK_REL if token in rel_tokens)
+            attr_map['rel'] = ordered_rel
+
+            href = attr_map.get('href') or ''
+            if href:
+                attr_map['target'] = attr_map.get('target') or '_blank'
+            else:
+                attr_map.pop('target', None)
+
+        return attr_map
+
+    @staticmethod
+    def _render_attr(name: str, value: str | None) -> str:
+        if value is None:
+            return f" {name}"
+        return f" {name}=\"{html_escape(value, quote=True)}\""
+
+
+def _enforce_anchor_security(html: str) -> str:
+    parser = _AnchorAttributeEnforcer()
+    parser.feed(html)
+    parser.close()
+    return parser.get_html()
+
+
 def _sanitize_rich_text(html: str) -> str:
     if not html:
         return ''
@@ -97,7 +180,8 @@ def _sanitize_rich_text(html: str) -> str:
         protocols=_ALLOWED_PROTOCOLS,
         strip=True,
     )
-    return _RICH_TEXT_LINKER.linkify(clean_html)
+    linked_html = _RICH_TEXT_LINKER.linkify(clean_html)
+    return _enforce_anchor_security(linked_html)
 
 
 def _format_rag_context(chunks: list[dict[str, object]]) -> str:
@@ -155,6 +239,21 @@ def get_agent_tip():
     tip_text = result.get("text", "保持羊舍通風乾燥，提供清潔飲水。")
     tip_html = markdown.markdown(tip_text, extensions=['nl2br', 'fenced_code', 'tables'])
     return jsonify(tip_html=_sanitize_rich_text(tip_html))
+
+
+@bp.route('/status', methods=['GET'])
+@login_required
+def agent_status():
+    api_key = request.headers.get('X-Api-Key')
+    if not api_key:
+        return jsonify(error="未提供API金鑰於請求頭中 (X-Api-Key)"), 401
+
+    status = get_rag_status()
+    return jsonify(
+        rag_enabled=bool(status.get('available')),  # type: ignore[arg-type]
+        message=status.get('message', ''),
+        detail=status.get('detail'),
+    )
 
 
 def _format_filters(filters: dict[str, object]) -> str:
