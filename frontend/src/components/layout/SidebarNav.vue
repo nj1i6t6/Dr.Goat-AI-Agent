@@ -41,31 +41,31 @@
       <ul class="nav-list">
         <li v-for="item in navItems" :key="item.id" class="nav-item">
           <template v-if="item.type === 'section'">
-            <button
-            type="button"
-            class="nav-button"
-            :class="{
-              'is-open': openSections.includes(item.id),
-              'is-active': isSectionActive(item),
-            }"
-            @click="toggleSection(item.id)"
+            <el-popover
+              v-if="collapsed && !isMobile"
+              placement="right-start"
+              trigger="click"
+              :open-delay="100"
+              :close-delay="80"
+              popper-class="sidebar__popover"
             >
-              <el-icon class="nav-button__icon"><component :is="item.icon" /></el-icon>
-              <span v-if="!collapsed || isMobile" class="nav-button__label">{{ item.label }}</span>
-              <el-icon v-if="!collapsed || isMobile" class="nav-button__chevron">
-                <ArrowRight :class="{ 'is-rotated': openSections.includes(item.id) }" />
-              </el-icon>
-            </button>
-            <transition name="accordion">
-              <ul
-                v-if="openSections.includes(item.id) && (!collapsed || isMobile)"
-                class="nav-sub-list"
-              >
-                <li
-                  v-for="child in item.children"
-                  :key="child.id"
-                  class="nav-sub-item"
+              <template #reference>
+                <button
+                  type="button"
+                  class="nav-button"
+                  :class="{
+                    'is-open': isSectionExpanded(item),
+                    'is-active': isSectionActive(item),
+                  }"
+                  aria-haspopup="true"
+                  :aria-expanded="isSectionActive(item)"
                 >
+                  <el-icon class="nav-button__icon"><component :is="item.icon" /></el-icon>
+                  <span v-if="!collapsed || isMobile" class="nav-button__label">{{ item.label }}</span>
+                </button>
+              </template>
+              <ul class="nav-sub-list nav-sub-list--popover">
+                <li v-for="child in item.children" :key="child.id" class="nav-sub-item">
                   <RouterLink
                     :to="child.route"
                     class="nav-sub-link"
@@ -77,7 +77,39 @@
                   </RouterLink>
                 </li>
               </ul>
-            </transition>
+            </el-popover>
+            <template v-else>
+              <button
+                type="button"
+                class="nav-button"
+                :class="{
+                  'is-open': isSectionExpanded(item),
+                  'is-active': isSectionActive(item),
+                }"
+                @click="handleSectionPress(item)"
+              >
+                <el-icon class="nav-button__icon"><component :is="item.icon" /></el-icon>
+                <span v-if="!collapsed || isMobile" class="nav-button__label">{{ item.label }}</span>
+                <el-icon v-if="!collapsed || isMobile" class="nav-button__chevron">
+                  <ArrowRight :class="{ 'is-rotated': openSections.includes(item.id) }" />
+                </el-icon>
+              </button>
+              <transition name="accordion">
+                <ul v-if="openSections.includes(item.id)" class="nav-sub-list">
+                  <li v-for="child in item.children" :key="child.id" class="nav-sub-item">
+                    <RouterLink
+                      :to="child.route"
+                      class="nav-sub-link"
+                      :class="{ 'is-active': isActive(child.route) }"
+                      @click="handleNavigate"
+                    >
+                      <el-icon class="nav-sub-icon"><component :is="child.icon" /></el-icon>
+                      <span class="nav-sub-label">{{ child.label }}</span>
+                    </RouterLink>
+                  </li>
+                </ul>
+              </transition>
+            </template>
           </template>
 
           <RouterLink
@@ -148,11 +180,11 @@ import {
   MessageBox,
   Monitor,
   Notebook,
-  Opportunity,
   PieChart,
   Promotion,
   SetUp,
   Sunny,
+  Medal,
   Timer,
   TrendCharts,
   Tickets,
@@ -237,7 +269,7 @@ const navItems = computed(() => [
     icon: Grid,
     children: [
       { id: 'traceability', label: '產銷履歷', route: '/traceability', icon: Collection },
-      { id: 'esg-metrics', label: 'ESG 指標', route: '/data-management', icon: Opportunity },
+      { id: 'esg-metrics', label: 'ESG 指標', route: '/esg-metrics', icon: Medal },
     ],
   },
   {
@@ -262,6 +294,15 @@ const navItems = computed(() => [
 const openSections = ref([]);
 
 const isActive = (targetRoute) => route.path.startsWith(targetRoute);
+
+const isSectionActive = (section) => section.children.some((child) => isActive(child.route));
+
+const isSectionExpanded = (section) => {
+  if (props.collapsed && !props.isMobile) {
+    return isSectionActive(section);
+  }
+  return openSections.value.includes(section.id);
+};
 
 const ensureSectionVisibility = () => {
   const activePath = route.path;
@@ -294,7 +335,12 @@ const toggleSection = (id) => {
     : [...openSections.value, id];
 };
 
-const isSectionActive = (section) => section.children.some((child) => isActive(child.route));
+const handleSectionPress = (section) => {
+  if (props.collapsed && !props.isMobile) {
+    return;
+  }
+  toggleSection(section.id);
+};
 
 const navigateTo = (path) => {
   router.push(path);
@@ -476,6 +522,11 @@ const emitLogout = () => emit('logout');
   padding-left: 48px;
 }
 
+.nav-sub-list--popover {
+  padding-left: 0;
+  margin: 0;
+}
+
 .nav-sub-link {
   display: flex;
   align-items: center;
@@ -502,6 +553,19 @@ const emitLogout = () => emit('logout');
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+:deep(.sidebar__popover) {
+  padding: 8px 0;
+  background: rgba(15, 23, 42, 0.96);
+  border-radius: 14px;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.32);
+  min-width: 220px;
+}
+
+:deep(.sidebar__popover .nav-sub-list) {
+  padding: 0;
+  margin: 0;
 }
 
 .sidebar__divider {

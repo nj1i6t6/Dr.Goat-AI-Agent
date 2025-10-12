@@ -32,7 +32,10 @@ const props = defineProps({
   },
 });
 
-const isComponent = computed(() => typeof props.icon === 'object' || typeof props.icon === 'function');
+const isComponent = computed(
+  () =>
+    Boolean(props.icon) && (typeof props.icon === 'object' || typeof props.icon === 'function')
+);
 </script>
 
 <style scoped>

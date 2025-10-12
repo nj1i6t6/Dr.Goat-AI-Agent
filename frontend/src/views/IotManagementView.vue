@@ -184,6 +184,7 @@ import {
   Tooltip,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import EmptyState from '../components/common/EmptyState.vue';
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, TimeScale, Legend, Tooltip, Title);
 
@@ -532,4 +533,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-import EmptyState from '../components/common/EmptyState.vue';

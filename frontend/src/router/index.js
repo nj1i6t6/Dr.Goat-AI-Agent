@@ -65,6 +65,11 @@ const routes = [
         component: () => import('../views/AnalyticsHubView.vue')
       },
       {
+        path: 'esg-metrics',
+        name: 'EsgMetrics',
+        component: () => import('../views/EsgMetricsView.vue')
+      },
+      {
         path: 'iot-dashboard',
         name: 'IotDashboard',
         component: () => import('../views/IotDashboardView.vue')

@@ -7,7 +7,6 @@
 | 導覽分組 | 子項目 | 對應路由 | Vue 元件 | 功能重點 |
 | --- | --- | --- | --- | --- |
 | 📊 代理人儀表板 | 任務提醒卡片、健康與福利警示、ESG 指標速覽、活動日誌 | `/dashboard` | `src/views/DashboardView.vue` | 串接任務 Store 展示「今日待辦」「逾期」「即將到期」，可從儀表板跳轉任務提醒頁；同時顯示健康警示、羊群狀態概覽與 ESG 指標。 |
-|  |  | `/task-reminders` | `src/views/TaskRemindersView.vue` | 依篩選器（今日待辦／即將到期／已逾期／全部）展示任務卡片，支援完成、稍後提醒、編輯與新增任務；停藥期任務附帶高危警示。 |
 | 🐑 日常管理 | 羊群總覽 | `/flock` | `src/views/SheepListView.vue` | 提供羊隻篩選、表格檢視與編輯／刪除動作；無資料時顯示空狀態，附手動新增與批次匯入按鈕。 |
 |  | 任務提醒 | `/task-reminders` | `src/views/TaskRemindersView.vue` | 與代理人儀表板連結一致，列出疫苗、驅蟲、健康檢查、停藥期、繁殖節點與自訂待辦等任務。 |
 | 🤖 智慧羊博士 | 營養代理人與 ESG 建議 | `/consultation` | `src/views/ConsultationView.vue` | 透過耳號載入羊隻資料後，由使用者補充體重、月齡、生理狀態等欄位並呼叫 AI 取得永續飼養建議。 |
@@ -15,7 +14,7 @@
 | 📈 數據與預測 | 生長預測 | `/prediction` | `src/views/PredictionView.vue` | 選擇耳號與預測天數後呼叫預測 API 顯示體重成長趨勢、日增重、資料品質等指標。 |
 |  | 資料治理（原 Analytics Hub） | `/analytics` | `src/views/AnalyticsHubView.vue` | 包含 KPI、同 cohort 分析、成本／收益圖表、自動化報表與成本／收益紀錄表格，提供 CSV 匯出與報表生成功能。 |
 | 🌿 永續與追溯 | 產銷履歷 | `/traceability` | `src/views/TraceabilityManagementView.vue` | 管理產品批次與公開資訊，支援空狀態提示、批次詳細抽屜、連結複製與刪除。 |
-|  | ESG 指標 | `/dashboard`（ESG 卡片） | `src/views/DashboardView.vue` | ESG 指標區塊整合於儀表板中，顯示 FCR 等永續指標並提供牧場報告產生操作。 |
+|  | ESG 指標 | `/esg-metrics` | `src/views/EsgMetricsView.vue` | 專屬 ESG 指標頁面，呈現 FCR、耗水量、碳排密度與動物福利指數等指標，並提供導向資料治理的動作。 |
 | 📡 物聯網自動化 | 物聯網儀表 | `/iot-dashboard` | `src/views/IotDashboardView.vue` | 顯示裝置上線狀態、離線警示、連線概況長條圖與活動日誌；無裝置時顯示空狀態並導向裝置管理。 |
 |  | IoT 裝置管理 | `/iot` | `src/views/IotManagementView.vue` | 列出裝置、提供 CRUD、顯示裝置詳情抽屜與最近讀數圖表，並管理自動化規則。 |
 | ⚙️ 系統設定 | 系統設定 | `/settings` | `src/views/SettingsView.vue` | 管理介面字級、Gemini API 金鑰與事件選項。 |

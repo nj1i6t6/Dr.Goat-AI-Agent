@@ -3,7 +3,7 @@
     <header class="iot-dashboard__header">
       <div>
         <h1 class="iot-dashboard__title">物聯網儀表</h1>
-        <p class="iot-dashboard__subtitle">快速掌握感測器與制動器的連線狀態、動態日誌與警示。</p>
+        <p class="iot-dashboard__subtitle">快速掌握感測器與致動器的連線狀態、動態日誌與警示。</p>
       </div>
       <el-button :icon="Refresh" @click="refresh" :loading="iotStore.deviceLoading">重新整理</el-button>
     </header>
@@ -28,7 +28,7 @@
               <span class="status-item__meta">/{{ sensorCount }} 台</span>
             </div>
             <div class="status-item">
-              <span class="status-item__label">制動器上線</span>
+              <span class="status-item__label">致動器上線</span>
               <strong class="status-item__value">{{ onlineActuators }}</strong>
               <span class="status-item__meta">/{{ actuatorCount }} 台</span>
             </div>

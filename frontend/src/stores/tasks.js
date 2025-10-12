@@ -3,77 +3,89 @@ import { computed, ref } from 'vue';
 import { addDays, differenceInCalendarDays, isBefore, isToday, parseISO } from 'date-fns';
 import api from '@/api';
 
-const seedTasks = [
-  {
-    id: 'vaccination-001',
-    type: 'vaccination',
-    title: '疫苗接種提醒',
-    message: '羊隻 A102 的 口蹄疫 疫苗，即將於 2024-12-18 到期，請準備施打。',
-    dueDate: addDays(new Date(), 1).toISOString(),
-    earTag: 'A102',
-    vaccineName: '口蹄疫',
-    priority: 'medium',
-    status: 'pending',
-  },
-  {
-    id: 'deworm-001',
-    type: 'deworming',
-    title: '驅蟲計畫提醒',
-    message: '羊群 全場 的例行驅蟲，即將於 2024-12-15 到期。',
-    dueDate: addDays(new Date(), -1).toISOString(),
-    groupName: '全場',
-    priority: 'medium',
-    status: 'pending',
-  },
-  {
-    id: 'health-001',
-    type: 'health-check',
-    title: '定期健康檢查',
-    message: '本季度的全場羊隻健康檢查，預計於 2025-01-10 進行。',
-    dueDate: addDays(new Date(), 25).toISOString(),
-    priority: 'low',
-    status: 'pending',
-  },
-  {
-    id: 'withdrawal-001',
-    type: 'withdrawal',
-    title: '停藥期提醒',
-    message: '羊隻 B215 正處於停藥期，距離結束還有 3 天。其乳汁/肉品禁止使用。',
-    dueDate: addDays(new Date(), 3).toISOString(),
-    earTag: 'B215',
-    priority: 'high',
-    status: 'pending',
-  },
-  {
-    id: 'pregnancy-check-001',
-    type: 'pregnancy-check',
-    title: '繁殖週期節點提醒',
-    message: '羊隻 C332 距離配種已 30 天，建議進行驗孕。',
-    dueDate: addDays(new Date(), 0).toISOString(),
-    earTag: 'C332',
-    priority: 'medium',
-    status: 'pending',
-  },
-  {
-    id: 'prepartum-001',
-    type: 'prepartum-care',
-    title: '預產期照護提醒',
-    message: '羊隻 C332 即將進入預產期 (預計 2025-03-01)，請準備移至分娩欄位並加強產前照護。',
-    dueDate: addDays(new Date(), 80).toISOString(),
-    earTag: 'C332',
-    priority: 'medium',
-    status: 'pending',
-  },
-  {
-    id: 'custom-001',
-    type: 'custom',
-    title: '牧草庫存盤點',
-    message: '完成牧草庫存盤點並回報採購需求。',
-    dueDate: addDays(new Date(), 2).toISOString(),
-    priority: 'low',
-    status: 'pending',
-  },
-];
+const formatDisplayDate = (date) =>
+  new Intl.DateTimeFormat('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+
+const createSeedTasks = () => {
+  const now = new Date();
+  const vaccinationDue = addDays(now, 1);
+  const dewormingDue = addDays(now, -1);
+  const healthCheckDue = addDays(now, 25);
+  const withdrawalDue = addDays(now, 3);
+  const prepartumDue = addDays(now, 80);
+
+  return [
+    {
+      id: 'vaccination-001',
+      type: 'vaccination',
+      title: '疫苗接種提醒',
+      message: `羊隻 A102 的 口蹄疫 疫苗，即將於 ${formatDisplayDate(vaccinationDue)} 到期，請準備施打。`,
+      dueDate: vaccinationDue.toISOString(),
+      earTag: 'A102',
+      vaccineName: '口蹄疫',
+      priority: 'medium',
+      status: 'pending',
+    },
+    {
+      id: 'deworm-001',
+      type: 'deworming',
+      title: '驅蟲計畫提醒',
+      message: `羊群 全場 的例行驅蟲，即將於 ${formatDisplayDate(dewormingDue)} 到期。`,
+      dueDate: dewormingDue.toISOString(),
+      groupName: '全場',
+      priority: 'medium',
+      status: 'pending',
+    },
+    {
+      id: 'health-001',
+      type: 'health-check',
+      title: '定期健康檢查',
+      message: `本季度的全場羊隻健康檢查，預計於 ${formatDisplayDate(healthCheckDue)} 進行。`,
+      dueDate: healthCheckDue.toISOString(),
+      priority: 'low',
+      status: 'pending',
+    },
+    {
+      id: 'withdrawal-001',
+      type: 'withdrawal',
+      title: '停藥期提醒',
+      message: `羊隻 B215 正處於停藥期，距離結束還有 ${differenceInCalendarDays(withdrawalDue, now)} 天。其乳汁/肉品禁止使用。`,
+      dueDate: withdrawalDue.toISOString(),
+      earTag: 'B215',
+      priority: 'high',
+      status: 'pending',
+    },
+    {
+      id: 'pregnancy-check-001',
+      type: 'pregnancy-check',
+      title: '繁殖週期節點提醒',
+      message: '羊隻 C332 距離配種已 30 天，建議進行驗孕。',
+      dueDate: now.toISOString(),
+      earTag: 'C332',
+      priority: 'medium',
+      status: 'pending',
+    },
+    {
+      id: 'prepartum-001',
+      type: 'prepartum-care',
+      title: '預產期照護提醒',
+      message: `羊隻 C332 即將進入預產期 (預計 ${formatDisplayDate(prepartumDue)})，請準備移至分娩欄位並加強產前照護。`,
+      dueDate: prepartumDue.toISOString(),
+      earTag: 'C332',
+      priority: 'medium',
+      status: 'pending',
+    },
+    {
+      id: 'custom-001',
+      type: 'custom',
+      title: '牧草庫存盤點',
+      message: '完成牧草庫存盤點並回報採購需求。',
+      dueDate: addDays(now, 2).toISOString(),
+      priority: 'low',
+      status: 'pending',
+    },
+  ];
+};
 
 const normaliseTask = (task) => ({
   ...task,
@@ -98,12 +110,12 @@ export const useTaskStore = defineStore('tasks', () => {
       } else if (response?.tasks) {
         tasks.value = response.tasks.map(normaliseTask);
       } else {
-        tasks.value = seedTasks;
+        tasks.value = createSeedTasks();
       }
     } catch (error) {
       console.warn('[tasks] fallback to seed tasks due to API error', error);
       lastError.value = error;
-      tasks.value = seedTasks;
+      tasks.value = createSeedTasks();
     } finally {
       loading.value = false;
     }
@@ -117,26 +129,24 @@ export const useTaskStore = defineStore('tasks', () => {
       id: payload.id || `custom-${Date.now()}`,
       ...payload,
     });
-    if (index === -1) {
-      tasks.value = [merged, ...tasks.value];
-    } else {
-      const updated = [...tasks.value];
-      updated.splice(index, 1, { ...updated[index], ...merged });
-      tasks.value = updated;
-    }
+    tasks.value =
+      index === -1
+        ? [merged, ...tasks.value]
+        : tasks.value.map((task) => (task.id === merged.id ? { ...task, ...merged } : task));
     return merged;
   };
 
   const markCompleted = (taskId) => {
-    const index = findTaskIndex(taskId);
-    if (index === -1) return;
-    const updated = [...tasks.value];
-    updated[index] = {
-      ...updated[index],
-      status: 'completed',
-      completedAt: new Date().toISOString(),
-    };
-    tasks.value = updated;
+    if (findTaskIndex(taskId) === -1) return;
+    tasks.value = tasks.value.map((task) =>
+      task.id === taskId
+        ? {
+            ...task,
+            status: 'completed',
+            completedAt: new Date().toISOString(),
+          }
+        : task
+    );
   };
 
   const snoozeTask = (taskId, days = 1) => {
@@ -144,21 +154,22 @@ export const useTaskStore = defineStore('tasks', () => {
     if (index === -1) return;
     const task = tasks.value[index];
     const newDate = addDays(parseISO(task.dueDate), days);
-    const updated = [...tasks.value];
-    updated[index] = {
-      ...task,
-      dueDate: newDate.toISOString(),
-      status: 'pending',
-    };
-    tasks.value = updated;
+    tasks.value = tasks.value.map((current) =>
+      current.id === taskId
+        ? {
+            ...current,
+            dueDate: newDate.toISOString(),
+            status: 'pending',
+          }
+        : current
+    );
   };
 
   const updateTask = (taskId, updates) => {
-    const index = findTaskIndex(taskId);
-    if (index === -1) return;
-    const updated = [...tasks.value];
-    updated[index] = normaliseTask({ ...updated[index], ...updates, id: taskId });
-    tasks.value = updated;
+    if (findTaskIndex(taskId) === -1) return;
+    tasks.value = tasks.value.map((task) =>
+      task.id === taskId ? normaliseTask({ ...task, ...updates, id: taskId }) : task
+    );
   };
 
   const activeTasks = computed(() => tasks.value.filter((task) => task.status !== 'completed'));
@@ -204,7 +215,7 @@ export const useTaskStore = defineStore('tasks', () => {
   };
 
   const reset = () => {
-    tasks.value = seedTasks;
+    tasks.value = createSeedTasks();
   };
 
   return {

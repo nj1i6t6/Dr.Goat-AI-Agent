@@ -162,6 +162,23 @@ import { Check, Clock, Edit, Plus, WarningFilled } from '@element-plus/icons-vue
 import EmptyState from '@/components/common/EmptyState.vue';
 import { useTaskStore } from '@/stores/tasks';
 
+const toDateOrEmpty = (value) => {
+  if (!value) return '';
+  try {
+    return value instanceof Date ? value : parseISO(value);
+  } catch (error) {
+    console.warn('[tasks] failed to parse due date, reset to empty', error);
+    return '';
+  }
+};
+
+const serialiseDueDate = (value) => {
+  if (!value) return '';
+  if (value instanceof Date) return value.toISOString();
+  const coerced = new Date(value);
+  return Number.isNaN(coerced.getTime()) ? '' : coerced.toISOString();
+};
+
 const router = useRouter();
 const taskStore = useTaskStore();
 
@@ -219,7 +236,7 @@ const openTaskDialog = (task = null) => {
       title: task.title,
       earTag: task.earTag || '',
       groupName: task.groupName || '',
-      dueDate: task.dueDate ? new Date(task.dueDate) : '',
+      dueDate: toDateOrEmpty(task.dueDate),
       priority: task.priority || 'medium',
       message: task.message || '',
     });
@@ -249,7 +266,7 @@ const submitTask = () => {
         title: taskForm.title,
         earTag: taskForm.earTag || undefined,
         groupName: taskForm.groupName || undefined,
-        dueDate: typeof taskForm.dueDate === 'string' ? taskForm.dueDate : taskForm.dueDate.toISOString(),
+        dueDate: serialiseDueDate(taskForm.dueDate),
         priority: taskForm.priority,
         message: taskForm.message,
       };
