@@ -90,7 +90,13 @@ _RICH_TEXT_LINKER = Linker(callbacks=[_secure_link_callback], skip_tags=['code',
 
 
 class _AnchorAttributeEnforcer(HTMLParser):
-    """Post-sanitisation HTML parser that enforces secure anchor attributes."""
+    """Post-sanitisation HTML parser that enforces secure anchor attributes.
+
+    The sanitized HTML is reparsed to guarantee that anchors retain the required
+    ``rel`` and ``target`` attributes even when Bleach removes ``href`` values.
+    This incurs an extra parsing pass, but it keeps the enforcement logic
+    isolated from Bleach internals and consistent across versions.
+    """
 
     def __init__(self):
         super().__init__(convert_charrefs=False)

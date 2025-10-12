@@ -61,34 +61,7 @@ def append_event(
         session.flush()
         return entry
 
-    get_current_session = getattr(session, "__call__", None)
-    if callable(get_current_session):
-        try:
-            current_session = get_current_session()
-        except RuntimeError:
-            current_session = None
-    else:
-        current_session = session
-
-    should_defer_commit = False
-    if current_session is not None:
-        get_transaction = getattr(current_session, "get_transaction", None)
-        current_tx = get_transaction() if callable(get_transaction) else None
-        if current_tx is not None:
-            origin = getattr(current_tx, "origin", None)
-            if SessionTransactionOrigin is not None and origin is not None:
-                should_defer_commit = origin is not SessionTransactionOrigin.AUTOBEGIN
-            else:
-                parent = getattr(current_tx, "parent", None)
-                nested = getattr(current_tx, "nested", False)
-                if parent is not None or nested:
-                    should_defer_commit = True
-                else:
-                    in_transaction = getattr(current_session, "in_transaction", None)
-                    should_defer_commit = callable(in_transaction) and in_transaction()
-        else:
-            in_transaction = getattr(current_session, "in_transaction", None)
-            should_defer_commit = callable(in_transaction) and in_transaction()
+    should_defer_commit = _is_externally_managed_transaction(session)
 
     if should_defer_commit:
         return _append()
@@ -101,6 +74,60 @@ def append_event(
         raise
 
     return entry
+
+
+def _resolve_current_session(session: db.Session) -> db.Session | None:
+    """Return the actual SQLAlchemy session object, handling Flask proxies."""
+
+    get_current_session = getattr(session, "__call__", None)
+    if callable(get_current_session):
+        try:
+            return get_current_session()
+        except RuntimeError:
+            return None
+    return session
+
+
+def _is_externally_managed_transaction(session: db.Session) -> bool:
+    """Return ``True`` when a user-managed transaction is already active.
+
+    The logic is intentionally defensive because the behaviour and APIs for
+    inspecting transactions differ across SQLAlchemy releases:
+
+    - SQLAlchemy >= 1.4 exposes ``SessionTransaction.origin`` so we can
+      differentiate ``AUTOBEGIN`` (implicit) transactions from user-managed
+      ones.
+    - Older versions expose ``parent``/``nested`` flags, falling back to
+      ``in_transaction`` to detect an open transaction.
+    - Flask-SQLAlchemy provides a scoped-session proxy; calling it returns the
+      underlying session object, but it may raise ``RuntimeError`` when no
+      application context is active.
+
+    We only defer committing when we are confident that an outer transaction is
+    already being managed by the caller so that we do not interfere with their
+    lifecycle.
+    """
+
+    current_session = _resolve_current_session(session)
+    if current_session is None:
+        return False
+
+    get_transaction = getattr(current_session, "get_transaction", None)
+    current_tx = get_transaction() if callable(get_transaction) else None
+    if current_tx is not None:
+        if SessionTransactionOrigin is not None:
+            origin = getattr(current_tx, "origin", None)
+            if origin is not None:
+                return origin is not SessionTransactionOrigin.AUTOBEGIN
+
+        parent = getattr(current_tx, "parent", None)
+        nested = getattr(current_tx, "nested", False)
+        if parent is not None or nested:
+            return True
+
+    # Fallback for all versions: rely on ``in_transaction`` if available.
+    in_transaction = getattr(current_session, "in_transaction", None)
+    return callable(in_transaction) and in_transaction()
 
 
 def verify_chain(*, start_id: Optional[int] = None, limit: Optional[int] = None) -> Dict[str, Any]:
