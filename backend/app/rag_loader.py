@@ -38,6 +38,24 @@ _FAISS_INDEX: "faiss.Index" | None = None  # type: ignore[name-defined]
 _EMBEDDING_MATRIX: np.ndarray | None = None
 _FAISS_UNAVAILABLE_WARNED = False
 _REDIS_CACHE_KEY = "rag:vectors"
+_RAG_STATUS: Dict[str, object] = {
+    "available": False,
+    "message": "RAG 向量尚未載入",
+    "detail": None,
+}
+
+
+def get_status() -> Dict[str, object]:
+    """Return a snapshot of the current RAG availability status."""
+
+    with _VECTOR_LOCK:
+        return dict(_RAG_STATUS)
+
+
+def _update_status(*, available: bool, message: str, detail: str | None = None) -> None:
+    _RAG_STATUS["available"] = available
+    _RAG_STATUS["message"] = message
+    _RAG_STATUS["detail"] = detail
 
 
 def load_vectors(path: str | os.PathLike[str] = _DEFAULT_VECTOR_PATH) -> List[Dict[str, object]]:
@@ -95,6 +113,15 @@ def ensure_vectors(path: str | os.PathLike[str] = _DEFAULT_VECTOR_PATH) -> List[
                 _VECTOR_MTIME = cached_mtime
                 _VECTOR_MISSING_WARNED = False
                 _rebuild_index(_VECTOR_CACHE, cached_matrix)
+                _update_status(
+                    available=bool(_VECTOR_CACHE),
+                    message=(
+                        f"RAG 向量已從 Redis 快取載入（{len(_VECTOR_CACHE)} 筆）"
+                        if _VECTOR_CACHE
+                        else "RAG 向量為空，功能將以降級模式執行"
+                    ),
+                    detail="redis-cache",
+                )
                 LOGGER.info("Loaded %s RAG chunks from Redis cache", len(_VECTOR_CACHE))
                 return _VECTOR_CACHE
 
@@ -108,7 +135,14 @@ def ensure_vectors(path: str | os.PathLike[str] = _DEFAULT_VECTOR_PATH) -> List[
                 file_mtime = resolved_path.stat().st_mtime
                 _load_from_disk(resolved_path, redis_client, file_mtime)
             else:
-                LOGGER.warning("RAG vectors missing – fallback to no-context mode")
+                LOGGER.error(
+                    "RAG 檔案遺失於 %s，RAG 功能將會被禁用", resolved_path
+                )
+                _update_status(
+                    available=False,
+                    message="RAG 檔案遺失，RAG 功能將會被禁用",
+                    detail=str(resolved_path),
+                )
                 _VECTOR_MISSING_WARNED = True
 
         return _VECTOR_CACHE
@@ -370,10 +404,24 @@ def _load_from_disk(
         _VECTOR_MISSING_WARNED = False
         if redis_client is not None:
             _cache_in_redis(redis_client, _VECTOR_CACHE, file_mtime, _EMBEDDING_MATRIX)
+        _update_status(
+            available=bool(_VECTOR_CACHE),
+            message=(
+                f"RAG 向量載入完成（{len(_VECTOR_CACHE)} 筆）"
+                if _VECTOR_CACHE
+                else "RAG 向量為空，功能將以降級模式執行"
+            ),
+            detail=str(resolved_path),
+        )
         LOGGER.info("Loaded %s RAG chunks from %s", len(_VECTOR_CACHE), resolved_path)
     except Exception as exc:  # pragma: no cover - defensive logging
         LOGGER.error("Failed to load RAG vectors from %s: %s", resolved_path, exc)
-        _clear_cache()
+        _update_status(
+            available=False,
+            message="無法載入 RAG 檔案，RAG 功能將會被禁用",
+            detail=str(exc),
+        )
+        _clear_cache(reset_status=False)
 
 
 def _rebuild_index(vectors: List[Dict[str, object]], embeddings: Optional[np.ndarray] = None) -> None:
@@ -402,12 +450,14 @@ def _rebuild_index(vectors: List[Dict[str, object]], embeddings: Optional[np.nda
     _EMBEDDING_MATRIX = embeddings
 
 
-def _clear_cache() -> None:
+def _clear_cache(*, reset_status: bool = True) -> None:
     global _VECTOR_CACHE, _VECTOR_MTIME, _FAISS_INDEX, _EMBEDDING_MATRIX
     _VECTOR_CACHE = []
     _VECTOR_MTIME = None
     _FAISS_INDEX = None
     _EMBEDDING_MATRIX = None
+    if reset_status:
+        _update_status(available=False, message="RAG 向量尚未載入", detail=None)
 
 
 def _linear_search(
