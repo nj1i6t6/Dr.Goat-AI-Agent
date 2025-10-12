@@ -17,36 +17,48 @@
               <el-tag type="info">{{ iotStore.devices.length }} 台裝置</el-tag>
             </div>
           </template>
-          <el-table :data="iotStore.devices" v-loading="iotStore.deviceLoading" @row-click="handleRowClick" class="device-table" highlight-current-row>
-            <el-table-column prop="name" label="名稱" min-width="140" />
-            <el-table-column prop="device_type" label="裝置類型" min-width="160" />
-            <el-table-column prop="category" label="分類" width="110">
-              <template #default="scope">
-                <el-tag :type="scope.row.category === 'sensor' ? 'success' : 'warning'">{{ scope.row.category === 'sensor' ? '感測器' : '致動器' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="location" label="位置" min-width="120" />
-            <el-table-column prop="status" label="狀態" width="120">
-              <template #default="scope">
-                <el-tag :type="statusTagType(scope.row.status)">{{ formatStatus(scope.row.status) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="last_seen" label="最後通訊" min-width="180">
-              <template #default="scope">
-                {{ scope.row.last_seen ? formatDateTime(scope.row.last_seen) : '尚未連線' }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="160">
-              <template #default="scope">
-                <el-button type="primary" link @click.stop="openDeviceDialog(scope.row)">編輯</el-button>
-                <el-popconfirm title="確定要刪除此裝置嗎？" @confirm="handleDeleteDevice(scope.row.id)">
-                  <template #reference>
-                    <el-button type="danger" link>刪除</el-button>
-                  </template>
-                </el-popconfirm>
-              </template>
-            </el-table-column>
-          </el-table>
+
+          <template v-if="showDeviceEmptyState">
+            <EmptyState
+              icon="📡"
+              title="尚未註冊任何 IoT 裝置。"
+              message="將您的牧場感測器或控制器連接至系統，即可開始實現智慧化自動管理。"
+            >
+              <el-button type="primary" :icon="Plus" @click="openDeviceDialog()">+ 註冊第一個裝置</el-button>
+            </EmptyState>
+          </template>
+          <template v-else>
+            <el-table :data="iotStore.devices" v-loading="iotStore.deviceLoading" @row-click="handleRowClick" class="device-table" highlight-current-row>
+              <el-table-column prop="name" label="名稱" min-width="140" />
+              <el-table-column prop="device_type" label="裝置類型" min-width="160" />
+              <el-table-column prop="category" label="分類" width="110">
+                <template #default="scope">
+                  <el-tag :type="scope.row.category === 'sensor' ? 'success' : 'warning'">{{ scope.row.category === 'sensor' ? '感測器' : '致動器' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="location" label="位置" min-width="120" />
+              <el-table-column prop="status" label="狀態" width="120">
+                <template #default="scope">
+                  <el-tag :type="statusTagType(scope.row.status)">{{ formatStatus(scope.row.status) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="last_seen" label="最後通訊" min-width="180">
+                <template #default="scope">
+                  {{ scope.row.last_seen ? formatDateTime(scope.row.last_seen) : '尚未連線' }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="160">
+                <template #default="scope">
+                  <el-button type="primary" link @click.stop="openDeviceDialog(scope.row)">編輯</el-button>
+                  <el-popconfirm title="確定要刪除此裝置嗎？" @confirm="handleDeleteDevice(scope.row.id)">
+                    <template #reference>
+                      <el-button type="danger" link>刪除</el-button>
+                    </template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
         </el-card>
       </el-col>
 
@@ -172,6 +184,7 @@ import {
   Tooltip,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import EmptyState from '../components/common/EmptyState.vue';
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, TimeScale, Legend, Tooltip, Title);
 
@@ -195,6 +208,7 @@ const ruleForm = ref({});
 const drawerVisible = ref(false);
 const selectedDeviceId = ref(null);
 const readingLoading = ref(false);
+const showDeviceEmptyState = computed(() => !iotStore.deviceLoading && iotStore.devices.length === 0);
 
 const deviceDialogTitle = computed(() => (isEditingDevice.value ? '編輯裝置' : '新增裝置'));
 const deviceDialogSubmitLabel = computed(() => (isEditingDevice.value ? '儲存變更' : '建立裝置'));

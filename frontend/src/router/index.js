@@ -35,6 +35,11 @@ const routes = [
         component: () => import('../views/ConsultationView.vue')
       },
       {
+        path: 'task-reminders',
+        name: 'TaskReminders',
+        component: () => import('../views/TaskRemindersView.vue')
+      },
+      {
         path: 'chat',
         name: 'Chat',
         component: () => import('../views/ChatView.vue')
@@ -58,6 +63,16 @@ const routes = [
         path: 'analytics',
         name: 'AnalyticsHub',
         component: () => import('../views/AnalyticsHubView.vue')
+      },
+      {
+        path: 'esg-metrics',
+        name: 'EsgMetrics',
+        component: () => import('../views/EsgMetricsView.vue')
+      },
+      {
+        path: 'iot-dashboard',
+        name: 'IotDashboard',
+        component: () => import('../views/IotDashboardView.vue')
       },
       {
         path: 'iot',

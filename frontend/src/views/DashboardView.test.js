@@ -8,6 +8,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import DashboardView from './DashboardView.vue'
 import { useSettingsStore } from '../stores/settings'
+import { useTaskStore } from '../stores/tasks'
 import api from '../api'
 
 // Mock api
@@ -18,6 +19,7 @@ vi.mock('../api', () => ({
     getFarmReport: vi.fn(),
     getAgentStatus: vi.fn(),
     getAgentTip: vi.fn(),
+    getTaskReminders: vi.fn(),
   }
 }))
 
@@ -41,6 +43,7 @@ describe('DashboardView', () => {
   let wrapper
   let pinia
   let settingsStore
+  let taskStore
 
   // Mock data
   const mockSheepList = [
@@ -49,14 +52,6 @@ describe('DashboardView', () => {
   ]
 
   const mockDashboardData = {
-    reminders: [
-      {
-        ear_num: 'SH001',
-        type: '疫苗接種',
-        due_date: '2024-01-15',
-        status: '即將到期'
-      }
-    ],
     health_alerts: [
       {
         ear_num: 'SH002',
@@ -72,6 +67,11 @@ describe('DashboardView', () => {
       fcr: 2.5
     }
   }
+
+  const mockTaskData = [
+    { id: 't1', type: 'vaccination', title: '疫苗接種提醒', dueDate: new Date().toISOString() },
+    { id: 't2', type: 'withdrawal', title: '停藥期提醒', dueDate: new Date(Date.now() - 86400000).toISOString() }
+  ]
 
   const mockFarmReport = {
     flock_composition: {
@@ -100,7 +100,7 @@ describe('DashboardView', () => {
 
   beforeEach(() => {
     pinia = createPinia()
-    
+
     wrapper = mount(DashboardView, {
       global: {
         plugins: [pinia],
@@ -141,10 +141,13 @@ describe('DashboardView', () => {
     })
 
     settingsStore = useSettingsStore()
+    taskStore = useTaskStore()
+    taskStore.reset()
 
     // 重置所有 mocks
     vi.clearAllMocks()
     api.getAgentStatus.mockResolvedValue({ rag_enabled: false, message: '', detail: null })
+    api.getTaskReminders.mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -159,7 +162,8 @@ describe('DashboardView', () => {
 
     it('當沒有羊隻時應該顯示引導畫面', async () => {
       api.getAllSheep.mockResolvedValue([])
-      
+      api.getTaskReminders.mockResolvedValue([])
+
       await wrapper.vm.fetchInitialData()
       await wrapper.vm.$nextTick()
 
@@ -168,15 +172,17 @@ describe('DashboardView', () => {
     })
 
     it('當有羊隻時應該顯示儀表板內容', async () => {
-    api.getAllSheep.mockResolvedValue(mockSheepList)
-    api.getDashboardData.mockResolvedValue(mockDashboardData)
-    api.getAgentStatus.mockResolvedValue({ rag_enabled: true, message: 'RAG Ready', detail: 'test' })
-      
+      api.getAllSheep.mockResolvedValue(mockSheepList)
+      api.getDashboardData.mockResolvedValue(mockDashboardData)
+      api.getTaskReminders.mockResolvedValue(mockTaskData)
+      api.getAgentStatus.mockResolvedValue({ rag_enabled: true, message: 'RAG Ready', detail: 'test' })
+
       await wrapper.vm.fetchInitialData()
       await wrapper.vm.$nextTick()
 
       expect(wrapper.vm.hasSheep).toBe(true)
       expect(wrapper.vm.initialLoading).toBe(false)
+      expect(taskStore.summary.total).toBeGreaterThan(0)
     })
 
     it('應該處理 API 錯誤', async () => {
@@ -194,13 +200,14 @@ describe('DashboardView', () => {
     beforeEach(async () => {
       api.getAllSheep.mockResolvedValue(mockSheepList)
       api.getDashboardData.mockResolvedValue(mockDashboardData)
-      
+      api.getTaskReminders.mockResolvedValue(mockTaskData)
+
       await wrapper.vm.fetchInitialData()
       await wrapper.vm.$nextTick()
     })
 
-    it('應該正確顯示提醒事項', () => {
-      expect(wrapper.vm.dashboardData.reminders).toEqual(mockDashboardData.reminders)
+    it('應該正確載入任務摘要', () => {
+      expect(taskStore.summary.total).toBe(mockTaskData.length)
     })
 
     it('應該正確顯示健康警示', () => {
@@ -222,13 +229,6 @@ describe('DashboardView', () => {
       expect(wrapper.vm.getStatusText('lactating_peak')).toBe('泌乳高峰期')
       expect(wrapper.vm.getStatusText('unknown_status')).toBe('unknown_status')
       expect(wrapper.vm.getStatusText(null)).toBe('未分類')
-    })
-
-    it('應該正確映射標籤類型', () => {
-      expect(wrapper.vm.getTagType('已過期')).toBe('danger')
-      expect(wrapper.vm.getTagType('即將到期')).toBe('warning')
-      expect(wrapper.vm.getTagType('停藥中')).toBe('info')
-      expect(wrapper.vm.getTagType('其他')).toBe('primary')
     })
   })
 
@@ -279,7 +279,8 @@ describe('DashboardView', () => {
   describe('路由導航', () => {
     it('應該正確導航到數據管理頁面', async () => {
       api.getAllSheep.mockResolvedValue([])
-      
+      api.getTaskReminders.mockResolvedValue([])
+
       await wrapper.vm.fetchInitialData()
       await wrapper.vm.$nextTick()
 
@@ -294,12 +295,15 @@ describe('DashboardView', () => {
     it('應該調用 settings store 的 fetchAndSetAgentTip', async () => {
       api.getAllSheep.mockResolvedValue(mockSheepList)
       api.getDashboardData.mockResolvedValue(mockDashboardData)
-      
+      api.getTaskReminders.mockResolvedValue([])
+
       const fetchSpy = vi.spyOn(settingsStore, 'fetchAndSetAgentTip')
-      
+      const taskSpy = vi.spyOn(taskStore, 'loadFromApi')
+
       await wrapper.vm.fetchInitialData()
-      
+
       expect(fetchSpy).toHaveBeenCalled()
+      expect(taskSpy).toHaveBeenCalled()
     })
   })
 
@@ -307,16 +311,15 @@ describe('DashboardView', () => {
     it('應該處理空的儀表板數據', async () => {
       api.getAllSheep.mockResolvedValue(mockSheepList)
       api.getDashboardData.mockResolvedValue({
-        reminders: [],
         health_alerts: [],
         flock_status_summary: [],
         esg_metrics: {}
       })
-      
+      api.getTaskReminders.mockResolvedValue([])
+
       await wrapper.vm.fetchInitialData()
       await wrapper.vm.$nextTick()
 
-      expect(wrapper.vm.dashboardData.reminders).toEqual([])
       expect(wrapper.vm.dashboardData.health_alerts).toEqual([])
     })
 

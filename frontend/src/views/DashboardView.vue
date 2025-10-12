@@ -32,54 +32,75 @@
       </BaseAuroraCard>
 
       <section class="dashboard-grid">
-        <BaseAuroraCard title="📅 任務與安全提醒">
-          <el-empty
-            v-if="!dashboardData.reminders || dashboardData.reminders.length === 0"
-            description="暫無待辦事項"
-          />
-          <ul v-else class="capsule-list">
-            <li v-for="(reminder, index) in dashboardData.reminders" :key="`reminder-${index}`" class="capsule-item">
-              <div class="capsule-item__primary">
-                <span class="ear-num-link">{{ reminder.ear_num }}</span>
-                <span class="capsule-item__title">{{ reminder.type }}</span>
-                <span class="capsule-item__meta">至 {{ reminder.due_date }}</span>
+        <BaseAuroraCard title="📝 今日待辦任務">
+          <div class="tasks-overview">
+            <div class="tasks-overview__summary">
+              <div class="tasks-overview__counts">
+                <div class="tasks-overview__count">
+                  <span>今日</span>
+                  <strong>{{ taskSummary.today }}</strong>
+                </div>
+                <div class="tasks-overview__count is-alert">
+                  <span>逾期</span>
+                  <strong>{{ taskSummary.overdue }}</strong>
+                </div>
+                <div class="tasks-overview__count">
+                  <span>即將到期</span>
+                  <strong>{{ taskSummary.upcoming }}</strong>
+                </div>
               </div>
-              <el-tag :type="getTagType(reminder.status)" size="small" effect="light">{{ reminder.status }}</el-tag>
-            </li>
-          </ul>
+              <el-button type="primary" size="small" @click="$router.push('/task-reminders')">查看全部</el-button>
+            </div>
+            <el-empty
+              v-if="!taskHighlightList.length && !taskLoading"
+              description="今日沒有需要處理的任務"
+            />
+            <el-skeleton v-else-if="taskLoading" animated :rows="3" />
+            <ul v-else class="task-highlight">
+              <li v-for="task in taskHighlightList" :key="task.id" class="task-highlight__item">
+                <div class="task-highlight__primary">
+                  <strong class="task-highlight__title">{{ task.title }}</strong>
+                  <span v-if="task.earTag" class="task-highlight__meta">耳號 {{ task.earTag }}</span>
+                  <span v-else-if="task.groupName" class="task-highlight__meta">{{ task.groupName }}</span>
+                  <span class="task-highlight__meta">{{ formatTaskDue(task) }}</span>
+                </div>
+                <el-tag :type="taskTagType(task)" size="small" effect="light">{{ taskLabel(task.type) }}</el-tag>
+              </li>
+            </ul>
+          </div>
         </BaseAuroraCard>
 
         <BaseAuroraCard title="❤️ 健康與福利警示">
-          <el-empty
-            v-if="!dashboardData.health_alerts || dashboardData.health_alerts.length === 0"
-            description="羊群健康狀況良好"
-          />
-          <ul v-else class="capsule-list">
-            <li v-for="(alert, index) in dashboardData.health_alerts" :key="`alert-${index}`" class="capsule-item">
-              <div class="capsule-item__primary">
-                <strong class="capsule-item__title">{{ alert.type }}</strong>
-                <span class="ear-num-link">{{ alert.ear_num }}</span>
-                <span class="capsule-item__meta">{{ alert.message }}</span>
-              </div>
-            </li>
-          </ul>
+          <div class="health-overview">
+            <div class="health-overview__alerts">
+              <el-empty
+                v-if="!dashboardData.health_alerts || dashboardData.health_alerts.length === 0"
+                description="羊群健康狀況良好"
+              />
+              <ul v-else class="capsule-list">
+                <li v-for="(alert, index) in dashboardData.health_alerts" :key="`alert-${index}`" class="capsule-item">
+                  <div class="capsule-item__primary">
+                    <strong class="capsule-item__title">{{ alert.type }}</strong>
+                    <span class="ear-num-link">{{ alert.ear_num }}</span>
+                    <span class="capsule-item__meta">{{ alert.message }}</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div class="health-overview__summary" v-if="dashboardData.flock_status_summary?.length">
+              <h3>羊群狀態速覽</h3>
+              <ul class="summary-list">
+                <li v-for="summary in dashboardData.flock_status_summary" :key="summary.status">
+                  <span class="summary-list__label">{{ getStatusText(summary.status) }}</span>
+                  <span class="summary-list__value">{{ summary.count }} 隻</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </BaseAuroraCard>
       </section>
 
       <section class="dashboard-grid">
-        <BaseAuroraCard title="🐑 羊群狀態速覽">
-          <el-empty
-            v-if="!dashboardData.flock_status_summary || dashboardData.flock_status_summary.length === 0"
-            description="暫無狀態數據"
-          />
-          <ul v-else class="summary-list">
-            <li v-for="summary in dashboardData.flock_status_summary" :key="summary.status">
-              <span class="summary-list__label">{{ getStatusText(summary.status) }}</span>
-              <span class="summary-list__value">{{ summary.count }} 隻</span>
-            </li>
-          </ul>
-        </BaseAuroraCard>
-
         <BaseAuroraCard title="🌿 ESG 指標速覽">
           <div v-if="dashboardData.esg_metrics" class="esg-card">
             <p>
@@ -112,6 +133,7 @@ import VirtualizedLogTable from '@/components/tables/VirtualizedLogTable.vue';
 import BaseAuroraCard from '@/components/common/BaseAuroraCard.vue';
 import { sanitizeHtml } from '@/utils/sanitizeHtml';
 import { escapeHtml } from '@/utils/text';
+import { useTaskStore } from '@/stores/tasks';
 
 const settingsStore = useSettingsStore();
 
@@ -131,7 +153,6 @@ const initialLoading = ref(true);
 const hasSheep = ref(false);
 const reportLoading = ref(false);
 const dashboardData = reactive({
-  reminders: [],
   health_alerts: [],
   flock_status_summary: [],
   esg_metrics: {},
@@ -155,11 +176,44 @@ const statusMap = {
 };
 const getStatusText = (status) => statusMap[status] || status || '未分類';
 
-const getTagType = (status) => {
-  if (status === '已過期') return 'danger';
-  if (status === '即將到期') return 'warning';
-  if (status === '停藥中') return 'info';
+const taskStore = useTaskStore();
+const taskLoading = computed(() => taskStore.loading);
+const taskSummary = computed(() => taskStore.summary);
+const taskHighlightList = computed(() => {
+  const combined = [...taskStore.overdueTasks, ...taskStore.todayTasks, ...taskStore.upcomingTasks];
+  const unique = [];
+  const seen = new Set();
+  for (const task of combined) {
+    if (seen.has(task.id)) continue;
+    seen.add(task.id);
+    unique.push(task);
+    if (unique.length >= 4) break;
+  }
+  return unique;
+});
+
+const taskLabel = (type) => {
+  const mapping = {
+    vaccination: '疫苗接種提醒',
+    deworming: '驅蟲計畫提醒',
+    'health-check': '定期健康檢查',
+    withdrawal: '停藥期提醒',
+    'pregnancy-check': '繁殖節點提醒',
+    'prepartum-care': '預產期照護',
+    custom: '自訂任務',
+  };
+  return mapping[type] || type;
+};
+
+const taskTagType = (task) => {
+  if (task.type === 'withdrawal') return 'danger';
+  if (task.type === 'deworming' || task.type === 'vaccination') return 'warning';
   return 'primary';
+};
+
+const formatTaskDue = (task) => {
+  const due = new Date(task.dueDate);
+  return `${task.dueState === 'overdue' ? '已逾期' : '到期'} ${due.toLocaleDateString('zh-TW')}`;
 };
 
 async function fetchInitialData() {
@@ -180,6 +234,7 @@ async function fetchInitialData() {
 async function fetchDashboardContent() {
   settingsStore.fetchAndSetAgentTip();
   fetchDashboardData();
+  taskStore.loadFromApi();
 }
 
 async function fetchDashboardData() {
@@ -357,6 +412,94 @@ onMounted(() => {
   color: var(--aurora-accent-secondary);
 }
 
+.tasks-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tasks-overview__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tasks-overview__counts {
+  display: flex;
+  gap: 1rem;
+}
+
+.tasks-overview__count {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  background: rgba(59, 130, 246, 0.12);
+  min-width: 88px;
+}
+
+.tasks-overview__count span {
+  font-size: 0.85rem;
+  color: var(--aurora-text-muted);
+}
+
+.tasks-overview__count strong {
+  font-size: 1.4rem;
+  color: var(--aurora-text-primary);
+}
+
+.tasks-overview__count.is-alert strong {
+  color: #dc2626;
+}
+
+.task-highlight {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.task-highlight__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.task-highlight__primary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.task-highlight__title {
+  font-weight: 600;
+  color: var(--aurora-text-primary);
+}
+
+.task-highlight__meta {
+  font-size: 0.85rem;
+  color: var(--aurora-text-muted);
+}
+
+.health-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.health-overview__summary h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--aurora-text-secondary);
+}
+
 .esg-card {
   display: flex;
   flex-direction: column;
@@ -399,6 +542,15 @@ onMounted(() => {
   .capsule-item__primary {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .tasks-overview__summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tasks-overview__counts {
+    flex-wrap: wrap;
   }
 }
 </style>
