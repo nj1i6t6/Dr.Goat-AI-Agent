@@ -125,9 +125,7 @@ def _is_externally_managed_transaction(session: db.Session) -> bool:
         if parent is not None or nested:
             return True
 
-        in_transaction = getattr(current_session, "in_transaction", None)
-        return callable(in_transaction) and in_transaction()
-
+    # Fallback for all versions: rely on ``in_transaction`` if available.
     in_transaction = getattr(current_session, "in_transaction", None)
     return callable(in_transaction) and in_transaction()
 
