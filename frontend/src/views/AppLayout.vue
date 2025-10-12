@@ -1,176 +1,98 @@
 <template>
-  <div class="app-layout">
-    <header class="glass-nav">
-      <div
-        class="nav-brand"
-        role="button"
-        tabindex="0"
-        @click="$router.push('/dashboard')"
-        @keyup.enter="$router.push('/dashboard')"
+  <div class="app-shell" :class="{ 'is-collapsed': isSidebarCollapsed && !isMobile }">
+    <header class="app-header">
+      <button
+        v-if="isMobile"
+        class="app-header__hamburger"
+        type="button"
+        aria-label="開啟導覽"
+        @click="mobileSidebarOpen = true"
       >
-        <img class="nav-brand__logo" :src="logoUrl" alt="Aurora Navigation Logo" />
-        <div class="nav-brand__label">
-          <span class="nav-brand__title">領頭羊博士</span>
-          <span class="nav-brand__subtitle">Aurora Biophilic Tech Console</span>
+        <el-icon><Menu /></el-icon>
+      </button>
+      <div class="app-header__brand" @click="$router.push('/dashboard')">
+        <img :src="logoUrl" alt="Dr.Goat" class="app-header__logo" />
+        <div class="app-header__brand-text">
+          <span class="app-header__title">領頭羊博士</span>
+          <span class="app-header__subtitle">Aurora Biophilic Tech Console</span>
         </div>
       </div>
-
-      <el-menu
-        :default-active="$route.path"
-        class="nav-links"
-        mode="horizontal"
-        :ellipsis="false"
-        router
-      >
-        <el-menu-item index="/dashboard">代理人儀表板</el-menu-item>
-        <el-menu-item index="/consultation">飼養建議諮詢</el-menu-item>
-        <el-menu-item index="/chat">AI 問答助理</el-menu-item>
-        <el-menu-item index="/flock">羊群總覽</el-menu-item>
-        <el-menu-item index="/prediction">生長預測</el-menu-item>
-        <el-menu-item index="/analytics">Analytics Hub</el-menu-item>
-        <el-menu-item index="/iot">智慧牧場 IoT</el-menu-item>
-        <el-menu-item index="/traceability">產銷履歷管理</el-menu-item>
-        <el-menu-item index="/data-management">數據管理</el-menu-item>
-        <el-menu-item index="/settings">系統設定</el-menu-item>
-      </el-menu>
-
-      <div class="nav-actions">
-        <div class="control-cluster">
-          <el-tooltip :content="isDark ? '切換為淺色主題' : '切換為深色主題'">
-            <el-button
-              circle
-              size="small"
-              class="control-button"
-              :aria-label="isDark ? '切換為淺色主題' : '切換為深色主題'"
-              :aria-pressed="isDark"
-              @click="toggleColorScheme"
-            >
-              <el-icon>
-                <MoonNight v-if="isDark" />
-                <Sunny v-else />
-              </el-icon>
-            </el-button>
-          </el-tooltip>
-          <el-tooltip :content="motionEnabled ? '停用 Aurora 動效' : '啟用 Aurora 動效'">
-            <el-button
-              circle
-              size="small"
-              class="control-button"
-              :class="{ 'is-active': motionEnabled }"
-              :aria-label="motionEnabled ? '停用 Aurora 動效' : '啟用 Aurora 動效'"
-              :aria-pressed="motionEnabled"
-              @click="toggleMotion"
-            >
-              <el-icon><MagicStick /></el-icon>
-            </el-button>
-          </el-tooltip>
-        </div>
-
-        <div class="user-panel">
-          <div class="user-panel__details">
-            <span class="user-panel__name">{{ authStore.username }}</span>
-            <span class="user-panel__role">Aurora Admin</span>
-          </div>
-          <el-button class="user-panel__logout" size="small" plain type="danger" @click="handleLogout">
+      <div class="app-header__actions">
+        <el-tooltip content="檢視任務提醒">
+          <el-button
+            circle
+            size="small"
+            class="app-header__action"
+            @click="$router.push('/task-reminders')"
+          >
+            <el-icon><AlarmClock /></el-icon>
+          </el-button>
+        </el-tooltip>
+        <el-tooltip content="重新整理內容">
+          <el-button circle size="small" class="app-header__action" @click="reloadPage">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+        </el-tooltip>
+        <div class="app-header__divider" />
+        <div class="app-header__user">
+          <span class="app-header__username">{{ authStore.username }}</span>
+          <el-button size="small" plain type="danger" class="app-header__logout" @click="handleLogout">
             登出
           </el-button>
-        </div>
-
-        <div class="hamburger-menu" @click="drawerVisible = true">
-          <el-icon><Menu /></el-icon>
         </div>
       </div>
     </header>
 
-    <el-drawer
-      v-model="drawerVisible"
-      title="導航選單"
-      direction="rtl"
-      :with-header="true"
-      size="260px"
-    >
-      <el-menu
-        :default-active="$route.path"
-        class="drawer-menu"
-        router
-        @select="drawerVisible = false"
-      >
-        <el-menu-item index="/dashboard">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>代理人儀表板</span>
-        </el-menu-item>
-        <el-menu-item index="/consultation">
-          <el-icon><HelpFilled /></el-icon>
-          <span>飼養建議諮詢</span>
-        </el-menu-item>
-        <el-menu-item index="/chat">
-          <el-icon><Service /></el-icon>
-          <span>AI 問答助理</span>
-        </el-menu-item>
-        <el-menu-item index="/flock">
-          <el-icon><Tickets /></el-icon>
-          <span>羊群總覽</span>
-        </el-menu-item>
-        <el-menu-item index="/prediction">
-          <el-icon><TrendCharts /></el-icon>
-          <span>生長預測</span>
-        </el-menu-item>
-        <el-menu-item index="/analytics">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>Analytics Hub</span>
-        </el-menu-item>
-        <el-menu-item index="/iot">
-          <el-icon><Cpu /></el-icon>
-          <span>智慧牧場 IoT</span>
-        </el-menu-item>
-        <el-menu-item index="/traceability">
-          <el-icon><Collection /></el-icon>
-          <span>產銷履歷管理</span>
-        </el-menu-item>
-        <el-menu-item index="/data-management">
-          <el-icon><Upload /></el-icon>
-          <span>數據管理</span>
-        </el-menu-item>
-        <el-menu-item index="/settings">
-          <el-icon><Setting /></el-icon>
-          <span>系統設定</span>
-        </el-menu-item>
-      </el-menu>
-    </el-drawer>
+    <div class="app-body">
+      <transition name="sidebar-slide">
+        <SidebarNav
+          v-if="!isMobile || mobileSidebarOpen"
+          :collapsed="isSidebarCollapsed && !isMobile"
+          :is-mobile="isMobile"
+          :mobile-open="mobileSidebarOpen"
+          :username="authStore.username"
+          :is-dark="isDark"
+          :motion-enabled="motionEnabled"
+          @toggle-collapse="toggleSidebar"
+          @close-mobile="mobileSidebarOpen = false"
+          @logout="handleLogout"
+          @toggle-color-scheme="toggleColorScheme"
+          @toggle-motion="toggleMotion"
+        />
+      </transition>
 
-    <main class="main-content">
-      <div class="main-content__surface aurora-scrollbar">
-        <router-view />
-      </div>
-    </main>
+      <main class="app-main">
+        <div class="app-main__surface aurora-scrollbar">
+          <router-view />
+        </div>
+      </main>
+    </div>
+
+    <transition name="overlay-fade">
+      <div
+        v-if="isMobile && mobileSidebarOpen"
+        class="app-overlay"
+        @click="mobileSidebarOpen = false"
+      ></div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useAuthStore } from '../stores/auth';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import {
-  Menu,
-  DataAnalysis,
-  HelpFilled,
-  Service,
-  Tickets,
-  Upload,
-  Setting,
-  TrendCharts,
-  Collection,
-  Cpu,
-  Sunny,
-  MoonNight,
-  MagicStick,
-} from '@element-plus/icons-vue';
+import { Menu, AlarmClock, Refresh } from '@element-plus/icons-vue';
+import SidebarNav from '@/components/layout/SidebarNav.vue';
+import { useAuthStore } from '@/stores/auth';
 import { useTheme } from '@/composables/useTheme';
 import logoUrl from '@/assets/images/logo.svg';
 
 const authStore = useAuthStore();
-const drawerVisible = ref(false);
 const { isDark, motionEnabled, toggleColorScheme, toggleMotion } = useTheme();
+
+const isSidebarCollapsed = ref(false);
+const isMobile = ref(false);
+const mobileSidebarOpen = ref(false);
 
 const handleLogout = () => {
   ElMessageBox.confirm('您確定要登出嗎？', '提示', {
@@ -184,229 +106,217 @@ const handleLogout = () => {
     })
     .catch(() => {});
 };
+
+const toggleSidebar = () => {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value;
+};
+
+const reloadPage = () => {
+  window.dispatchEvent(new CustomEvent('aurora:refresh-requested'));
+};
+
+const evaluateViewport = () => {
+  const mobile = window.innerWidth <= 768;
+  isMobile.value = mobile;
+  if (!mobile) {
+    mobileSidebarOpen.value = false;
+  }
+};
+
+onMounted(() => {
+  evaluateViewport();
+  window.addEventListener('resize', evaluateViewport);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', evaluateViewport);
+});
 </script>
 
 <style scoped>
-.app-layout {
+.app-shell {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 45%),
+    radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.12), transparent 40%),
+    #0f172a;
 }
 
-.glass-nav {
+.app-header {
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 1100;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0 28px;
-  height: 72px;
-  background: linear-gradient(115deg, rgba(20, 184, 166, 0.22), rgba(59, 130, 246, 0.28));
+  gap: 16px;
+  padding: 12px 28px;
+  background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(18px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
 }
 
-.nav-brand {
+.app-header__hamburger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(30, 64, 175, 0.35);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.app-header__brand {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 12px;
   cursor: pointer;
   color: inherit;
   text-decoration: none;
 }
 
-.nav-brand:focus-visible {
-  outline: 2px solid rgba(59, 130, 246, 0.75);
-  outline-offset: 4px;
-  border-radius: 999px;
+.app-header__logo {
+  width: 44px;
+  height: 44px;
 }
 
-.nav-brand__logo {
-  height: 40px;
-  width: 40px;
-  filter: drop-shadow(0 4px 8px rgba(15, 23, 42, 0.35));
-}
-
-.nav-brand__label {
+.app-header__brand-text {
   display: flex;
   flex-direction: column;
   line-height: 1.1;
 }
 
-.nav-brand__title {
-  font-size: 1.35rem;
+.app-header__title {
+  font-size: 1.3rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
   color: #f8fafc;
 }
 
-.nav-brand__subtitle {
+.app-header__subtitle {
   font-size: 0.75rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(241, 245, 249, 0.78);
+  color: rgba(226, 232, 240, 0.7);
 }
 
-.nav-links {
-  flex: 1;
-  background: transparent;
-  border-bottom: none;
-  height: 100%;
-  --el-menu-active-color: #ffffff;
-}
-
-.nav-links :deep(.el-menu-item) {
-  color: rgba(241, 245, 249, 0.78);
-  font-weight: 500;
-  background: transparent !important;
-  border-bottom: 3px solid transparent !important;
-  transition: color var(--aurora-transition-base), border-color var(--aurora-transition-base);
-}
-
-.nav-links :deep(.el-menu-item:hover),
-.nav-links :deep(.el-menu-item.is-active) {
-  color: #ffffff !important;
-  border-bottom-color: rgba(255, 255, 255, 0.8) !important;
-}
-
-.nav-actions {
+.app-header__actions {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 12px;
 }
 
-.control-cluster {
-  display: flex;
-  gap: 0.55rem;
-}
-
-.control-button {
-  background: rgba(255, 255, 255, 0.24);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: #0f172a;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  transition: transform var(--aurora-transition-base), box-shadow var(--aurora-transition-base),
-    background var(--aurora-transition-base);
-}
-
-.control-button:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.34);
-}
-
-.control-button.is-active {
-  background: rgba(59, 130, 246, 0.35);
-  color: #0f172a;
-}
-
-.user-panel {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.45rem 0.85rem;
-  border-radius: 999px;
+.app-header__action {
   background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #0f172a;
 }
 
-.user-panel__details {
+.app-header__divider {
+  width: 1px;
+  height: 28px;
+  background: linear-gradient(180deg, transparent, rgba(148, 163, 184, 0.5), transparent);
+}
+
+.app-header__user {
   display: flex;
-  flex-direction: column;
-  line-height: 1.1;
+  align-items: center;
+  gap: 12px;
   color: #f8fafc;
 }
 
-.user-panel__name {
+.app-header__username {
   font-weight: 600;
-  font-size: 0.95rem;
 }
 
-.user-panel__role {
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(226, 232, 240, 0.75);
-}
-
-.user-panel__logout {
-  --el-button-bg-color: rgba(255, 255, 255, 0.2);
-  --el-button-hover-bg-color: rgba(248, 113, 113, 0.18);
-  --el-button-hover-text-color: #fee2e2;
+.app-header__logout {
   border-radius: 999px;
-  font-weight: 600;
 }
 
-.hamburger-menu {
-  display: none;
-  cursor: pointer;
-  color: #f8fafc;
-  font-size: 1.5rem;
-}
-
-.main-content {
+.app-body {
+  display: flex;
   flex: 1;
-  width: 100%;
-  padding: 28px 32px 48px;
+  min-height: 0;
+}
+
+.app-main {
+  flex: 1;
+  padding: 32px 36px 48px;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
 }
 
-.main-content__surface {
+.app-main__surface {
   width: 100%;
   max-width: 1360px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.28);
-  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.12);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.18);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   padding: 32px;
   box-sizing: border-box;
 }
 
-.main-content__surface :deep(> *) {
-  width: 100%;
+.app-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  z-index: 1000;
 }
 
-.drawer-menu {
-  border-right: none;
+.sidebar-slide-enter-active,
+.sidebar-slide-leave-active {
+  transition: transform 0.28s ease;
 }
 
-:deep(.control-button .el-icon) {
-  color: inherit;
+.sidebar-slide-enter-from,
+.sidebar-slide-leave-to {
+  transform: translateX(-100%);
 }
 
-@media (max-width: 1200px) {
-  .nav-links {
-    display: none;
+.overlay-fade-enter-active,
+.overlay-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.overlay-fade-enter-from,
+.overlay-fade-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 1024px) {
+  .app-main {
+    padding: 24px;
   }
 
-  .hamburger-menu {
-    display: block;
-  }
-}
-
-@media (max-width: 960px) {
-  .user-panel {
-    display: none;
+  .app-main__surface {
+    padding: 24px;
+    border-radius: 20px;
   }
 }
 
 @media (max-width: 768px) {
-  .glass-nav {
-    padding: 0 18px;
-    gap: 1rem;
+  .app-header {
+    padding: 12px 18px;
   }
 
-  .main-content {
-    padding: 20px 18px 36px;
+  .app-header__brand-text {
+    display: none;
   }
 
-  .main-content__surface {
-    padding: 20px;
+  .app-main {
+    padding: 18px;
+  }
+
+  .app-main__surface {
+    padding: 18px;
+    border-radius: 18px;
   }
 }
 </style>
