@@ -177,6 +177,11 @@ export default {
     return withErrorHandling(() => apiClient.get('/api/dashboard/farm_report'), errorHandler);
   },
 
+  // 任務提醒 API
+  getTaskReminders(errorHandler) {
+    return withErrorHandling(() => apiClient.get('/api/tasks/reminders'), errorHandler);
+  },
+
   // 成本 / 收益管理 API
   listCostEntries(params = {}, errorHandler) {
     return withErrorHandling(() => apiClient.get('/api/finance/costs', { params }), errorHandler);
