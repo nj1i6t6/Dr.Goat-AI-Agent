@@ -104,7 +104,7 @@ export const useTaskStore = defineStore('tasks', () => {
     loading.value = true;
     lastError.value = null;
     try {
-      const response = await api.getTaskReminders?.();
+      const response = await api.getTaskReminders();
       if (response && Array.isArray(response)) {
         tasks.value = response.map(normaliseTask);
       } else if (response?.tasks) {
