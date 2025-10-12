@@ -143,4 +143,33 @@ def test_ensure_vectors_missing_file_triggers_git_lfs(monkeypatch, tmp_path, cap
 
     assert result == []
     assert invoked["count"] == 1
-    assert any("RAG vectors missing" in record.message for record in caplog.records)
+    status = rag_loader.get_status()
+    assert status["available"] is False
+    assert "RAG 檔案遺失" in status["message"]
+
+
+def test_rag_status_updates_on_invalid_file(monkeypatch, tmp_path, caplog):
+    rag_loader._clear_cache()
+    caplog.set_level("ERROR")
+    monkeypatch.setattr(rag_loader, "_get_redis_client", lambda: None)
+    monkeypatch.setattr(rag_loader, "_attempt_git_lfs_pull", lambda: None)
+
+    bad_path = tmp_path / "broken.parquet"
+    bad_path.write_text("not parquet content", encoding="utf-8")
+
+    rag_loader.ensure_vectors(bad_path)
+    status = rag_loader.get_status()
+    assert status["available"] is False
+    assert "無法載入 RAG 檔案" in status["message"]
+    assert status["detail"]
+
+
+def test_rag_status_reflects_success(parquet_path, monkeypatch):
+    rag_loader._clear_cache()
+    monkeypatch.setattr(rag_loader, "_get_redis_client", lambda: None)
+    monkeypatch.setattr(rag_loader, "_attempt_git_lfs_pull", lambda: None)
+
+    rag_loader.ensure_vectors(parquet_path)
+    status = rag_loader.get_status()
+    assert status["available"] is True
+    assert "載入完成" in status["message"]

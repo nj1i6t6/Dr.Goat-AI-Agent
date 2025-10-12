@@ -16,6 +16,8 @@ vi.mock('../api', () => ({
     getAllSheep: vi.fn(),
     getDashboardData: vi.fn(),
     getFarmReport: vi.fn(),
+    getAgentStatus: vi.fn(),
+    getAgentTip: vi.fn(),
   }
 }))
 
@@ -126,6 +128,10 @@ describe('DashboardView', () => {
             template: '<div class="el-empty">{{ description }}</div>',
             props: ['description']
           },
+          'el-alert': {
+            template: '<div class="el-alert"><slot /></div>',
+            props: ['title', 'type', 'closable', 'showIcon']
+          },
           'el-tag': {
             template: '<span class="el-tag">{{ $slots.default?.[0]?.children || "" }}</span>',
             props: ['type', 'size', 'effect']
@@ -135,9 +141,10 @@ describe('DashboardView', () => {
     })
 
     settingsStore = useSettingsStore()
-    
+
     // 重置所有 mocks
     vi.clearAllMocks()
+    api.getAgentStatus.mockResolvedValue({ rag_enabled: false, message: '', detail: null })
   })
 
   afterEach(() => {
@@ -161,8 +168,9 @@ describe('DashboardView', () => {
     })
 
     it('當有羊隻時應該顯示儀表板內容', async () => {
-      api.getAllSheep.mockResolvedValue(mockSheepList)
-      api.getDashboardData.mockResolvedValue(mockDashboardData)
+    api.getAllSheep.mockResolvedValue(mockSheepList)
+    api.getDashboardData.mockResolvedValue(mockDashboardData)
+    api.getAgentStatus.mockResolvedValue({ rag_enabled: true, message: 'RAG Ready', detail: 'test' })
       
       await wrapper.vm.fetchInitialData()
       await wrapper.vm.$nextTick()
