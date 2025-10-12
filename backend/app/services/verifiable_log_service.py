@@ -6,6 +6,11 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Set
 
 from sqlalchemy import or_, select
 
+try:
+    from sqlalchemy.orm.session import SessionTransactionOrigin
+except ImportError:  # pragma: no cover - fallback for older SQLAlchemy
+    SessionTransactionOrigin = None
+
 from app import db
 from app.models import ProductBatch, ProcessingStep, SheepEvent, VerifiableLog
 from app.schemas import VerifiableLogEventModel
@@ -56,9 +61,36 @@ def append_event(
         session.flush()
         return entry
 
-    in_transaction = getattr(session, "in_transaction", None)
-    active_transaction = in_transaction() if callable(in_transaction) else None
-    if active_transaction is not None:
+    get_current_session = getattr(session, "__call__", None)
+    if callable(get_current_session):
+        try:
+            current_session = get_current_session()
+        except RuntimeError:
+            current_session = None
+    else:
+        current_session = session
+
+    should_defer_commit = False
+    if current_session is not None:
+        get_transaction = getattr(current_session, "get_transaction", None)
+        current_tx = get_transaction() if callable(get_transaction) else None
+        if current_tx is not None:
+            origin = getattr(current_tx, "origin", None)
+            if SessionTransactionOrigin is not None and origin is not None:
+                should_defer_commit = origin is not SessionTransactionOrigin.AUTOBEGIN
+            else:
+                parent = getattr(current_tx, "parent", None)
+                nested = getattr(current_tx, "nested", False)
+                if parent is not None or nested:
+                    should_defer_commit = True
+                else:
+                    in_transaction = getattr(current_session, "in_transaction", None)
+                    should_defer_commit = callable(in_transaction) and in_transaction()
+        else:
+            in_transaction = getattr(current_session, "in_transaction", None)
+            should_defer_commit = callable(in_transaction) and in_transaction()
+
+    if should_defer_commit:
         return _append()
 
     try:

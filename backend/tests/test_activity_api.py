@@ -89,6 +89,7 @@ def test_activity_logs_reflects_recent_append_event(authenticated_client, app, t
                 },
             },
         )
+        db.session.commit()
 
     response = authenticated_client.get('/api/activity/logs?page=1&page_size=5')
     assert response.status_code == 200
