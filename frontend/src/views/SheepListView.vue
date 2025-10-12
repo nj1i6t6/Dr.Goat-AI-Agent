@@ -5,25 +5,37 @@
       羊群總覽
     </h1>
 
-    <!-- 篩選器元件 -->
-    <SheepFilter @filter="applyFilters" />
+    <EmptyState
+      v-if="showEmptyState"
+      icon="🐑"
+      title="您的牧場還沒有任何羊隻記錄。"
+      message="您可以選擇手動新增第一筆資料，或透過我們提供的 Excel 範本進行批次匯入。"
+    >
+      <el-button type="primary" :icon="Plus" @click="openModal(null)">+ 手動新增羊隻</el-button>
+      <el-button type="success" plain @click="handleBatchImport">🚀 批次匯入資料</el-button>
+    </EmptyState>
 
-    <el-card shadow="never">
-      <div class="table-header">
-        <el-button type="primary" :icon="Plus" @click="openModal(null)">新增羊隻資料</el-button>
-        <div class="list-summary">{{ summaryText }}</div>
-      </div>
-      
-      <!-- 表格元件 -->
-      <SheepTable
-        :sheep-data="filteredSheep"
-        :loading="sheepStore.isLoading"
-        @edit="openModal"
-        @delete="handleDelete"
-        @view-log="openModalWithTab('eventsLogTab', $event)"
-        @consult="navigateToConsultation"
-      />
-    </el-card>
+    <template v-else>
+      <!-- 篩選器元件 -->
+      <SheepFilter @filter="applyFilters" />
+
+      <el-card shadow="never">
+        <div class="table-header">
+          <el-button type="primary" :icon="Plus" @click="openModal(null)">新增羊隻資料</el-button>
+          <div class="list-summary">{{ summaryText }}</div>
+        </div>
+
+        <!-- 表格元件 -->
+        <SheepTable
+          :sheep-data="filteredSheep"
+          :loading="sheepStore.isLoading"
+          @edit="openModal"
+          @delete="handleDelete"
+          @view-log="openModalWithTab('eventsLogTab', $event)"
+          @consult="navigateToConsultation"
+        />
+      </el-card>
+    </template>
 
     <!-- 模態窗元件 -->
     <SheepModal
@@ -48,6 +60,7 @@ import api from '../api';
 import SheepFilter from '../components/sheep/SheepFilter.vue';
 import SheepTable from '../components/sheep/SheepTable.vue';
 import SheepModal from '../components/sheep/SheepModal.vue';
+import EmptyState from '../components/common/EmptyState.vue';
 
 const router = useRouter();
 const sheepStore = useSheepStore();
@@ -58,6 +71,7 @@ const filteredSheep = ref([]);
 const isModalVisible = ref(false);
 const editingEarNum = ref(null);
 const initialTab = ref('basicInfoTab');
+const showEmptyState = computed(() => !sheepStore.isLoading && sheepStore.sheepList.length === 0);
 
 const summaryText = computed(() => `共 ${sheepStore.sheepList.length} 隻，顯示 ${filteredSheep.value.length} 隻`);
 
@@ -133,6 +147,10 @@ const handleDelete = async (earNum) => {
 
 const navigateToConsultation = (earNum) => {
   router.push({ name: 'Consultation', query: { earNum } });
+};
+
+const handleBatchImport = () => {
+  ElMessage.info('批次匯入功能將引導您使用 Excel 範本，敬請期待。');
 };
 
 onMounted(async () => {

@@ -21,36 +21,45 @@
         </div>
       </template>
 
-      <el-table :data="traceStore.sortedBatches" stripe style="width: 100%">
-        <el-table-column prop="batch_number" label="批次號" width="160" />
-        <el-table-column prop="product_name" label="產品名稱" min-width="200" />
-        <el-table-column label="生產日期" width="140">
-          <template #default="scope">
-            {{ formatDate(scope.row.production_date) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="公開狀態" width="110">
-          <template #default="scope">
-            <el-tag :type="scope.row.is_public ? 'success' : 'info'">
-              {{ scope.row.is_public ? '公開中' : '僅內部' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="建立時間" width="160">
-          <template #default="scope">
-            {{ formatDateTime(scope.row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column fixed="right" label="操作" width="240">
-          <template #default="scope">
-            <el-button type="primary" link @click="openDrawer(scope.row)">查看 / 編輯</el-button>
-            <el-button type="success" link @click="copyPublicLink(scope.row)">複製公開連結</el-button>
-            <el-button type="danger" link @click="confirmDelete(scope.row)">刪除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <el-empty v-if="!traceStore.sortedBatches.length && !traceStore.isLoading" description="尚未建立產品批次" />
+      <template v-if="showEmptyState">
+        <EmptyState
+          icon="📦"
+          title="尚未建立任何產品批次。"
+          message="在這裡您可以為您的產品建立可追溯的履歷，提升品牌價值。"
+        >
+          <el-button type="primary" :icon="Plus" @click="openCreateForm">+ 建立第一個產品批次</el-button>
+        </EmptyState>
+      </template>
+      <template v-else>
+        <el-table :data="traceStore.sortedBatches" stripe style="width: 100%">
+          <el-table-column prop="batch_number" label="批次號" width="160" />
+          <el-table-column prop="product_name" label="產品名稱" min-width="200" />
+          <el-table-column label="生產日期" width="140">
+            <template #default="scope">
+              {{ formatDate(scope.row.production_date) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="公開狀態" width="110">
+            <template #default="scope">
+              <el-tag :type="scope.row.is_public ? 'success' : 'info'">
+                {{ scope.row.is_public ? '公開中' : '僅內部' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="建立時間" width="160">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column fixed="right" label="操作" width="240">
+            <template #default="scope">
+              <el-button type="primary" link @click="openDrawer(scope.row)">查看 / 編輯</el-button>
+              <el-button type="success" link @click="copyPublicLink(scope.row)">複製公開連結</el-button>
+              <el-button type="danger" link @click="confirmDelete(scope.row)">刪除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
     </el-card>
 
     <!-- 建立批次表單 -->
@@ -297,6 +306,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import { useTraceabilityStore } from '../stores/traceability';
 import { useSheepStore } from '../stores/sheep';
+import EmptyState from '../components/common/EmptyState.vue';
 
 const traceStore = useTraceabilityStore();
 const sheepStore = useSheepStore();
@@ -343,6 +353,7 @@ const stepForm = reactive({
 const sheepDialogVisible = ref(false);
 const selectedSheepIds = ref([]);
 const sheepLinkDraft = ref([]);
+const showEmptyState = computed(() => !traceStore.sortedBatches.length && !traceStore.isLoading);
 
 const drawerTitle = computed(() => {
   if (!currentBatch.value) return '批次詳情';
