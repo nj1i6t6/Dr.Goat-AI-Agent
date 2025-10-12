@@ -178,7 +178,6 @@ async function fetchInitialData() {
 }
 
 async function fetchDashboardContent() {
-  settingsStore.refreshRagStatus();
   settingsStore.fetchAndSetAgentTip();
   fetchDashboardData();
 }
