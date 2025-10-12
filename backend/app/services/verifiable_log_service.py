@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set
 
 from sqlalchemy import or_, select
+from sqlalchemy.orm.session import SessionTransactionOrigin
 
 from app import db
 from app.models import ProductBatch, ProcessingStep, SheepEvent, VerifiableLog
@@ -29,7 +30,8 @@ def append_event(
     payload = event_model.model_dump()
     payload["metadata"] = normalise_json_payload(payload.get("metadata") or {})
 
-    session = db.session
+    scoped_session = db.session
+    session = scoped_session() if callable(scoped_session) else scoped_session
 
     def _append() -> VerifiableLog:
         previous_entry = _lock_current_tail()
@@ -52,21 +54,22 @@ def append_event(
             previous_hash=previous_hash,
             current_hash=current_hash,
         )
-        session.add(entry)
-        session.flush()
+        scoped_session.add(entry)
+        scoped_session.flush()
         return entry
 
-    active_session = getattr(session, "_proxied", session)
+    tx = session.get_transaction()
+    manage_commit = tx is None or tx.origin is SessionTransactionOrigin.AUTOBEGIN
 
-    transaction = getattr(active_session, "_transaction", None)
-    if transaction is not None and getattr(transaction, "_parent", None) is not None:
-        return _append()
+    entry = _append()
+
+    if not manage_commit:
+        return entry
 
     try:
-        entry = _append()
-        session.commit()
+        scoped_session.commit()
     except Exception:
-        session.rollback()
+        scoped_session.rollback()
         raise
 
     return entry

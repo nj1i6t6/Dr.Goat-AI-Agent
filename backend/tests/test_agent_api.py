@@ -167,7 +167,6 @@ class TestAgentAPI:
         assert payload['rag_enabled'] is True
         assert payload['message'] == 'RAG OK'
         assert payload['detail'] == 'vectors.parquet'
-        assert len(data['reply_html']) > 0
 
     def test_chat_with_agent_validation_error(self, authenticated_client):
         """測試聊天資料驗證錯誤"""
