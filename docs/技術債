@@ -1,0 +1,19 @@
+真的有的問題
+版本 1｜重大：根目錄 .env 預設填入 POSTGRES_* 值並把 POSTGRES_HOST 設為 db，create_app() 只要偵測到這些變數就建立 PostgreSQL URI（__init__.py），若未啟動容器內的資料庫，應用在啟動階段就會連線失敗，確實缺少自動回退或明確指引。
+版本 1｜嚴重：/api/data/process_import 在匯入「基礎資料」後立即 db.session.commit()，後續步驟若出錯即便 rollback() 也無法回溯已寫入資料（data_management.py 第 198 行附近），會留下不一致狀態。
+版本 1｜普通：同一匯入流程成功後沒有呼叫 clear_dashboard_cache，與羊隻/事件 API 的行為不一致，使用者得等 TTL 才看到新統計。
+版本 1＋2｜建議：我們實際跑了 npm run build，Vite 警告主 chunk 分別達 ~1.0 MB 與 1.15 MB（dist/assets/index-BGiGSUnG.js、PredictionView-BgmYYAHv.js），提示需要拆分或調整 chunkSizeWarningLimit，此警告確實存在。
+版本 2｜重大：直接執行 pytest tests/test_agent_api.py -q 會在收集階段噴出 ModuleNotFoundError: No module named 'app'（實測輸出如上），必須改用 python -m pytest ... 或手動調整 PYTHONPATH 才能運作，與回報相符。
+版本 2｜嚴重：settings.js 的 fetchAndSetAgentTip 在呼叫失敗時仍把 agentTip.loaded 設為 true，setApiKey 又不會重置，導致修正金鑰後仍無法重新抓資料。
+版本 2｜普通：create_app() 仍呼叫 db.engine.execute(...) 來探測資料表，SQLAlchemy 2 已移除 Engine.execute，現在每次啟動都會丟 AttributeError 再落入 db.create_all()，產生誤導訊息。
+版本 3｜嚴重：/api/sheep/events/<id> 的更新端點對 request.get_json() 的回傳值未做空值檢查，data 可能是 None，進一步 data.get(...) 會丟 AttributeError 變成 500。
+版本 3｜嚴重：與版本 2 相同，pytest 直接執行無法匯入 app，需要特別處理路徑。
+版本 3｜普通：Excel 上傳只接受小寫 .xlsx / .xls，endswith() 判斷大小寫敏感，像 .XLSX 會被拒絕。
+版本 4｜嚴重：create_app() 在資料庫檢查時對任何例外都直接呼叫 db.create_all() 並吞掉錯誤，若真正是連線失敗會被靜默忽略，既無法準確告警也可能在未備妥的資料庫上動手建表。
+版本 4｜普通：/api/auth/login 仍保留大量 print 除錯訊息（例如 Login attempt for user: ...），在正式環境會污染日誌與洩漏資訊。
+其它純建議（例如導入改成背景作業、SimpleQueue 換成持久化佇列、Gemini 逾時/安全策略等）屬於長期優化方向，現階段沒有證據顯示是立即性缺陷。
+執行紀錄與觀察
+已在 frontend 執行 npm install 與 npm run build，重現 chunk 過大警告。
+安裝後端套件並以 python -m pytest tests/test_agent_api.py -q 驗證：切換到模組模式後 18 項測試全數通過，證實問題來自匯入路徑設定而非測試內容。
+結論
+四份回報中多數關於資料匯入、環境預設與測試路徑的指控都屬實；db.engine.execute 結合錯誤處理的設計同時造成了版本 2 的啟動誤導與版本 4 所說的靜默掩蓋。相對地，版本 3 所稱的「啟動即崩潰」並不精準。建議優先處理表單匯入交易、自動快取清除、測試路徑設定與資料庫初始流程，後續再評估前端 chunk 拆分與 Gemini 呼叫策略等優化事項。
