@@ -143,7 +143,7 @@ graph TB
 
 ## 4. 前端應用 (Vue 3)
 
-- **技術**：Vue 3 `<script setup>`、Vite、Pinia、Element Plus、Axios、Chart.js、ECharts。
+- **技術**：Vue 3、Vite、Pinia、Element Plus、Axios、Chart.js、ECharts。
 - **路由**：`src/router/index.js` 包含 Dashboard、Nutrition & ESG Guidance（營養與ESG建議）、Dr.Goat Q&A（羊博士問答）、Sheep Management（羊群管理）、Prediction、Data Analytics Center（數據分析中心）、IoT、Traceability、Data Management、Settings 等需登入路由，以及 `/login`、`/trace/:batchNumber` 公開頁面。
 - **狀態管理**：`src/stores/` 依功能拆分（auth、sheep、consultation、chat、prediction、analytics、iot、traceability、settings），皆附 Vitest 覆蓋。
 - **API 層**：`src/api/index.js` 統一錯誤處理、Gemini Header 注入、Multipart 上傳。
