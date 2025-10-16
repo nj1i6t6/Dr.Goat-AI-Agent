@@ -53,6 +53,19 @@ class TestAuthAPI:
         assert 'user' in data
         assert data['user']['username'] == 'testuser'
 
+    def test_login_when_already_authenticated(self, authenticated_client):
+        """測試已登入用戶再次請求登入時仍返回用戶資訊"""
+        response = authenticated_client.post('/api/auth/login', json={
+            'username': 'testuser',
+            'password': 'testpass'
+        })
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['success'] is True
+        assert 'user' in data
+        assert data['user']['username'] == 'testuser'
+
     def test_login_invalid_credentials(self, client, test_user):
         """測試無效憑證登錄"""
         login_data = {

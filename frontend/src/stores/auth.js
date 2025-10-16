@@ -32,10 +32,25 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = await api.login(credentials);
       if (response.success) {
-        // 登入成功，更新 user 狀態
-        user.value = response.user;
-        // 將用戶資訊存儲到 localStorage，以便刷新頁面後保持登入狀態
-        localStorage.setItem('user', JSON.stringify(response.user));
+        // 後端應回傳用戶資訊，但在舊 session 下可能缺失—這裡做回補，避免寫入 'undefined'
+        let resolvedUser = response.user ?? null;
+        if (!resolvedUser) {
+          try {
+            const status = await api.getAuthStatus();
+            if (status?.logged_in && status.user) {
+              resolvedUser = status.user;
+            }
+          } catch (statusError) {
+            console.warn('登入成功但補抓用戶資訊失敗:', statusError);
+          }
+        }
+
+        if (!resolvedUser) {
+          console.warn('登入成功但未取得用戶資訊，跳過本地持久化。');
+        } else {
+          user.value = resolvedUser;
+          localStorage.setItem('user', JSON.stringify(resolvedUser));
+        }
         // 登入成功後跳轉到儀表板頁面 - 使用動態導入避免循環依賴
         const { default: router } = await import('../router')
         await router.push({ name: 'Dashboard' });

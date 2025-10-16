@@ -78,7 +78,11 @@ def register():
 def login():
     try:
         if current_user.is_authenticated:
-            return jsonify(success=True, message='用戶已登入')
+            return jsonify(
+                success=True,
+                message='用戶已登入',
+                user={'username': current_user.username}
+            )
 
         data = request.get_json()
         if not data:
