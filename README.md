@@ -1,4 +1,4 @@
-# 領頭羊博士（Goat Nutrition App）
+# 領頭羊博士(Dr.Goat AI Agent)
 
 [中文 (README)](/README.md) | [English (Docs)](/docs/README.en.md)
 
