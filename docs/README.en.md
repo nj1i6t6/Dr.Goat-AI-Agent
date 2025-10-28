@@ -1,4 +1,4 @@
-# Goat Nutrition App – Comprehensive Guide
+# Dr.Goat AI Agent – Comprehensive Guide
 
 [中文 (README)](/README.md) | [English (Docs)](/docs/README.en.md)
 
